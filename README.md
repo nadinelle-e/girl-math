@@ -126,6 +126,39 @@ sich die App.
 
 ## Was dich trägt
 
+**Wohlstand, der in mein Leben fließt.** Eine eigene Karte über den Affirmationen,
+und die einzige Sammlung in der App, die nichts bewertet. Hier notierst du alles,
+was zu dir gekommen ist, ohne dass du etwas dafür getan hast: Geld, das dir jemand
+zugesteckt hat, Blumen, die dir jemand mitgebracht hat, eine Einladung zum Essen,
+zwei Euro auf der Straße, eine Spende am Flohmarktstand.
+
+Die Grenze läuft bei **es gab keinen Anlass**. Ein Geburtstagsgeschenk gehört nicht
+hierher, ein Gehalt auch nicht, und Geld für einen Gefallen erst recht nicht. Es
+geht um das, was einfach so passiert und das man am nächsten Tag schon wieder
+vergessen hat.
+
+Oben stehen zwei Zahlen gleich groß nebeneinander: **wie viel** dir in diesem Monat
+zugeflossen ist und **wie oft** jemand an dich gedacht hat. Beides zählt gleich viel,
+denn Blumen haben kein Preisschild. Deshalb ist der Wert beim Eintragen auch optional —
+schätz ihn, oder lass ihn leer, der Moment zählt trotzdem. Hat in einem Monat nichts
+einen Wert bekommen, verschwindet der Euro-Betrag ganz, statt „0 €" zu behaupten.
+
+Unten in der Karte steht die **Jahresauswertung**, eine Zeile pro Jahr, das neueste
+zuerst. Das ist die Zahl, die staunen lässt: Zwanzig Euro hier, ein Essen dort, das
+sieht einzeln nach nichts aus und steht am Jahresende dreistellig da. Das laufende
+Jahr ist als „bisher" gekennzeichnet, damit es sich nicht mit einem vollen Vorjahr
+vergleicht.
+
+Die Jahreszahlen entstehen aus dem Archiv, füllen sich also mit jedem **Monat, den du
+abschließt**. Ein Monat, in dem noch nichts steht, zeigt oben keine große Null, sondern
+einen Satz — die Jahresauswertung darunter trägt die Karte dann.
+
+Wichtig, damit keine Verwirrung aufkommt: **Diese Karte rechnet nirgendwo mit.**
+Kein Cent von hier geht in deine Einnahmen, in deinen Kontostand, in die Prozente
+oder in ein Ziel. Deshalb darf dasselbe Geld auch oben bei den Einnahmen stehen,
+wenn es wirklich auf dein Konto gekommen ist. Hier unten ist es kein Geld, sondern
+ein Moment.
+
 **Affirmationen.** Ganz unten steht ein Satz, der nichts von dir will: keine
 Prozente, kein Vergleich, kein Urteil. Er wechselt einmal am Tag von allein, und
 über **nächster Satz ↻** blätterst du weiter, wenn du mehr willst. Am nächsten Tag

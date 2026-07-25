@@ -245,7 +245,10 @@ with sync_playwright() as p:
     k = page.locator('details[data-kat="luxus"]')
     pruefe("acht Klappkarten", page.locator("details[data-kat]").count(), 8)
     pruefe("standardmaessig offen", k.get_attribute("open") is not None, True)
-    pruefe("Anzahl im Kopf", k.locator(".karte-anzahl").inner_text(), "1 Posten")
+    # „Posten" ist Buchhalter-Sprache und steht nirgends mehr in der Oberflaeche.
+    pruefe("Anzahl im Kopf", k.locator(".karte-anzahl").inner_text(), "1 Eintrag")
+    pruefe("das Wort Posten kommt nirgends vor",
+           "Posten" in page.locator(".wrap").inner_text(), False)
     k.locator("summary").click()
     pruefe("zugeklappt", k.get_attribute("open") is None, True)
     pruefe("Summe bleibt sichtbar", k.locator(".karte-summe").is_visible(), True)
@@ -647,7 +650,23 @@ with sync_playwright() as p:
     pruefe("und die Haekchen sind weg",
            page.locator(f'{karte("sparen")} .schalter').count(), 0)
 
-    print("\n=== 28. Sparziel: alte Staende und der Monatswechsel ===")
+    print("\n=== 28. Jedes Haekchen startet leer ===")
+    neu_starten(page)
+    # Kein Haekchen setzt sich von allein — weder im Formular noch am neuen Posten.
+    for kat in ("income", "abos", "versicherungen"):
+        pruefe(f"{kat}: Formular-Haekchen leer",
+               page.locator(f'form[data-add="{kat}"] [data-add-schalter]').is_checked(), False)
+        add(page, kat, "Testposten", 100)
+        pruefe(f"{kat}: neuer Posten ohne Haken",
+               page.locator(f'{karte(kat)} .posten input[type="checkbox"]').is_checked(), False)
+
+    # Ohne Haken kein Arbeitseinkommen: die App rechnet keinen Stundenlohn,
+    # statt einen zu erfinden, den niemand bestaetigt hat.
+    pruefe("kein Stundenlohn ohne Haken", page.locator("#wochenstunden").count(), 0)
+    page.locator(f'{karte("income")} .posten input[type="checkbox"]').click()
+    pruefe("nach dem Antippen rechnet sie ihn", page.locator("#wochenstunden").count(), 1)
+
+    print("\n=== 29. Sparziel: alte Staende und der Monatswechsel ===")
     neu_starten(page)
     # Ein Stand aus der Zeit vor dem Sparziel: kennt weder das Feld noch die
     # getrennten Summen im Archiv. Er darf weder abstuerzen noch Puffer verlieren.
@@ -686,6 +705,222 @@ with sync_playwright() as p:
            norm(page.locator(".notgroschen-ist").inner_text()), "250,00 €")
     pruefe("Archiv haelt beide Summen getrennt",
            page.evaluate("STATE.archive[0].summary.gespartZiel"), 150)
+
+    print("\n=== 30. Wohlstand, der in mein Leben fliesst ===")
+
+    def zufluss_add(page, was, wert=None):
+        """Traegt einen zugeflossenen Moment ueber das Formular ein."""
+        page.locator("[data-zufluss-label]").fill(was)
+        page.locator("[data-zufluss-amount]").fill("" if wert is None else str(wert))
+        page.locator(".zufluss-form button[type=submit]").click()
+
+    neu_starten(page)
+    pruefe("Karte ist von Anfang an da", page.locator(".zufluss-karte").count(), 1)
+    pruefe("aber ohne Nullwert", page.locator(".zufluss-gross").count(), 0)
+    pruefe("stattdessen eine Einladung", page.locator(".zufluss-leer").count(), 1)
+
+    # Ein Moment MIT Wert und einer OHNE. Beide zaehlen, nur einer hat einen Preis.
+    zufluss_add(page, "Oma hat mir was zugesteckt", 20)
+    zufluss_add(page, "Blumen von Nadja")
+    pruefe("beide Momente stehen in der Liste", page.locator(".zufluss-eintrag").count(), 2)
+    pruefe("nur einer zeigt einen Betrag", page.locator(".zufluss-wert").count(), 1)
+    zahlen = page.locator(".zufluss-gross").all_inner_texts()
+    pruefe("Summe und Anzahl des Monats stehen nebeneinander",
+           [norm(t) for t in zahlen], ["20,00 €", "2 ×"])
+    # .lower(), weil styles.css die Beschriftung in Grossbuchstaben setzt
+    # und inner_text() den GERENDERTEN Text zurueckgibt.
+    pruefe("die Summe traegt den Monatsnamen",
+           "zugeflossen" in page.locator(".zufluss-klein").first.inner_text().lower(), True)
+    pruefe("im ersten Monat noch keine Jahresauswertung",
+           page.locator(".zufluss-jahre").count(), 0)
+
+    # Das Kernversprechen: Diese Karte fasst KEINE Zahl der grossen Rechnung an.
+    add(page, "income", "Gehalt", 1000, haken=True)
+    add(page, "fixkosten", "Miete", 500)
+    vorher = page.evaluate("(() => { const z = rechne(STATE.currentMonth);"
+                           "  return [z.gehalt, z.kontostand, z.quoteNicht, z.quoteSpar]; })()")
+    zufluss_add(page, "50 Euro auf der Strasse gefunden", 50)
+    nachher = page.evaluate("(() => { const z = rechne(STATE.currentMonth);"
+                            "  return [z.gehalt, z.kontostand, z.quoteNicht, z.quoteSpar]; })()")
+    pruefe("Gehalt, Kontostand und Quoten bleiben unberuehrt", nachher, vorher)
+    pruefe("Gehalt ist wirklich nur das Einkommen", page.evaluate("rechne(STATE.currentMonth).gehalt"), 1000)
+
+    # Ohne Bezeichnung geht nichts rein: „20 €" allein erinnert an nichts.
+    zufluss_add(page, "", 99)
+    pruefe("namenloser Eintrag wird abgelehnt", page.locator(".zufluss-eintrag").count(), 3)
+
+    # Der Bericht nennt die Momente beim Namen, auch die ohne Preisschild.
+    page.click("#btn-bericht")
+    bericht = page.locator("#bericht").inner_text()
+    pruefe("Bericht listet die Momente", "Oma hat mir was zugesteckt" in bericht, True)
+    pruefe("und schreibt bei den unbezifferten „ohne Preis“", "ohne Preis" in bericht, True)
+
+    # Loeschen laeuft ueber denselben Weg wie bei den Posten.
+    page.locator(".zufluss-eintrag", has_text="Blumen von Nadja").locator(".del").click()
+    pruefe("geloescht", page.locator(".zufluss-eintrag").count(), 2)
+    pruefe("und die Anzahl zaehlt runter",
+           norm(page.locator(".zufluss-gross").nth(1).inner_text()), "2 ×")
+
+    # Monatswechsel: Die Momente bleiben im alten Monat, das Jahr zaehlt weiter.
+    page.click("#btn-monat-abschliessen")
+    pruefe("neuer Monat startet ohne Momente",
+           page.evaluate("STATE.currentMonth.zufluesse.length"), 0)
+    pruefe("Archiv haelt die Summe fest",
+           page.evaluate("STATE.archive[0].summary.zuflussSumme"), 70)
+    pruefe("und die Anzahl",
+           page.evaluate("STATE.archive[0].summary.zuflussAnzahl"), 2)
+    pruefe("der leere Monat zeigt keine grosse Null",
+           page.locator(".zufluss-gross").count(), 0)
+    pruefe("sondern sagt es in einem Satz",
+           "noch nichts" in page.locator(".zufluss-monat-leer").inner_text(), True)
+
+    # Jetzt traegt die Jahresauswertung die Karte.
+    pruefe("Jahresauswertung erscheint", page.locator(".zufluss-jahre").count(), 1)
+    pruefe("mit einer Zeile fuers laufende Jahr", page.locator(".zufluss-jahr").count(), 1)
+    pruefe("Jahressumme stimmt",
+           norm(page.locator(".zufluss-jahr-wert").inner_text()), "70,00 €")
+    pruefe("Jahres-Anzahl stimmt", page.locator(".zufluss-jahr-mal").inner_text(), "2 Mal")
+    pruefe("das laufende Jahr ist als „bisher“ gekennzeichnet",
+           "bisher" in page.locator(".zufluss-jahr-name").inner_text(), True)
+
+    zufluss_add(page, "Kaffee ausgegeben bekommen", 4)
+    zahlen = page.locator(".zufluss-gross").all_inner_texts()
+    pruefe("der neue Monat zaehlt bei null wieder los",
+           [norm(t) for t in zahlen], ["4,00 €", "1 ×"])
+    pruefe("das Jahr zaehlt dazu",
+           norm(page.locator(".zufluss-jahr-wert").inner_text()), "74,00 €")
+    pruefe("und zwar in Momenten", page.locator(".zufluss-jahr-mal").inner_text(), "3 Mal")
+
+    # Ein Jahreswechsel: jedes Jahr bekommt eine eigene Zeile, neuestes zuerst.
+    page.evaluate("""
+      STATE.archive.push({ id: "2025-11", summary: { zuflussSumme: 1240, zuflussAnzahl: 87 },
+                           snapshot: { id: "2025-11" } });
+      speichern(); render();
+    """)
+    pruefe("zwei Jahre, zwei Zeilen", page.locator(".zufluss-jahr").count(), 2)
+    namen = [t.split()[0] for t in page.locator(".zufluss-jahr-name").all_inner_texts()]
+    pruefe("neuestes Jahr zuerst", namen, ["2026", "2025"])
+    werte = [norm(t) for t in page.locator(".zufluss-jahr-wert").all_inner_texts()]
+    pruefe("jedes Jahr mit seiner eigenen Summe", werte, ["74,00 €", "1.240,00 €"])
+    pruefe("das abgeschlossene Jahr ohne „bisher“",
+           "bisher" in page.locator(".zufluss-jahr-name").nth(1).inner_text(), False)
+
+    # Der Bericht traegt dieselbe Jahresauswertung.
+    page.click("#btn-bericht")
+    bericht = page.locator("#bericht").inner_text()
+    pruefe("Bericht nennt die Jahresauswertung", "Jahresauswertung" in bericht, True)
+    pruefe("und das abgeschlossene Jahr darin", "87 Mal" in bericht, True)
+
+    # Momente ganz ohne Wert: dann verschwindet der Euro-Betrag, die Anzahl bleibt.
+    neu_starten(page)
+    zufluss_add(page, "Blumen")
+    zufluss_add(page, "Zum Essen eingeladen")
+    zahlen = page.locator(".zufluss-gross").all_inner_texts()
+    pruefe("ohne Werte keine Null-Summe", [norm(t) for t in zahlen], ["2 ×"])
+
+    # Ein Stand aus der Zeit vor dieser Karte darf weder abstuerzen noch etwas erfinden.
+    page.evaluate("""
+      localStorage.setItem("girlmath.v1", JSON.stringify({
+        version: 3,
+        einstellungen: { wochenstunden: 40 },
+        currentMonth: { id: "2026-05", startBalance: 100, income: [{ label: "Gehalt", amount: 900 }] },
+        archive: [{ id: "2026-04", summary: { gehalt: 900, quoteNicht: 10 }, snapshot: { id: "2026-04" } }],
+        onboardingGesehen: true
+      }));
+    """)
+    page.reload()
+    pruefe("alter Stand laedt", page.evaluate("STATE.currentMonth.income.length"), 1)
+    pruefe("und bekommt eine leere Liste", page.evaluate("STATE.currentMonth.zufluesse.length"), 0)
+    pruefe("Archiv ohne die Felder ergibt keine Jahreszeile",
+           page.evaluate("zuflussJahre().length"), 0)
+    pruefe("die Karte zeigt wieder die Einladung", page.locator(".zufluss-leer").count(), 1)
+
+    print("\n=== 32. Einzahl und Mehrzahl: die Falle ist immer die 1 ===")
+    neu_starten(page)
+    page.evaluate("""() => {
+      STATE.currentMonth.income = [{id:"i",label:"Gehalt",amount:2000,gearbeitet:true}];
+      STATE.currentMonth.fixkosten = [{id:"f",label:"Miete",amount:800,rhythmus:"monatlich",faellig:7}];
+      STATE.currentMonth.abos = [{id:"a",label:"Netflix",amount:20,notwendig:false,rhythmus:"monatlich",faellig:7}];
+      STATE.currentMonth.luxus = [{id:"l",label:"Sushi",amount:30}];
+      speichern(); render();
+    }""")
+    pruefe("ein Eintrag, keine Einträge",
+           page.locator(f'{karte("luxus")} .karte-anzahl').inner_text(), "1 Eintrag")
+    pruefe("ein Vertrag, keine Verträge",
+           "für einen Vertrag, den du" in norm(page.locator(".vertrag-fazit").inner_text()), True)
+
+    # Rangliste zeigt drei Plaetze, der Rest wird gezaehlt.
+    for anzahl, erwartet in ((4, "… und eine weitere."), (5, "… und 2 weitere.")):
+        page.evaluate(f"""() => {{
+          STATE.currentMonth.abos = [];
+          STATE.currentMonth.luxus = Array.from({{length:{anzahl}}}, (_, i) =>
+            ({{ id:"x"+i, label:"Sache"+i, amount: 50 - i }}));
+          speichern(); render();
+        }}""")
+        pruefe(f"Rest bei {anzahl} Ausnahmen", page.locator(".rang-rest").inner_text(), erwartet)
+
+    # Beim Sofort-Einwurf zaehlt die App mit, auch da lauert die 1.
+    pruefe("eine Ausnahme im Einwurf",
+           page.evaluate('ZAEHL_SPRUECHE[1](1, {label:"Sushi", amount:18})'),
+           "Notiert. Sushi, 18,00 €. Macht 1 Ausnahme bisher. Kein Kommentar.")
+    pruefe("mehrere Ausnahmen im Einwurf",
+           page.evaluate('ZAEHL_SPRUECHE[3](4, {label:"Sushi", amount:18})'),
+           "4 Ausnahmen. Du weißt, dass ich das aufschreibe, ja?")
+
+    # Und im Sparziel: ein Monat gegen mehrere.
+    pruefe("ein Monat spaeter",
+           page.evaluate("""zielMassstab(100, {aktiv:true, geschafft:false, rate:100,
+                             betrag:2000, label:"Lissabon"})"""),
+           "1 Monat später: Lissabon")
+    pruefe("mehrere Monate spaeter",
+           page.evaluate("""zielMassstab(300, {aktiv:true, geschafft:false, rate:100,
+                             betrag:2000, label:"Lissabon"})"""),
+           "3 Monate später: Lissabon")
+
+    print("\n=== 33. Der Vergleich bleibt deutsch, egal wie die Rechnung heisst ===")
+    # Du tippst den Namen selbst ein, und deutsche Grammatik haengt am
+    # Geschlecht des Wortes: „28% deiner Miete" stimmt, „28% deiner Strom" nicht.
+    grammatik = page.evaluate("""() => {
+      const proben = ["Miete", "Wohnung", "Strom", "Kredit", "Auto", "Leasing Nr. 2"];
+      return proben.map(n => n + " -> " + mietenText(220, { label: n, betrag: 780 }));
+    }""")
+    for zeile in grammatik:
+        print("   ", zeile)
+    pruefe("bekannte weibliche Namen kurz",
+           page.evaluate('mietenText(220, {label:"Miete", betrag:780})'), "28% deiner Miete")
+    pruefe("alles andere ueber „Rechnung fuer“",
+           page.evaluate('mietenText(220, {label:"Strom", betrag:780})'),
+           "28% deiner Rechnung für Strom")
+    pruefe("auch beim Vielfachen",
+           page.evaluate('mietenText(900, {label:"Auto", betrag:780})'),
+           "1,2× deine Rechnung für Auto")
+    # Der „zweite Miete"-Spruch braucht ein weibliches Wort und faellt sonst aus.
+    pruefe("Spruch faellt aus, wenn er nicht passt",
+           page.evaluate("""VERDIKTE[2].sprueche[2]({
+             fix: { label: "Strom", betrag: 780 }, summe: 560 })"""), False)
+
+    print("\n=== 34. Banner sagt denselben Vergleich nur einmal ===")
+    # Sprueche bekommen dieselben Zahlen wie die Zeile darunter. Nennt ein Spruch
+    # den Massstab schon, muss die Zeile schweigen — sonst stand da zweimal
+    # "2,0x deine Fixkosten" untereinander.
+    neu_starten(page)
+    add(page, "income", "Buergergeld", 600)     # ohne Haken: kein Arbeitseinkommen
+    add(page, "fixkosten", "Miete", 78)
+    for quote, betrag in (("33%", 200), ("60%", 360)):
+        page.evaluate(f"""
+          STATE.currentMonth.luxus = [{{ id: "x", label: "Sushi", amount: {betrag} }}];
+          speichern();
+        """)
+        doppelt = []
+        for nr in range(1, 13):
+            page.evaluate(f'STATE.currentMonth.id = "2026-{nr:02d}"; render();')
+            banner = page.locator(".verdikt").inner_text()
+            mass = page.evaluate(
+                "(() => { const z = rechne(STATE.currentMonth);"
+                "  return mietenText(z.nichtUmlage, z.notwendige[0]); })()")
+            if mass and banner.count(mass) > 1:
+                doppelt.append(f"Monat {nr}: {mass!r}")
+        pruefe(f"bei {quote} kein doppelter Vergleich", doppelt, [])
 
     browser.close()
 

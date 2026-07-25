@@ -1425,6 +1425,206 @@ body.modal-offen { overflow: hidden; }
 }
 
 /* ============================================================
+   Wohlstand, der in mein Leben fließt
+
+   Die zweite Karte, die nichts bewertet. Sie steht direkt über den
+   Affirmationen und teilt deren Haltung, hat aber ihre eigene Farbe:
+   ein zartes Rosé statt Creme, damit man beim Scrollen merkt, dass
+   hier etwas anderes anfängt.
+
+   Die beiden Zahlen stehen gleich groß nebeneinander. Das ist der
+   ganze Punkt der Karte: Was keinen Preis hat, zählt genauso.
+   ============================================================ */
+.zufluss-karte {
+  background: linear-gradient(160deg, var(--pink-weich), var(--karte) 70%);
+  border: 1px solid var(--linie-zart);
+  text-align: center;
+  padding: 26px 22px 20px;
+}
+
+.zufluss-unter {
+  font-size: 14px;
+  color: var(--braun-weich);
+  margin: 0 auto;
+  max-width: 32em;
+  text-wrap: balance;
+}
+
+/* Der erste Besuch: kein Nullwert, sondern eine Einladung. */
+.zufluss-leer {
+  font-family: Georgia, "Iowan Old Style", "Times New Roman", serif;
+  font-size: 17px;
+  font-style: italic;
+  line-height: 1.5;
+  color: var(--braun);
+  margin: 18px auto 0;
+  max-width: 28em;
+  text-wrap: balance;
+}
+
+/* Die zwei großen Zahlen. Sie MÜSSEN nebeneinander stehen, das ist die
+   ganze Aussage der Karte: Was keinen Preis hat, zählt genauso viel.
+
+   Deshalb bekommt jede Spalte eine feste Obergrenze und die Beschriftung
+   darunter darf umbrechen. Ohne `max-width` schiebt „hat jemand an dich
+   gedacht" die zweite Zahl auf dem Handy unter die erste — und damit sähe
+   die Anzahl aus wie eine Fußnote zur Summe. */
+.zufluss-zahlen {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  gap: 18px;
+  margin: 22px 0 4px;
+}
+
+.zufluss-zahl {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  flex: 1 1 0;
+  max-width: 11em;
+}
+
+.zufluss-gross {
+  font-family: Georgia, "Iowan Old Style", "Times New Roman", serif;
+  font-size: 34px;
+  font-weight: 700;
+  line-height: 1.05;
+  color: var(--pink);
+}
+
+.zufluss-klein {
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.3;            /* damit die Beschriftung sauber umbricht */
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--braun-weich);
+  text-wrap: balance;
+}
+
+/* Ein Monat, in dem noch nichts steht. Bewusst dieselbe Serifenschrift wie
+   die Einladung ganz am Anfang: ein Satz, keine Zahl. */
+.zufluss-monat-leer {
+  font-family: Georgia, "Iowan Old Style", "Times New Roman", serif;
+  font-size: 17px;
+  font-style: italic;
+  color: var(--braun-weich);
+  margin: 20px 0 0;
+}
+
+/* Die Jahresauswertung, unten in der Karte. Sie steht auf eigenem Grund
+   und mit einer Linie darüber, weil sie eine andere Zeitebene ist als
+   alles darüber: nicht dieser Monat, sondern das ganze Jahr. */
+.zufluss-jahre {
+  margin-top: 22px;
+  padding-top: 16px;
+  border-top: 1px solid var(--linie-zart);
+  text-align: left;
+}
+
+.zufluss-jahre-titel {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--braun-weich);
+  margin: 0 0 10px;
+}
+
+/* Drei Spalten: Jahr links, Betrag rechtsbündig, Anzahl dahinter. Die
+   feste Breite der letzten Spalte hält die „Mal"-Angaben untereinander. */
+.zufluss-jahr {
+  display: grid;
+  grid-template-columns: 1fr auto 5.5em;
+  align-items: baseline;
+  gap: 10px;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--linie-zart);
+  font-size: 14px;
+}
+.zufluss-jahr:last-child { border-bottom: none; }
+
+.zufluss-jahr-name {
+  font-weight: 700;
+  color: var(--braun);
+}
+.zufluss-jahr-name small {
+  font-weight: 400;
+  font-size: 11px;
+  color: var(--braun-weich);
+  margin-left: 5px;
+}
+
+.zufluss-jahr-wert {
+  font-weight: 700;
+  color: var(--pink);
+  text-align: right;
+  white-space: nowrap;
+}
+
+.zufluss-jahr-mal {
+  color: var(--braun-weich);
+  text-align: right;
+  white-space: nowrap;
+}
+
+/* Die Momente dieses Monats. Wie bei den Affirmationen: nur lesen und
+   löschen, keine Eingabefelder — es ist ein Notizbuch, kein Formular. */
+.zufluss-liste {
+  list-style: none;
+  margin: 18px 0 0;
+  padding: 0;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.zufluss-eintrag {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--karte);
+  border: 1px solid var(--linie-zart);
+  border-radius: var(--radius-klein);
+  padding: 9px 12px;
+  font-size: 14px;
+}
+
+.zufluss-was  { flex: 1; }
+.zufluss-wert { font-weight: 700; color: var(--pink); white-space: nowrap; }
+.zufluss-eintrag .del { flex: none; }
+
+.zufluss-form {
+  display: flex;
+  gap: 8px;
+  margin-top: 18px;
+}
+
+.zufluss-form input {
+  font-family: inherit;
+  font-size: 15px;
+  color: var(--braun);
+  background: var(--feld);
+  border: 1px solid var(--linie);
+  border-radius: var(--radius-klein);
+  padding: 10px 12px;
+  min-width: 0;               /* sonst sprengt das Textfeld die Zeile */
+}
+.zufluss-form input[data-zufluss-label]  { flex: 1; }
+.zufluss-form input[data-zufluss-amount] { flex: none; width: 5.5em; }
+.zufluss-form input:focus {
+  outline: none;
+  border-color: var(--pink);
+}
+
+@media (max-width: 480px) {
+  .zufluss-gross { font-size: 28px; }
+  .zufluss-karte { padding: 22px 16px 16px; }
+}
+
+/* ============================================================
    Affirmationen
 
    Bewusst anders als alles andere: keine Prozente, keine Balken,

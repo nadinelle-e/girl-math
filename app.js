@@ -50,25 +50,29 @@
 
      hinweis        Ein erklärender Satz unter der Überschrift
    ------------------------------------------------------------ */
-const SCHALTER_NOTWENDIG_AUS = { feld: "notwendig",  text: "notwendig?",       standard: false };
-const SCHALTER_NOTWENDIG_AN  = { feld: "notwendig",  text: "notwendig?",       standard: true  };
-const SCHALTER_GEARBEITET    = { feld: "gearbeitet", text: "dafür gearbeitet?", standard: true  };
+/* JEDES Häkchen startet leer. Ausnahmslos.
 
-/* Der Schalter an den Sparposten entscheidet, WOFÜR du zurücklegst:
-   ohne Häkchen für den Notgroschen, mit Häkchen für dein Sparziel.
+   Der Grund ist Vertrauen in die eigenen Zahlen: Ein Häkchen, das die App
+   von sich aus setzt, verändert die Rechnung, ohne dass du es angetippt
+   hast. Später steht dann eine Zahl da, die man sich nicht erklären kann.
+   Lieber rechnet die App erst, wenn du gesagt hast, was gilt.
 
-   `nurBeiSparziel` blendet ihn aus, solange gar kein Ziel gesetzt ist —
-   ein Häkchen für etwas, das es nicht gibt, wäre nur ein Rätsel. Und die
-   Standard-Stellung ist bewusst „aus": Wer die App schon benutzt hat, hat
-   bisher für den Notgroschen gespart, und genau dort bleibt das Geld auch. */
-const SCHALTER_FUERS_ZIEL    = { feld: "fuersZiel", text: "fürs Sparziel?",   standard: false, nurBeiSparziel: true };
+   Deshalb gibt es hier auch keine Standard-Stellung mehr: leer ist die
+   einzige. Was du früher schon angehakt hast, bleibt angehakt — das rührt
+   dieser Wechsel nicht an. */
+const SCHALTER_NOTWENDIG  = { feld: "notwendig",  text: "notwendig?" };
+const SCHALTER_GEARBEITET = { feld: "gearbeitet", text: "dafür gearbeitet?" };
+
+/* `nurBeiSparziel` blendet dieses eine Häkchen aus, solange gar kein Ziel
+   gesetzt ist. Eine Frage nach etwas, das es nicht gibt, wäre nur ein Rätsel. */
+const SCHALTER_FUERS_ZIEL = { feld: "fuersZiel", text: "fürs Sparziel?", nurBeiSparziel: true };
 
 const KATEGORIEN = [
-  { key: "income",         titel: "1 · Einnahmen 💰",              typ: "positiv",   zeitfeld: true, schalter: SCHALTER_GEARBEITET, platzhalter: "z.B. Gehalt",
-    hinweis: "Alles, was reinkommt: Gehalt, Bürgergeld, Kindergeld, Unterhalt, Geschenke, Flohmarkt." },
+  { key: "income",         titel: "1 · Einnahmen 💰",              typ: "positiv",   zeitfeld: true, schalter: SCHALTER_GEARBEITET, altHaken: true, platzhalter: "z.B. Gehalt",
+    hinweis: "Auch Bürgergeld, Unterhalt, Kindergeld oder Geschenke." },
   { key: "fixkosten",      titel: "2 · Fixkosten 🏠",              typ: "notwendig", wiederkehrend: true, platzhalter: "z.B. Miete" },
-  { key: "abos",           titel: "3 · Abos 📺",                   typ: "abo",       wiederkehrend: true, schalter: SCHALTER_NOTWENDIG_AUS, vertrag: true, platzhalter: "z.B. Netflix" },
-  { key: "versicherungen", titel: "4 · Versicherungen 🛡️",         typ: "abo",       wiederkehrend: true, schalter: SCHALTER_NOTWENDIG_AN,  vertrag: true, platzhalter: "z.B. Haftpflicht" },
+  { key: "abos",           titel: "3 · Abos 📺",                   typ: "abo",       wiederkehrend: true, schalter: SCHALTER_NOTWENDIG, vertrag: true, platzhalter: "z.B. Netflix" },
+  { key: "versicherungen", titel: "4 · Versicherungen 🛡️",         typ: "abo",       wiederkehrend: true, schalter: SCHALTER_NOTWENDIG, altHaken: true, vertrag: true, platzhalter: "z.B. Haftpflicht" },
   { key: "lebensmittel",   titel: "5 · Einkauf: Lebensmittel 🥑", typ: "notwendig", platzhalter: "z.B. Wocheneinkauf" },
   { key: "luxus",          titel: "6 · Einkauf: Ausnahmen 🍣",    typ: "nicht",     platzhalter: "z.B. Sushi" },
   { key: "konsum",         titel: "7 · Große Ausnahmen 🛍️",        typ: "nicht",     platzhalter: "z.B. Klamotten" },
@@ -150,20 +154,37 @@ const REGEL = {
    deine echten Zahlen (siehe `spruchDaten` weiter unten) und darf
    sie beim Namen nennen.
 
-   Die Regel dabei, und sie ist die wichtigste in dieser Datei:
-   DIE ZAHL IST DIE MUNITION, NICHT DIE POINTE.
+   DER TON: trocken, sarkastisch, schadenfroh. Drei Regeln, und jede
+   davon ist wichtiger als ein guter Einfall.
 
-   "624 € für Klamotten, dafür hast du 45 h gearbeitet" ist eine
-   Umrechnung. Sie sagt nichts, was nicht schon dasteht, und man kann
-   achselzuckend drüber hinweggehen: ja, hab ich, und?
+   1. DIE APP REDET ÜBER SICH, NICHT ÜBER DICH.
+      "Ich hab schon mal Popcorn geholt." "Ich frag nicht mal mehr wofür."
+      "Ich führ da jetzt eine eigene Spalte für." Sie beschreibt ihre
+      eigene Reaktion auf dein Verhalten, nie dein Verhalten selbst.
+      Genau das ist der Unterschied zwischen schadenfroh und belehrend:
+      "Du gibst zu viel aus" ist eine Mahnung, "ich hol schon mal
+      Popcorn" ist eine Freundin, die es sich gemütlich macht.
 
-   "Du bist da keine Kundin mehr, du bist Sponsorin" dreht die Rolle
-   um. Plötzlich ist da ein anderer, der an ihr verdient. Das bleibt
-   hängen. Die Zahl darunter macht es unwiderlegbar — aber die Pointe
-   ist das Bild.
+   2. REGISTERBRUCH. Dein Untergang wird in Amtssprache oder Floskel
+      abgehandelt: "Täterin bekannt." "Herzlichen Glückwunsch zum
+      Zweitjob." "Stört dich offenbar nicht." Je größer das Drama, desto
+      sachlicher der Satz.
 
-   Also: ein Bild, eine Umdeutung oder ein Vergleich mit ihrer eigenen
-   Miete. Niemals nur eine geteilte Zahl.
+   3. SIE IST SCHON FERTIG MIT DIR. Kein Streit, keine Drohung, keine
+      Verteidigung. Sie hat gewonnen und macht sich einen schönen Abend.
+      Deshalb ist "du hast dir das schöngeredet, ich hab nachgerechnet"
+      nur mittelmäßig: da streitet sie noch.
+
+   Dazu, unverändert gültig: DIE ZAHL IST DIE MUNITION, NICHT DIE POINTE.
+   "624 € = 45 h Arbeit" ist eine Umrechnung, da zuckt man mit den
+   Schultern. Die Pointe steht hinten, ist kurz und am liebsten ein
+   Fragment: "Verstörend." "Ätzend." "Täterin bekannt."
+
+   Und was NICHT funktioniert: Poesie. "Für Sachen, die keine Adresse
+   haben" war mal ein Spruch hier. Man muss zweimal lesen, um die
+   Anspielung auf die Miete zu verstehen, und wer sie versteht, denkt
+   "ah, clever". Das ist der Tod von frech. Frech ist sofort da oder
+   gar nicht. Also keine Rätsel, keine Reime, keine überdehnten Bilder.
 
    Wichtig für eigene Sprüche: Wenn die Zahlen fehlen, die dein Spruch
    braucht, gib etwas Falsches zurück (`false`, `null`). Dann wird er
@@ -180,7 +201,7 @@ const VERDIKTE = [
       d => hatNamen(d.top) &&
         `Spar-Königin 👑 Dein größter Ausrutscher: ${d.top.label} für ${euro(d.top.betrag)}. Ich hab extra nachgerechnet, ob ich dich dafür fertigmachen kann. Kann ich nicht. Ätzend.`,
       d => d.summe > 0 &&
-        `${d.prozent}%. Du hast ${euro(d.summe)} verjubelt und den Rest tatsächlich behalten. Wer bist du und was hast du mit ihr gemacht?`,
+        `${d.prozent}%. ${euro(d.summe)} raus, der Rest liegt noch da. Und jetzt? Soll ich klatschen? Ich klatsch nicht.`,
       d => `Spar-Königin 👑 Dein Konto sieht aus wie das einer erwachsenen Frau. Verstörend.`,
       d => `Unter 10%. Entweder Disziplin oder Grippe. Ich zähl beides.`,
     ],
@@ -188,9 +209,9 @@ const VERDIKTE = [
   {
     grenze: 20, stufe: 1, sprueche: [
       d => d.jahr > 0 &&
-        `Erwachsen. Igitt. ${euro(d.summe)} diesen Monat, ${euro(d.jahr)} aufs Jahr. Das ist ein Urlaub, den du dir in Einzelteilen gekauft hast.`,
+        `Erwachsen. Igitt. ${euro(d.summe)} diesen Monat, ${euro(d.jahr)} aufs Jahr. Ich geb dem drei Wochen.`,
       d => hatNamen(d.top) && d.top.anzahl > 1 &&
-        `${d.top.label}, ${d.top.anzahl}×. Du hast ein Muster. Noch hast du es im Griff, aber ich guck jetzt hin.`,
+        `${d.top.label}, ${d.top.anzahl}×. Noch nenn ich das Zufall. Wir wissen beide, dass ich lüge.`,
       d => `Du hast dich benommen. Einmal. Wir tun jetzt so, als wäre das dein Charakter.`,
       d => `Solide wie eine Steuererklärung. Langweilig, und ich bin trotzdem stolz.`,
     ],
@@ -198,23 +219,26 @@ const VERDIKTE = [
   {
     grenze: 35, stufe: 2, sprueche: [
       d => d.miete &&
-        `${euro(d.summe)} weg. Das sind ${d.miete}. Für Sachen, die keine Adresse haben.`,
+        `${euro(d.summe)} weg, ${d.miete}. Sag jetzt bitte nicht, das war ein besonderer Monat.`,
       d => hatNamen(d.top) && d.topMiete &&
-        `${d.top.label}: ${euro(d.top.betrag)}. Das sind ${d.topMiete}. Für einen Posten, der nicht mal ein Dach über dem Kopf ist.`,
-      d => hatNamen(d.fix) &&
-        `Deine größte Rechnung heißt ${d.fix.label} und kostet ${euro(d.fix.betrag)}. Deine Ausnahmen kosten ${euro(d.summe)}. Noch gewinnt die Rechnung. Noch.`,
-      d => `Du stehst auf der Kippe, Schatz. Die Kippe hat WLAN und einen vollen Warenkorb.`,
+        `${d.top.label}: ${euro(d.top.betrag)}, ${d.topMiete}. Ich schreib ${d.top.label} einfach zu den Fixkosten. Spart uns beiden Zeit.`,
+      /* „deine zweite Miete" braucht ein weibliches Wort. Heißt deine größte
+         Rechnung „Strom", fällt der Spruch aus und der nächste kommt dran —
+         lieber ein anderer Satz als ein falscher. */
+      d => hatNamen(d.fix) && istWeiblich(d.fix.label) &&
+        `${d.fix.label}: ${euro(d.fix.betrag)}. Deine Ausnahmen: ${euro(d.summe)}. Die sind auf dem besten Weg, deine zweite ${d.fix.label} zu werden.`,
+      d => `Du stehst auf der Kippe, Schatz. Ich hab schon mal Popcorn geholt.`,
     ],
   },
   {
     grenze: 50, stufe: 3, sprueche: [
       d => hatNamen(d.top) && hatNamen(d.fix) &&
-        `${d.top.label} kostet dich ${euro(d.top.betrag)} im Monat, ${d.fix.label} kostet ${euro(d.fix.betrag)}. Du zahlst nebenbei eine zweite Rechnung, die dir nie jemand geschickt hat.`,
+        `${d.top.label}: ${euro(d.top.betrag)}. ${d.fix.label}: ${euro(d.fix.betrag)}. Für eins davon kriegst du wenigstens einen Schlüssel.`,
       d => d.jahr > 0 &&
-        `${euro(d.jahr)} im Jahr, wenn das so weiterläuft. Dafür kriegt man ein Auto. Du kriegst dafür einen vollen Schrank und ein schlechtes Gefühl.`,
+        `${euro(d.jahr)} im Jahr, wenn das so bleibt. Das ist ein Gebrauchtwagen. Jedes Jahr einer.`,
       d => d.miete &&
-        `${euro(d.summe)} für Dinge, die dich morgen nicht wiedererkennen. Das sind ${d.miete}. Du hast dir das schöngeredet, ich hab's ausgerechnet.`,
-      d => `Halbe-halbe zwischen Leben und Lifestyle. Lifestyle führt gerade nach Punkten.`,
+        `${euro(d.summe)} weg, ${d.miete}. Du hast dir das schöngeredet, ich hab's nachgerechnet. Einer von uns hatte recht.`,
+      d => `Halbe-halbe zwischen Leben und Laune. Deine Laune wohnt besser als du.`,
     ],
   },
   {
@@ -222,30 +246,31 @@ const VERDIKTE = [
       d => hatNamen(d.top) &&
         `Konsumopfer 🛍️ ${euro(d.top.betrag)} an ${d.top.label}. Du bist da keine Kundin mehr. Du bist Sponsorin.`,
       d => d.miete &&
-        `Über die Hälfte weg. ${euro(d.summe)} an Leute, die deinen Namen nicht kennen — ${d.miete}.`,
+        `Über die Hälfte weg. ${euro(d.summe)}, ${d.miete}. Herzlichen Glückwunsch zum Zweitjob.`,
       d => d.ueberRegel > 0 &&
-        `${d.prozent}%. Erlaubt wären 30. Die ${euro(d.ueberRegel)} dazwischen hättest du behalten dürfen und hast dich dagegen entschieden.`,
-      d => `Dein Ernst? ${d.prozent}%. Ich frag nicht wofür, ich seh's an deinem Flur.`,
+        `${d.prozent}%. Erlaubt wären 30. ${euro(d.ueberRegel)} Unterschied, aber du wirst deine Gründe haben.`,
+      d => `Dein Ernst? ${d.prozent}%. Ich frag nicht mal mehr wofür.`,
     ],
   },
   {
     grenze: 100, stufe: 5, sprueche: [
       d => hatNamen(d.top) && d.gespart < d.top.betrag &&
-        `Totales Konsumopfer 💀 ${d.top.label} hat diesen Monat ${euro(d.top.betrag)} von dir bekommen. Du selbst: ${euro(d.gespart)}. Rate mal, wer von euch beiden Pläne hat.`,
-      d => `${euro(d.summe)} raus, Notgroschen bei ${euro(d.puffer)}. Wenn morgen die Waschmaschine stirbt, stehst du sehr gut angezogen daneben und guckst zu.`,
+        `Totales Konsumopfer 💀 ${d.top.label} hat ${euro(d.top.betrag)} von dir bekommen. Du selbst: ${euro(d.gespart)}. Merkste selber, oder?`,
+      d => `${euro(d.summe)} raus, Notgroschen bei ${euro(d.puffer)}. Wenn was kaputtgeht, ruf mich nicht an. Ich hab auch nichts.`,
       d => d.miete &&
         `${euro(d.summe)} weg, ${d.miete}. Dein Gehalt kam an, hat sich kurz umgesehen und ist wieder gegangen.`,
-      d => `Das war kein Monat, das war ein Raubzug. Und du warst Opfer und Täterin gleichzeitig.`,
+      d => `Das war kein Monat, das war ein Raubzug. Täterin bekannt.`,
     ],
   },
   {
     grenze: Infinity, stufe: 6, sprueche: [
       d => hatNamen(d.top) &&
-        `Mehr raus als rein. ${d.top.label} allein: ${euro(d.top.betrag)}. Du finanzierst gerade fremde Leute mit Geld, das dir nicht gehört.`,
+        `Mehr raus als rein. ${d.top.label} allein: ${euro(d.top.betrag)}. Das Geld dafür existiert nicht. Stört dich offenbar nicht.`,
       d => d.miete &&
-        `${d.miete}, ausgegeben für nichts, was bleibt. Du hast nicht über deine Verhältnisse gelebt, du hast die Verhältnisse ignoriert.`,
+        `${d.miete} für nichts, was bleibt. Sag mir bitte, dass da ein Fehler drin ist.`,
       d => `Insolvenz-Vibes 💀💀 ${euro(d.summe)} raus bei ${euro(d.gehalt)} rein. Du gibst Geld aus, das noch nicht erfunden wurde.`,
-      d => `STOPP. Karte weg, Handy weg. Ruf mich an, wir regeln das zusammen.`,
+      d => `Mehr ausgegeben als verdient. An der Stelle hör ich mit den Witzen auf.`,
+      d => `Mehr ausgegeben als verdient. Ich hab keinen Spruch mehr, ich hab nur noch Fragen.`,
     ],
   },
 ];
@@ -255,11 +280,14 @@ const VERDIKTE = [
    du eine Ausnahme eintippst. Das Urteil am Monatsende kommt zu
    spät; wehtun muss es beim Tippen.
    ------------------------------------------------------------ */
+// „1 Ausnahme", ab zwei „5 Ausnahmen". Ohne das stünde da „1 Ausnahmen".
+const ausnahmen = (n) => n === 1 ? "1 Ausnahme" : `${n} Ausnahmen`;
+
 const ZAEHL_SPRUECHE = [
   (n, p) => `Ausnahme Nummer ${n} diesen Monat: ${p.label} für ${euro(p.amount)}. Ich zähle mit.`,
-  (n, p) => `Notiert. ${p.label}, ${euro(p.amount)}. Macht ${n} Ausnahmen bisher. Kein Kommentar.`,
-  (n, p) => `Nummer ${n}. Das ist kein Zufall mehr, das ist ein Muster.`,
-  (n, p) => `${n} Ausnahmen. Du weißt, dass ich das aufschreibe, ja?`,
+  (n, p) => `Notiert. ${p.label}, ${euro(p.amount)}. Macht ${ausnahmen(n)} bisher. Kein Kommentar.`,
+  (n, p) => `Nummer ${n}. Ich hab aufgehört zu zählen. Nein, Quatsch, ich zähl natürlich weiter.`,
+  (n, p) => `${ausnahmen(n)}. Du weißt, dass ich das aufschreibe, ja?`,
 ];
 
 /* ------------------------------------------------------------
@@ -579,6 +607,30 @@ function arbeitstageText(betrag, lohn) {
    keine Erklärung — bei der Miete weiß jeder sofort, was sie bedeutet.
    ------------------------------------------------------------ */
 
+/* Den Namen deiner größten Rechnung so einbauen, dass der Satz deutsch bleibt.
+
+   Das Problem: Du tippst den Namen selbst ein, und deutsche Grammatik hängt
+   am Geschlecht des Wortes. "28% deiner Miete" stimmt, "28% deiner Strom"
+   ist Unsinn. Raten kann die App das nicht.
+
+   Also zwei Wege. Die üblichen Verdächtigen stehen in einer Liste und
+   bekommen die kurze Form. Alles andere läuft über "deiner Rechnung für X" —
+   "Rechnung" ist immer weiblich, damit stimmt der Satz für jedes Wort, das
+   du eintippen kannst, auch für "Leasing Nummer 2" oder "Bude". */
+const WEIBLICHE_FIXKOSTEN = [
+  "miete", "kaltmiete", "warmmiete", "wohnung", "bude", "versicherung",
+  "rate", "kita", "heizung", "garage", "krankenkasse", "pflege", "wohnungsmiete",
+];
+
+function istWeiblich(name) {
+  return WEIBLICHE_FIXKOSTEN.includes(String(name || "").trim().toLowerCase());
+}
+
+function fixNameMit(artikel, name) {
+  // "deiner Miete" — oder, wenn wir das Wort nicht kennen, "deiner Rechnung für Strom".
+  return istWeiblich(name) ? `${artikel} ${name}` : `${artikel} Rechnung für ${name}`;
+}
+
 /* Einen Betrag ins Verhältnis zur größten notwendigen Ausgabe setzen.
    `fix` ist { label, betrag } — meist die Miete, sonst Strom oder Einkauf.
 
@@ -589,9 +641,9 @@ function mietenText(betrag, fix) {
   const anteil = betrag / fix.betrag;
   if (anteil < 0.1) return "";
   const name = (fix.label && fix.label !== "(ohne Namen)") ? fix.label : "Fixkosten";
-  if (anteil < 1) return Math.round(anteil * 100) + "% deiner " + name;
-  if (anteil < 10) return anteil.toFixed(1).replace(".", ",") + "× deine " + name;
-  return Math.round(anteil) + "× deine " + name;
+  if (anteil < 1)  return Math.round(anteil * 100) + "% " + fixNameMit("deiner", name);
+  if (anteil < 10) return anteil.toFixed(1).replace(".", ",") + "× " + fixNameMit("deine", name);
+  return Math.round(anteil) + "× " + fixNameMit("deine", name);
 }
 
 /* Der Maßstab für einen Betrag — in der Währung, die es bei DIESER
@@ -617,6 +669,13 @@ function neuerMonat(id, startguthaben, vorlage) {
   const monat = {
     id: id,
     startBalance: startguthaben || 0,
+    /* Was dir zugeflossen ist, ohne dass du etwas dafür getan hast.
+
+       Startet in JEDEM Monat leer, auch wenn die Vorlage voll war: Ein
+       geschenkter Moment gehört dem Monat, in dem er passiert ist. Ihn
+       mitwandern zu lassen wie eine Miete würde ihn zur Gewohnheit machen
+       und ihm genau das nehmen, was ihn besonders macht. */
+    zufluesse: [],
   };
   KATEGORIEN.forEach(kat => {
     const uebernehmen = kat.wiederkehrend && vorlage && Array.isArray(vorlage[kat.key]);
@@ -762,12 +821,30 @@ function normalisiereMonat(monat, ersatzId) {
   const sauber = {
     id: typeof roh.id === "string" ? roh.id : ersatzId,
     startBalance: Number(roh.startBalance) || 0,
+    /* Stände von vor dieser Karte kennen das Feld nicht. Dann steht hier
+       eben eine leere Liste — der Monat ist deshalb nicht kaputt, er hat
+       nur noch nichts gezählt. */
+    zufluesse: (Array.isArray(roh.zufluesse) ? roh.zufluesse : []).map(saubererZufluss),
   };
   KATEGORIEN.forEach(kat => {
     const liste = Array.isArray(roh[kat.key]) ? roh[kat.key] : [];
     sauber[kat.key] = liste.map(p => normalisierePosten(p, kat, sauber.id));
   });
   return sauber;
+}
+
+/* Ein einzelner Zufluss auf saubere Werte gebracht.
+
+   Der Betrag darf ausdrücklich 0 sein: Blumen ohne Preisschild sind genauso
+   ein Moment wie zwanzig Euro. Deshalb ist der Wert hier optional und die
+   Anzahl zählt trotzdem mit. */
+function saubererZufluss(roh) {
+  const p = (roh && typeof roh === "object") ? roh : {};
+  return {
+    id: p.id ? String(p.id) : neueId(),
+    label: typeof p.label === "string" ? p.label : "",
+    amount: Math.max(0, Number(p.amount) || 0),
+  };
 }
 
 function normalisierePosten(roh, kat, monatId) {
@@ -780,7 +857,14 @@ function normalisierePosten(roh, kat, monatId) {
   if (kat.schalter) {
     // War das Häkchen schon gesetzt? Sonst die Standard-Stellung nehmen.
     const feld = kat.schalter.feld;
-    posten[feld] = typeof p[feld] === "boolean" ? p[feld] : !!kat.schalter.standard;
+    /* Steht im gespeicherten Posten schon ja oder nein, gilt das.
+
+       Fehlt das Feld ganz, ist der Stand älter als das Häkchen. Dann zählt,
+       was die App damals angenommen hat (`altHaken`): Einnahmen galten alle
+       als Arbeitseinkommen, Versicherungen alle als notwendig. Ohne diese
+       Zeile würden alte Stände beim Laden still ihre Arbeitszeit-Rechnung
+       verlieren und ihre Versicherungen plötzlich als Ausnahme zählen. */
+    posten[feld] = typeof p[feld] === "boolean" ? p[feld] : !!kat.altHaken;
   }
   if (kat.wiederkehrend) {
     posten.rhythmus = INTERVALL[p.rhythmus] ? p.rhythmus : "monatlich";
@@ -1311,6 +1395,80 @@ function anzahlAusnahmen() {
   return n;
 }
 
+/* ------------------------------------------------------------
+   10b. WOHLSTAND, DER ZUFLIESST
+
+   Die einzige Sammlung in dieser App, die nichts bewertet.
+
+   Sie steht bewusst NEBEN der großen Rechnung und nicht darin: kein Cent
+   von hier geht in dein Gehalt, in deinen Kontostand, in die Prozente
+   oder in irgendein Ziel. Das hat zwei Gründe.
+
+   Der erste ist Richtigkeit. Was dir jemand zusteckt, taucht auf keinem
+   Kontoauszug auf. Ließe man es mitrechnen, stimmten die Zahlen der App
+   nicht mehr mit denen deiner Bank überein.
+
+   Der zweite ist wichtiger. Sobald etwas in die 50/30/20-Rechnung fällt,
+   wird es zu Budget — zu etwas, das man verplant und wieder ausgibt. Diese
+   Karte soll das Gegenteil sein: eine Liste, die nur wächst. Genau deshalb
+   darfst du dieselben zwanzig Euro auch oben bei den Einnahmen stehen
+   haben. Hier unten sind sie kein Geld, sondern ein Moment.
+
+   Und deshalb zählt die App zwei Zahlen gleichberechtigt: die Summe UND
+   wie oft es passiert ist. Blumen ohne Preisschild haben keinen Betrag,
+   aber sie sind derselbe Beweis.
+   ------------------------------------------------------------ */
+
+/* Was ist diesem einen Monat zugeflossen? */
+function zufluss(monat) {
+  const liste = (monat && Array.isArray(monat.zufluesse)) ? monat.zufluesse : [];
+  return {
+    liste:  liste,
+    anzahl: liste.length,
+    summe:  liste.reduce((s, e) => s + (Number(e.amount) || 0), 0),
+  };
+}
+
+/* Und dieselbe Frage fürs ganze Jahr, für jedes Jahr einzeln.
+
+   Eintragen tust du monatlich, weil die App so aufgebaut ist. Aber der
+   Betrag, der wirklich staunen lässt, ist der Jahresbetrag: Zwanzig Euro
+   hier, ein Essen dort, das sieht einzeln nach nichts aus und steht am
+   Jahresende als dreistellige Summe da.
+
+   Gezählt wird aus dem laufenden Monat plus dem Archiv. Aus dem Archiv
+   nehmen wir die Zahlen aus `summary`, weil sie beim Abschließen genau so
+   festgehalten wurden. Fehlen sie (der Monat wurde abgeschlossen, bevor es
+   diese Karte gab), zählt er als Null — er hat damals nichts gezählt, also
+   darf er heute auch nichts behaupten.
+
+   Zurück kommt eine Liste, neuestes Jahr zuerst. Jahre ohne einen einzigen
+   Moment fallen raus: eine Zeile „2024 · 0 €" ist keine Auswertung. */
+function zuflussJahre() {
+  const jahre = new Map();
+
+  const dazu = (monatsId, summe, anzahl) => {
+    const jahr = String(monatsId || "").slice(0, 4);
+    if (!/^\d{4}$/.test(jahr)) return;   // unlesbare ID: lieber gar nicht zählen
+    const bisher = jahre.get(jahr) || { jahr: jahr, summe: 0, anzahl: 0 };
+    bisher.summe  += summe;
+    bisher.anzahl += anzahl;
+    jahre.set(jahr, bisher);
+  };
+
+  const jetzt = zufluss(STATE.currentMonth);
+  dazu(STATE.currentMonth.id, jetzt.summe, jetzt.anzahl);
+
+  (STATE.archive || []).forEach(eintrag => {
+    const s = (eintrag && eintrag.summary) || {};
+    dazu(eintrag && eintrag.id, Number(s.zuflussSumme) || 0, Number(s.zuflussAnzahl) || 0);
+  });
+
+  return [...jahre.values()]
+    .filter(e => e.anzahl > 0)
+    .sort((a, b) => b.jahr.localeCompare(a.jahr));
+}
+
 /* Zwei Dinge, die die Seite sich nur bis zum nächsten Neuladen merkt.
 
    Beide bewusst NICHT im Speicher: Der Blätter-Stand soll morgen wieder beim
@@ -1370,6 +1528,9 @@ function render() {
   renderUebersicht(z);
   renderNotgroschen(z);
   renderSparziel(z);
+  // Bekommt bewusst kein `z`: Diese Karte hängt an keiner Zahl der großen
+  // Rechnung, und das soll man schon hier sehen.
+  renderZufluss();
   renderAffirmation();
   renderArchiv();
   renderModal();
@@ -1439,16 +1600,28 @@ function renderKopf(z) {
     const tage = arbeitstageText(z.nichtUmlage, z.stundenlohn);
     const fix = z.notwendige[0];
     const imVerhaeltnis = mietenText(z.nichtUmlage, fix);
+
+    /* Der Spruch wird VOR der Zeile gebaut, weil die Zeile ihn kennen muss.
+
+       Sprüche dürfen dieselben Zahlen nennen wie diese Zeile — sie bekommen ja
+       genau dieselben Daten. Dann stand hier zweimal derselbe Vergleich
+       untereinander: „…2,0× deine Fixkosten." und darunter „Das sind 2,0×
+       deine Fixkosten." Die Zeile meldet sich deshalb nur noch, wenn der
+       Spruch ihre Zahl nicht schon gesagt hat. */
+    const spruch = spruchFuer(v, STATE.currentMonth.id, spruchDaten(z));
+
     let zeit = "";
     if (std) {
-      zeit = `<p class="verdikt-zeit">Dafür hast du <strong>${std}</strong> gearbeitet.${tage ? ` Das sind ${tage}.` : ""}</p>`;
-    } else if (imVerhaeltnis) {
+      if (!spruch.includes(std)) {
+        zeit = `<p class="verdikt-zeit">Dafür hast du <strong>${std}</strong> gearbeitet.${tage ? ` Das sind ${tage}.` : ""}</p>`;
+      }
+    } else if (imVerhaeltnis && !spruch.includes(imVerhaeltnis)) {
       zeit = `<p class="verdikt-zeit">Das sind <strong>${imVerhaeltnis}</strong>.</p>`;
     }
     banner = `
       <div class="verdikt v${v.stufe}">
         <p class="prozent">${Math.round(z.quoteNicht)}%<small> deines Gehalts für Ausnahmen</small></p>
-        <p class="spruch">${spruchFuer(v, STATE.currentMonth.id, spruchDaten(z))}</p>
+        <p class="spruch">${spruch}</p>
         ${zeit}
       </div>`;
   }
@@ -1484,12 +1657,13 @@ function renderZiel(z) {
   if (z.keinGehalt) {
     stand = `<p class="ziel-stand">Sobald deine Einnahmen drin stehen, messe ich dich daran.</p>`;
   } else if (z.regelErreicht) {
-    const luft = REGEL.nicht - z.quoteNicht;
-    stand = `<p class="ziel-stand gut">Du bist bei <strong>${Math.round(z.quoteNicht)}%</strong>
-      und hast noch <strong>${Math.round(luft)} Prozentpunkte</strong> Luft. Verbau's nicht.</p>`;
+    /* In Euro statt in Prozentpunkten: Die Prozentzahl steht schon riesig im
+       Banner darüber, und „noch 240 €" muss man nicht erst umrechnen, um zu
+       wissen, was man sich davon noch leisten kann. */
+    const luft = ((REGEL.nicht - z.quoteNicht) / 100) * z.gehalt;
+    stand = `<p class="ziel-stand gut">Noch <strong>${euro(luft)}</strong> Luft. Verbau's nicht.</p>`;
   } else {
-    stand = `<p class="ziel-stand schlecht">Du bist bei <strong>${Math.round(z.quoteNicht)}%</strong>.
-      Erlaubt wären ${REGEL.nicht}%. Das sind <strong>${euro(z.ueberRegel)}</strong> zu viel.</p>`;
+    stand = `<p class="ziel-stand schlecht"><strong>${euro(z.ueberRegel)}</strong> zu viel.</p>`;
   }
 
   let zustand = "";
@@ -1531,7 +1705,7 @@ function kategorieHtml(kat, z) {
   const extras = [];
   if (schalterZeigen(kat)) {
     extras.push(`<label class="schalter">
-      <input type="checkbox" data-add-schalter ${kat.schalter.standard ? "checked" : ""}>
+      <input type="checkbox" data-add-schalter>
       ${kat.schalter.text}
     </label>`);
   }
@@ -1548,11 +1722,13 @@ function kategorieHtml(kat, z) {
   }
   const extraZeile = extras.length ? `<div class="form-extras">${extras.join("")}</div>` : "";
 
-  // Bei wiederkehrenden Kategorien sagen wir dazu, dass sie mitwandern.
-  // Kategorien mit eigenem `hinweis` bekommen ihren eigenen Satz.
-  const hinweisText = kat.hinweis
-    || (kat.wiederkehrend ? "Läuft automatisch in den nächsten Monat weiter." : "");
-  const hinweis = hinweisText ? `<p class="kat-hinweis">${hinweisText}</p>` : "";
+  /* Nur Kategorien mit eigenem `hinweis` bekommen einen Satz.
+
+     Hier stand früher bei allen drei wiederkehrenden Kategorien „Läuft
+     automatisch in den nächsten Monat weiter." Dreimal derselbe Satz
+     untereinander liest niemand, und beim ersten Monatswechsel sieht man
+     es ohnehin. */
+  const hinweis = kat.hinweis ? `<p class="kat-hinweis">${kat.hinweis}</p>` : "";
 
   // Nur bei den Einnahmen: das Feld für die Wochenstunden, aus dem sich
   // der Stundenlohn und damit die ganze Lebenszeit-Rechnung ergibt.
@@ -1564,7 +1740,8 @@ function kategorieHtml(kat, z) {
      Zustand im Kopf.
      Welche Karten zu sind, merkt sich die App in den Einstellungen. */
   const offen = !STATE.einstellungen.zugeklappt.includes(kat.key);
-  const anzahl = liste.length === 1 ? "1 Posten" : `${liste.length} Posten`;
+  // „Posten" ist Buchhalter-Sprache. Im Kartenkopf steht deshalb „Eintrag".
+  const anzahl = liste.length === 1 ? "1 Eintrag" : `${liste.length} Einträge`;
 
   return `
     <details class="karte kat-karte" data-kat="${kat.key}" ${offen ? "open" : ""}>
@@ -1626,7 +1803,7 @@ function wochenstundenHtml(z) {
                value="${STATE.einstellungen.wochenstunden}" />
       </label>
       <span class="umlage-hinweis">≈ ${euro(z.stundenlohn)} pro Stunde</span>
-      <p class="feld-hinweis breit">Gerechnet aus ${euro(z.arbeitsEinkommen)} Arbeitseinkommen.</p>
+      <p class="feld-hinweis breit">aus ${euro(z.arbeitsEinkommen)} Arbeitseinkommen</p>
     </div>
   `;
 }
@@ -1721,7 +1898,6 @@ function renderFaellig(z) {
   const jetzt = z.faelligJetzt.length ? `
     <div class="karte faellig-karte jetzt">
       <h3 class="faellig-titel">❗️ Diesen Monat geht zusätzlich ab</h3>
-      <p class="faellig-unter">Das sind keine monatlichen Posten. Die schlagen jetzt komplett zu.</p>
       ${z.faelligJetzt.map(e => zeile(e)).join("")}
       <div class="faellig-summe">zusammen ${euro(z.faelligJetzt.reduce((s, e) => s + e.betrag, 0))}</div>
     </div>` : "";
@@ -1762,9 +1938,7 @@ function renderFaellig(z) {
         ${aufschluesselung}
         ${summenzeile}
       </div>
-      <p class="faellig-unter">So viel kosten deine nicht-monatlichen Posten im Schnitt pro Monat.
-        Leg das jetzt zur Seite, dann trifft dich der Fälligkeits-Monat nicht.
-        Rechnen tut die App das schon. Weglegen musst du selbst.</p>
+      <p class="faellig-unter">Rechnen tut die App. Weglegen musst du selbst.</p>
     </div>` : "";
 
   ziel.innerHTML = jetzt + bald + ruecklage;
@@ -1796,15 +1970,19 @@ function renderVertraege(z) {
   }).join("");
 
   const gesamtJahr = z.vertraege.reduce((s, v) => s + v.proJahr, 0);
-  const unnoetigJahr = z.vertraege.filter(v => !v.notwendig).reduce((s, v) => s + v.proJahr, 0);
+  const unnoetige = z.vertraege.filter(v => !v.notwendig);
+  const unnoetigJahr = unnoetige.reduce((s, v) => s + v.proJahr, 0);
   const zpUnnoetig = massstab(unnoetigJahr, z);
 
+  // Bei einem einzigen Vertrag stünde sonst „für Verträge, die du …".
+  const wovon = unnoetige.length === 1
+    ? "für einen Vertrag, den du selbst nicht als notwendig markiert hast"
+    : "für Verträge, die du selbst nicht als notwendig markiert hast";
+
   const fazit = unnoetigJahr > 0
-    ? `<div class="vertrag-fazit">Davon <strong>${euro(unnoetigJahr)}</strong> im Jahr für Verträge,
-         die du selbst als nicht notwendig markiert hast.${zpUnnoetig ? ` Das sind ${zpUnnoetig}.` : ""}
-         Kündigen, pausieren oder wechseln?</div>`
-    : `<div class="vertrag-fazit">Alles als notwendig markiert. Trotzdem lohnt der Blick: bei welchem davon
-         zahlst du zu viel, ohne es zu merken?</div>`;
+    ? `<div class="vertrag-fazit">Davon <strong>${euro(unnoetigJahr)}</strong> ${wovon}${
+         zpUnnoetig ? `. Das sind ${zpUnnoetig}` : ""}.</div>`
+    : "";
 
   ziel.innerHTML = `
     <h2 class="nr-titel">Was kostet dich das im Jahr?</h2>
@@ -1823,8 +2001,8 @@ function renderKonto(z) {
 
   // Nur zeigen, wenn Umlage und echte Abbuchung auseinandergehen.
   const echtZeile = z.hatUmlage
-    ? `<p class="konto-fussnote">Diesen Monat wirklich abgebucht: <strong>${euro(z.ausgegebenReal)}</strong>
-         In der Übersicht unten rechnen wir mit ${euro(z.ausgegebenUmlage)} umgelegt.</p>`
+    ? `<p class="konto-fussnote">Wirklich abgebucht: <strong>${euro(z.ausgegebenReal)}</strong>,
+         in der Übersicht unten umgelegt gerechnet: ${euro(z.ausgegebenUmlage)}.</p>`
     : "";
 
   document.getElementById("konto").innerHTML = `
@@ -1861,9 +2039,10 @@ function renderUebersicht(z) {
     </div>
   `;
 
-  const umlageHinweis = z.hatUmlage
-    ? `<p class="kat-hinweis mittig">Jährliche und vierteljährliche Posten sind hier auf den Monat umgelegt.</p>`
-    : "";
+  /* Dass hier umgelegt gerechnet wird, steht bereits als Fußnote beim
+     Kontostand direkt darüber, und zwar mit beiden Zahlen. Zweimal dasselbe
+     auf einem Bildschirm liest niemand. */
+  const umlageHinweis = "";
 
   document.getElementById("uebersicht").innerHTML = `
     <h2 class="nr-titel">Monats-Übersicht</h2>
@@ -1911,8 +2090,10 @@ function ranglisteHtml(z) {
     `;
   }).join("");
 
-  const rest = z.ausnahmen.length > 3
-    ? `<p class="rang-rest">… und ${z.ausnahmen.length - 3} weitere.</p>`
+  // „und eine weitere", nicht „und 1 weitere".
+  const uebrig = z.ausnahmen.length - 3;
+  const rest = uebrig > 0
+    ? `<p class="rang-rest">… und ${uebrig === 1 ? "eine weitere" : uebrig + " weitere"}.</p>`
     : "";
 
   return `
@@ -2158,15 +2339,14 @@ function renderSparziel(z) {
   let terminText = "";
   if (sz.termin && !sz.geschafft) {
     if (sz.terminVorbei) {
-      terminText = `<p class="sparziel-termin warn">Dein Wunschmonat ${monatLesbar(sz.termin)} ist vorbei
-        und es fehlen noch ${euro(sz.fehlt)}. Setz dir einen neuen, sonst misst der hier nichts mehr.</p>`;
+      terminText = `<p class="sparziel-termin warn">${monatLesbar(sz.termin)} ist vorbei,
+        es fehlen ${euro(sz.fehlt)}.</p>`;
     } else if (sz.terminSchaffbar) {
       terminText = `<p class="sparziel-termin gut">Für ${monatLesbar(sz.termin)} brauchst du
-        ${euro(sz.noetigeRate)} im Monat. Du legst ${euro(sz.rate)} weg. Das passt.</p>`;
+        ${euro(sz.noetigeRate)} im Monat. Das passt.</p>`;
     } else {
       terminText = `<p class="sparziel-termin warn">Für ${monatLesbar(sz.termin)} bräuchtest du
-        <strong>${euro(sz.noetigeRate)}</strong> im Monat. Du legst ${euro(sz.rate)} weg.
-        So wird das nichts. Entweder mehr zurücklegen oder den Termin ehrlich verschieben.</p>`;
+        <strong>${euro(sz.noetigeRate)}</strong> im Monat. Du legst ${euro(sz.rate)} weg.</p>`;
     }
   }
 
@@ -2209,6 +2389,128 @@ function renderSparziel(z) {
       </details>
     </div>
   `;
+}
+
+/* --- 11h3. Wohlstand, der in mein Leben fließt ---
+
+   Zwei Ebenen, und beide werden gebraucht.
+
+   OBEN steht der laufende Monat, groß. Das ist die Zahl, die zu dem passt,
+   was du gerade tust: eintragen, was diese Woche passiert ist.
+
+   UNTEN steht die Jahresauswertung, eine Zeile pro Jahr. Das ist die Zahl,
+   die staunen lässt. Zwanzig Euro hier, ein Essen dort, das sieht einzeln
+   nach nichts aus und steht am Jahresende dreistellig da.
+
+   Die Anzahl steht gleichberechtigt neben der Summe, weil manches keinen
+   Preis hat. Und wenn nichts einen Wert bekommen hat, verschwindet der
+   Euro-Betrag ganz: Drei Sträuße Blumen sind kein „0 €"-Monat.
+   --- */
+
+// „einmal" statt „1 Mal" — sonst liest sich jede Zeile wie ein Formular.
+function malText(n) {
+  return n === 1 ? "einmal" : `${n} Mal`;
+}
+
+function renderZufluss() {
+  const ziel = document.getElementById("zufluss");
+  const jetzt = zufluss(STATE.currentMonth);
+  const jahre = zuflussJahre();
+  const monatName = MONATSNAMEN[monatsNummer(STATE.currentMonth.id) - 1];
+
+  // Immer gleich aufgebaut, damit die Karte nie ganz verschwindet: Der
+  // Eintrag von heute ist der Grund, warum sie morgen etwas zu zeigen hat.
+  const form = `
+    <form class="zufluss-form" data-zufluss-form>
+      <input type="text" data-zufluss-label maxlength="60"
+             placeholder="z.B. zum Essen eingeladen" />
+      <input type="number" data-zufluss-amount step="0.01" inputmode="decimal"
+             placeholder="Wert" />
+      <button type="submit" class="btn btn-plus" title="hinzufügen">＋</button>
+    </form>
+    <p class="feld-hinweis breit">Nur Dinge ohne Anlass und ohne Gegenleistung.
+      Zugesteckt, mitgebracht, eingeladen, gefunden. Den Wert darfst du schätzen
+      oder leer lassen, der Moment zählt trotzdem.</p>`;
+
+  const kopf = `
+    <h2 class="nr-titel">Wohlstand, der in mein Leben fließt 🌸</h2>`;
+  const unter = `
+    <p class="zufluss-unter">Alles, was zu dir kommt, ohne dass du etwas dafür getan hast.</p>`;
+
+  // Noch nie etwas gezählt: kein Nullwert, sondern eine Einladung.
+  if (jahre.length === 0) {
+    ziel.innerHTML = `
+      ${kopf}
+      <div class="karte zufluss-karte">
+        ${unter}
+        <p class="zufluss-leer">Fang bei der letzten Kleinigkeit an, die dir jemand
+          einfach so gegeben hat. Du wirst überrascht sein, wie schnell das hier voll wird.</p>
+        ${form}
+      </div>`;
+    return;
+  }
+
+  /* Der Monat oben. Ist er noch leer, steht dort ein Satz statt einer
+     großen Null — die Jahreszeile darunter trägt in dem Fall die Karte. */
+  let monatsBlock;
+  if (jetzt.anzahl === 0) {
+    monatsBlock = `<p class="zufluss-monat-leer">Im ${monatName} steht noch nichts.</p>`;
+  } else {
+    const summenBlock = jetzt.summe > 0 ? `
+      <div class="zufluss-zahl">
+        <span class="zufluss-gross">${euro(jetzt.summe)}</span>
+        <span class="zufluss-klein">im ${monatName} zugeflossen</span>
+      </div>` : "";
+
+    monatsBlock = `
+      <div class="zufluss-zahlen">
+        ${summenBlock}
+        <div class="zufluss-zahl">
+          <span class="zufluss-gross">${jetzt.anzahl} ×</span>
+          <span class="zufluss-klein">hat jemand an dich gedacht</span>
+        </div>
+      </div>`;
+  }
+
+  /* Gelistet wird nur der laufende Monat, neuester Moment zuerst. Ältere
+     stecken in ihrem Archiv-Monat und in der Jahreszahl unten — eine Liste,
+     die über Jahre wächst, will niemand scrollen. */
+  const eintraege = jetzt.liste.slice().reverse().map(e => `
+    <li class="zufluss-eintrag">
+      <span class="zufluss-was">${escapeAttr(e.label)}</span>
+      ${e.amount > 0 ? `<span class="zufluss-wert">${euro(e.amount)}</span>` : ""}
+      <button class="del" data-del data-cat="zufluesse" data-id="${e.id}" title="löschen">✕</button>
+    </li>`).join("");
+
+  /* Die Jahresauswertung. Sie erscheint erst, wenn sie etwas anderes sagt
+     als der Monat darüber — im allerersten Monat wäre sie nur dieselbe Zahl
+     mit einer anderen Überschrift.
+
+     Das laufende Jahr wird als „bisher" gekennzeichnet: Es ist noch nicht
+     fertig, und ein Vergleich mit einem vollen Vorjahr wäre sonst schief. */
+  const laufendesJahr = String(STATE.currentMonth.id).slice(0, 4);
+  const nurDieserMonat = jahre.length === 1 && jahre[0].anzahl === jetzt.anzahl;
+
+  const jahresBlock = nurDieserMonat ? "" : `
+    <div class="zufluss-jahre">
+      <h3 class="zufluss-jahre-titel">Jahresauswertung</h3>
+      ${jahre.map(j => `
+        <div class="zufluss-jahr">
+          <span class="zufluss-jahr-name">${j.jahr}${j.jahr === laufendesJahr ? " <small>bisher</small>" : ""}</span>
+          <span class="zufluss-jahr-wert">${j.summe > 0 ? euro(j.summe) : ""}</span>
+          <span class="zufluss-jahr-mal">${malText(j.anzahl)}</span>
+        </div>`).join("")}
+    </div>`;
+
+  ziel.innerHTML = `
+    ${kopf}
+    <div class="karte zufluss-karte">
+      ${unter}
+      ${monatsBlock}
+      ${eintraege ? `<ul class="zufluss-liste">${eintraege}</ul>` : ""}
+      ${form}
+      ${jahresBlock}
+    </div>`;
 }
 
 /* --- 11i. Affirmationen ---
@@ -2384,11 +2686,11 @@ function reaktionsText(z, posten) {
     const name = escapeAttr(sz.label || "Dein Ziel");
     if (monate === 1) {
       return `${name} rückt damit <strong>einen Monat nach hinten</strong>.
-        Der Kauf ist heute Abend vorbei, der Monat nicht.`;
+        Ich hab das Datum schon umgeschrieben.`;
     }
     if (monate > 1) {
-      return `${name}: <strong>${monate} Monate später</strong>. Du hast gerade nicht
-        Geld ausgegeben, du hast Zeit ausgegeben.`;
+      return `${name}: <strong>${monate} Monate später</strong>.
+        Ich hab das Datum schon umgeschrieben.`;
     }
   }
 
@@ -2621,6 +2923,30 @@ document.addEventListener("submit", (e) => {
     return;
   }
 
+  // Einen zugeflossenen Moment festhalten
+  if (e.target.closest("[data-zufluss-form]")) {
+    e.preventDefault();
+    const textFeld = e.target.querySelector("[data-zufluss-label]");
+    const wertFeld = e.target.querySelector("[data-zufluss-amount]");
+    const label = textFeld.value.trim().slice(0, 60);
+    const wert  = Math.max(0, Number(wertFeld.value) || 0);
+
+    /* Ohne Bezeichnung geht nichts rein — anders als bei den Posten, wo ein
+       nackter Betrag reicht. Hier ist der Text die eigentliche Sache: „20 €"
+       erinnert an nichts, „Oma hat mir was zugesteckt" an alles. */
+    if (label === "") {
+      textFeld.focus();
+      return;
+    }
+
+    STATE.currentMonth.zufluesse.push({ id: neueId(), label: label, amount: wert });
+    speichern();
+    textFeld.value = "";
+    wertFeld.value = "";
+    renderZufluss();
+    return;
+  }
+
   const form = e.target.closest("[data-add]");
   if (!form) return;
   e.preventDefault(); // Seite nicht neu laden
@@ -2640,7 +2966,7 @@ document.addEventListener("submit", (e) => {
 
   if (kat.schalter) {
     const feld = form.querySelector("[data-add-schalter]");
-    posten[kat.schalter.feld] = feld ? feld.checked : !!kat.schalter.standard;
+    posten[kat.schalter.feld] = feld ? feld.checked : false;
   }
   if (kat.wiederkehrend) {
     const rFeld = form.querySelector("[data-add-rhythmus]");
@@ -2674,6 +3000,7 @@ document.addEventListener("submit", (e) => {
 document.getElementById("btn-monat-abschliessen").addEventListener("click", () => {
   const monat = STATE.currentMonth;
   const z = rechne(monat);
+  const zu = zufluss(monat);
 
   const bestaetigt = confirm(
     `„${monatLesbar(monat.id)}" abschließen?\n\n` +
@@ -2699,6 +3026,12 @@ document.getElementById("btn-monat-abschliessen").addEventListener("click", () =
       quoteNotwendig: z.quoteNotwendig,
       quoteSpar: z.quoteSpar,
       regelErreicht: z.regelErreicht,
+      /* Was dir in diesem Monat zugeflossen ist. Steht hier, obwohl es in
+         `snapshot` ohnehin mitkommt: Die Gesamtzahl auf der Karte summiert
+         nur diese beiden Felder und muss dafür nicht jeden Archiv-Monat
+         durchrechnen. */
+      zuflussSumme: zu.summe,
+      zuflussAnzahl: zu.anzahl,
     },
     snapshot: JSON.parse(JSON.stringify(monat)), // tiefe Kopie, damit spätere Änderungen sie nicht betreffen
   });
@@ -2849,6 +3182,33 @@ function renderBericht(z) {
       </table>`;
   }
 
+  /* Was dir zugeflossen ist. Steht im Bericht ganz bewusst NICHT in der
+     großen Zahlen-Tabelle, sondern als eigener Block darunter: Es ist kein
+     Einkommen, das man verrechnet, sondern eine Liste, die man liest. */
+  const zu = zufluss(monat);
+  const jahreZu = zuflussJahre();
+  let zugeflossen = "";
+  if (zu.anzahl > 0) {
+    /* Unter der Monatsliste steht dieselbe Jahresauswertung wie auf der
+       Karte. Sie gehört in den Bericht, weil er das Blatt ist, das man
+       aufhebt: In einem Jahr liest man dort nicht nur den Juli nach,
+       sondern auch, was das Jahr insgesamt gebracht hat. */
+    const jahresZeilen = jahreZu.map(j => `
+      <tr><th>${j.jahr}</th>
+          <td>${j.summe > 0 ? euro(j.summe) : "ohne Preis"} · ${malText(j.anzahl)}</td></tr>`).join("");
+
+    zugeflossen = `<h2 class="bericht-titel">Wohlstand, der in dein Leben geflossen ist</h2>
+      <table class="bericht-tabelle">
+        ${zu.liste.map(e => `
+          <tr><th>${escapeAttr(e.label)}</th>
+              <td>${e.amount > 0 ? euro(e.amount) : "ohne Preis"}</td></tr>`).join("")}
+        <tr class="summe"><th>${malText(zu.anzahl)} in diesem Monat</th>
+          <td>${euro(zu.summe)}</td></tr>
+      </table>
+      <h3 class="bericht-untertitel">Jahresauswertung</h3>
+      <table class="bericht-tabelle">${jahresZeilen}</table>`;
+  }
+
   // Der Anhang: jeder einzelne Posten, nach Kategorie sortiert. Das macht
   // aus der Übersicht erst einen Bericht, den man nachschlagen kann.
   const anhang = KATEGORIEN.map(kat => {
@@ -2889,7 +3249,7 @@ function renderBericht(z) {
     </table>
 
     ${z.hatUmlage
-      ? `<p class="bericht-fussnote">Jährliche und vierteljährliche Posten sind auf den Monat
+      ? `<p class="bericht-fussnote">Jährliche und vierteljährliche Beträge sind auf den Monat
            umgelegt. Tatsächlich abgebucht wurden in diesem Monat ${euro(z.ausgegebenReal)}.</p>`
       : ""}
 
@@ -2903,6 +3263,7 @@ function renderBericht(z) {
     ${ausnahmen}
     ${vertraege}
     ${puffer}
+    ${zugeflossen}
 
     <h2 class="bericht-titel">Alle Posten im Einzelnen</h2>
     ${anhang}
