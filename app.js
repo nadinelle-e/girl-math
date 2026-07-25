@@ -1912,8 +1912,36 @@ document.getElementById("btn-monat-abschliessen").addEventListener("click", () =
    Bildschirm siehst du davon nichts, das Kleid hängt im Schrank
    (display: none) und kommt nur zum Drucken raus.
    ------------------------------------------------------------ */
+/* Der Hinweis vor dem Druckdialog.
+
+   Der Dialog heißt „Drucken", obwohl niemand hier etwas drucken will —
+   das Sichern als PDF versteckt sich darin. Ohne einen Satz dazu klickt
+   man ihn weg und denkt, es hätte nicht funktioniert. Welchen Weg wir
+   nennen, hängt am Gerät, deshalb fragen wir kurz nach, welches es ist. */
+function berichtHinweis() {
+  const kennung = navigator.userAgent;
+  const istApple = /iPhone|iPad|iPod/.test(kennung);
+  const istAndroid = /Android/.test(kennung);
+
+  if (istApple) {
+    return "Gleich öffnet sich die Druckansicht.\n\n" +
+      "Tipp dort oben auf das Teilen-Symbol und wähle „In Dateien sichern“. " +
+      "Dein Bericht liegt dann als PDF bei dir, gedruckt wird nichts.";
+  }
+  if (istAndroid) {
+    return "Gleich öffnet sich die Druckansicht.\n\n" +
+      "Wähle dort oben als Ziel „Als PDF speichern“ und tipp auf den blauen Knopf. " +
+      "Dein Bericht landet dann als PDF in deinen Downloads, gedruckt wird nichts.";
+  }
+  return "Gleich öffnet sich der Druckdialog.\n\n" +
+    "Wähle darin „Als PDF sichern“ (am Mac unten links im Ausklappmenü „PDF“, " +
+    "unter Windows oben bei „Drucker“ den Eintrag „Microsoft Print to PDF“). " +
+    "Dein Bericht wird dann als Datei gespeichert, gedruckt wird nichts.";
+}
+
 document.getElementById("btn-bericht").addEventListener("click", () => {
   renderBericht(rechne(STATE.currentMonth));
+  alert(berichtHinweis());
   window.print();
 });
 
