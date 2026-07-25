@@ -183,6 +183,18 @@ with sync_playwright() as p:
                page.locator(f'{karte("versicherungen")} .umlage-hinweis').inner_text()), True)
     pruefe("Warnung 'geht diesen Monat ab'", page.locator(".faellig-karte.jetzt").count(), 1)
     pruefe("Ruecklagen-Karte", page.locator(".ruecklage-betrag").inner_text(), "30,00 €")
+    # Die Rechnung hinter der Summe steht offen da: voller Betrag, Teilung, Anteil.
+    pruefe("Aufschluesselung: eine Zeile", page.locator(".ruecklage-zeile").count(), 1)
+    pruefe("Aufschluesselung nennt den Posten",
+           page.locator(".ruecklage-zeile .ruecklage-name").inner_text().split("\n")[0],
+           "Kfz-Versicherung")
+    pruefe("Aufschluesselung zeigt die Teilung",
+           norm(page.locator(".ruecklage-zeile .ruecklage-name small").inner_text()),
+           "360,00 € ÷ 12 Monate")
+    pruefe("Aufschluesselung zeigt den Monatsanteil",
+           norm(page.locator(".ruecklage-zeile .ruecklage-anteil").inner_text()), "30,00 €")
+    pruefe("keine Summenzeile bei einem einzigen Posten",
+           page.locator(".ruecklage-summe").count(), 0)
 
     print("\n=== 9. Kontostand rechnet mit echtem Geld ===")
     # real = 800 + 58 + 300 + 360 (Kfz voll!) + 370 = 1888 | 2000 - 1888 - 200 = -88
@@ -440,6 +452,86 @@ with sync_playwright() as p:
         gctx.close()
 
     page.screenshot(path=f"{SHOTS}/04-migriert.png", full_page=True)
+
+    print("\n=== 25. Ruecklage: mehrere Posten ergeben eine Summe ===")
+    neu_starten(page)
+    # Den laufenden Monat aus der Seite holen, damit der Test in jedem Monat
+    # des Jahres funktioniert und nicht nur im Juli.
+    dieser_monat = page.evaluate("new Date().getMonth() + 1")
+    add(page, "income", "Gehalt", 2000, haken=True)
+    # 360 im Jahr -> 30 pro Monat | 120 alle 3 Monate -> 40 pro Monat | zusammen 70
+    add(page, "versicherungen", "Kfz", 360, rhythmus="jaehrlich",
+        faellig=dieser_monat, haken=True)
+    add(page, "abos", "Fitness", 120, rhythmus="vierteljaehrlich",
+        faellig=dieser_monat, haken=False)
+    pruefe("Summe aus zwei Posten", page.locator(".ruecklage-betrag").inner_text(), "70,00 €")
+    pruefe("zwei Zeilen in der Aufschluesselung", page.locator(".ruecklage-zeile").count(), 2)
+    pruefe("groesster Anteil steht oben",
+           page.locator(".ruecklage-zeile").first.locator(".ruecklage-anteil").inner_text(),
+           "40,00 €")
+    pruefe("Summenzeile taucht ab zwei Posten auf",
+           norm(page.locator(".ruecklage-summe").inner_text()).replace("\n", " "),
+           "zusammen jeden Monat weglegen 70,00 €")
+    page.screenshot(path=f"{SHOTS}/05-ruecklage.png", full_page=True)
+
+    print("\n=== 26. Affirmationen: Satz des Tages, eigene Saetze, Nachschub ===")
+    neu_starten(page)
+    vorrat = page.evaluate("AFFIRMATIONEN_START.length")
+    pruefe("Anfangsbestand hat mindestens 50 Saetze", vorrat >= 50, True)
+    pruefe("ein Satz steht da", page.locator(".affirmation-satz").count(), 1)
+    pruefe("Zaehler nennt den Vorrat",
+           page.locator(".affirmation-zaehler").inner_text().endswith(f"von {vorrat}"), True)
+
+    # Derselbe Tag zeigt denselben Satz, auch nach einer Neuberechnung der Seite
+    heute = page.locator(".affirmation-satz").inner_text()
+    add(page, "luxus", "Sushi", 20)
+    pruefe("Satz bleibt beim Eintragen stehen", page.locator(".affirmation-satz").inner_text(), heute)
+
+    # Weiterblaettern zeigt einen anderen Satz
+    page.click("#btn-affirmation-weiter")
+    pruefe("Blaettern zeigt einen anderen Satz",
+           page.locator(".affirmation-satz").inner_text() != heute, True)
+
+    # Eigenen Satz hinzufuegen
+    page.click(".affirmation-verwalten > summary")
+    page.locator("[data-affirmation-neu]").fill("Mein Geld bleibt bei mir.")
+    page.locator(".affirmation-form button[type=submit]").click()
+    pruefe("eigener Satz liegt in der Sammlung",
+           page.locator(".affirmation-eintrag", has_text="Mein Geld bleibt bei mir.").count(), 1)
+    pruefe("Vorrat um eins gewachsen",
+           page.locator(".affirmation-zaehler").inner_text().endswith(f"von {vorrat + 1}"), True)
+    pruefe("kein Nachschub-Knopf, solange nichts fehlt",
+           page.locator("#btn-affirmationen-holen").count(), 0)
+
+    # Der eigene Satz ueberlebt das Neuladen
+    page.reload()
+    page.click(".affirmation-verwalten > summary")
+    pruefe("eigener Satz ueberlebt das Neuladen",
+           page.locator(".affirmation-eintrag", has_text="Mein Geld bleibt bei mir.").count(), 1)
+
+    # Alles loeschen: die App schiebt nichts von allein wieder unter
+    page.evaluate("STATE.einstellungen.affirmationen = []; speichern();")
+    page.reload()
+    pruefe("geloeschte Saetze bleiben geloescht", page.locator(".affirmation-satz").count(), 0)
+    pruefe("stattdessen die Einladung", page.locator(".affirmation-leer").count(), 1)
+
+    # … aber auf Knopfdruck kommen sie zurueck
+    page.click(".affirmation-verwalten > summary")
+    pruefe("Nachschub-Knopf bietet den vollen Vorrat an",
+           page.locator("#btn-affirmationen-holen").inner_text().strip(), f"+ {vorrat} Vorschläge holen")
+    page.click("#btn-affirmationen-holen")
+    pruefe("nach dem Klick sind alle wieder da", page.locator(".affirmation-eintrag").count(), vorrat)
+    pruefe("und der Knopf ist verschwunden", page.locator("#btn-affirmationen-holen").count(), 0)
+
+    # Zweimal holen darf nichts verdoppeln
+    page.evaluate("STATE.einstellungen.affirmationen.push('Ich bin reich.'); speichern();")
+    page.reload()
+    page.click(".affirmation-verwalten > summary")
+    pruefe("Nachschub ergaenzt nur, was fehlt",
+           page.locator("#btn-affirmationen-holen").count(), 0)
+
+    page.screenshot(path=f"{SHOTS}/06-affirmationen.png", full_page=True)
+
     browser.close()
 
 server.terminate()

@@ -242,6 +242,92 @@ const ZAEHL_SPRUECHE = [
   (n, p) => `${n} Ausnahmen. Du weißt, dass ich das aufschreibe, ja?`,
 ];
 
+/* ------------------------------------------------------------
+   5b. AFFIRMATIONEN — der Gegenpol zum Verdikt.
+
+   Der Rest der App zeigt dir, was schiefläuft. Das hier ist die
+   andere Seite: ein Satz, der dich trägt statt dich zu stellen.
+   Er wechselt von allein, einmal am Tag.
+
+   Der Ton ist mit Absicht ein völlig anderer als überall sonst in
+   der App. Keine Disziplin, keine Mahnung, keine Realitätsprüfung:
+   reine Behauptung im Hier und Jetzt. Diese Sätze sollen nicht
+   beschreiben, wie es gerade IST, sondern den Kopf auf Reichtum
+   umgewöhnen. Dass sie größer klingen als der aktuelle Kontostand,
+   ist der Punkt und kein Fehler.
+
+   Deshalb gilt für eigene Sätze hier die umgekehrte Regel wie beim
+   Rest der Datei: Gegenwart statt Zukunft („Ich bin", nicht „Ich
+   werde"), keine Bedingungen, keine Einschränkungen, kein „auch
+   wenn". Alles, was den Satz kleiner macht, macht ihn kaputt.
+
+   Die Liste unten ist nur der Anfangsbestand. Beim allerersten
+   Start wird sie in die Einstellungen kopiert und gehört ab da
+   dir: Du kannst jeden Satz löschen und eigene dazuschreiben.
+   ------------------------------------------------------------ */
+/* Die Reihenfolge ist bewusst gemischt und nicht nach Themen sortiert.
+   Angezeigt wird der Reihe nach, ein Satz pro Tag — thematisch sortiert
+   bekämst du eine Woche lang nur „Geld kommt zu mir"-Sätze am Stück. */
+const AFFIRMATIONEN_START = [
+  "Ich bin reich.",
+  "Geld kommt auf allen Wegen zu mir.",
+  "Es ist immer mehr als genug für mich da.",
+  "Ich habe passive Einnahmequellen.",
+  "Mein Vermögen wächst jeden Tag.",
+  "Ich darf reich sein.",
+  "Geld fließt mir mühelos zu.",
+  "Ich bin die reichste Frau, die ich kenne.",
+  "Ich verdiene Geld, während ich schlafe.",
+  "Rechnungen zahle ich aus der Portokasse.",
+  "Wohlstand ist mein natürlicher Zustand.",
+  "Ich bin ein Magnet für Geld.",
+  "Mein Konto wächst schneller, als ich ausgeben kann.",
+  "Ich lebe im Überfluss.",
+  "Geld liebt mich und bleibt bei mir.",
+  "Große Summen fühlen sich für mich ganz normal an.",
+  "Reichtum erreicht mich aus erwarteten und aus unerwarteten Quellen.",
+  "Mein Geld arbeitet für mich, rund um die Uhr.",
+  "Ich ziehe Gelegenheiten an, die mich reicher machen.",
+  "Alles, was ich anfasse, vermehrt sich.",
+  "Reich sein steht mir.",
+  "Mein Einkommen vervielfacht sich.",
+  "Ich gebe großzügig und bekomme es vielfach zurück.",
+  "Geld findet mich, wo immer ich bin.",
+  "Ich bin eine Frau mit Vermögen.",
+  "Für mich ist genug da, und für alle anderen auch.",
+  "Menschen zahlen mir gern, was ich wert bin.",
+  "Mein Kontostand überrascht mich immer wieder positiv.",
+  "Ich verdiene mein Geld mit dem, was ich liebe.",
+  "Jeden Tag kommt Geld zu mir.",
+  "Ich bin finanziell frei.",
+  "Meine Einnahmequellen vermehren sich von allein.",
+  "Ich habe alles, was ich brauche, und mehr.",
+  "Sechsstellige Zahlen sind für mich Alltag.",
+  "Ich denke wie eine reiche Frau.",
+  "Das Geld ist längst unterwegs zu mir.",
+  "Ich lasse Geld zu mir kommen.",
+  "Jeder Euro, der zu mir kommt, bringt weitere mit.",
+  "Ich bin bereit für große Summen.",
+  "Meine Miete zahlt sich wie von selbst.",
+  "Ich gebe Geld gelassen aus, und es kommt gelassen zurück.",
+  "Reichtum fühlt sich sicher für mich an.",
+  "Mein Leben ist voller Fülle.",
+  "Ich bin für den Überfluss gemacht.",
+  "Meine Zahlen wachsen jeden Monat.",
+  "Ich kaufe, was ich will, und der Preis ist mir gleich.",
+  "Geld gehört zu meinem Leben wie die Luft zum Atmen.",
+  "Ich verdiene Wohlstand, einfach weil es mich gibt.",
+  "Mein Reichtum macht auch andere reicher.",
+  "Geld kommt schneller zu mir, als ich es erwarte.",
+  "Ich nehme an, was das Leben mir gibt.",
+  "Ich bin meine eigene beste Investition.",
+  "Mein Einkommen wächst, während ich lebe.",
+  "Ich bin von Fülle umgeben.",
+];
+
+// Länger als das nimmt die App nicht an — ein Satz, kein Aufsatz.
+const AFFIRMATION_MAX = 200;
+
 const SPEICHER_SCHLUESSEL = "girlmath.v1"; // Name der "Schublade" im Browser
 
 /* ------------------------------------------------------------
@@ -443,7 +529,22 @@ function standardEinstellungen() {
     wochenstunden: 40,      // für die Lebenszeit-Umrechnung
     notgroschenStart: 0,    // was du schon zurückgelegt hast, außerhalb der App
     zugeklappt: [],         // welche Kategorie-Karten du eingeklappt hast
+    affirmationen: AFFIRMATIONEN_START.slice(), // deine Sätze (Kopie, damit sie dir gehören)
   };
+}
+
+/* Eine Liste von Affirmationen aufräumen: nur echte Sätze, gekürzt,
+   ohne Leerzeichen am Rand und ohne Dopplungen. */
+function saubereAffirmationen(liste) {
+  const gesehen = new Set();
+  return (Array.isArray(liste) ? liste : [])
+    .filter(s => typeof s === "string")
+    .map(s => s.trim().slice(0, AFFIRMATION_MAX))
+    .filter(s => {
+      if (s === "" || gesehen.has(s)) return false;
+      gesehen.add(s);
+      return true;
+    });
 }
 
 function leererStand() {
@@ -493,6 +594,13 @@ function migriere(daten) {
       // Nur Kategorie-Schlüssel durchlassen, die es wirklich gibt.
       zugeklappt: (Array.isArray(roheEinst.zugeklappt) ? roheEinst.zugeklappt : [])
         .filter(key => KATEGORIEN.some(kat => kat.key === key)),
+      /* Die Unterscheidung hier ist wichtig: FEHLT die Liste, ist der Stand
+         älter als die Affirmationen — dann legen wir den Anfangsbestand hinein.
+         Ist sie da, aber LEER, hast du bewusst alle gelöscht. Das respektieren
+         wir, sonst stünden sie nach jedem Neuladen wieder da. */
+      affirmationen: Array.isArray(roheEinst.affirmationen)
+        ? saubereAffirmationen(roheEinst.affirmationen)
+        : AFFIRMATIONEN_START.slice(),
     },
     currentMonth: normalisiereMonat(daten.currentMonth, heute),
     archive: archive,
@@ -566,6 +674,7 @@ function rechne(monat) {
     faelligJetzt: [],                     // große Brocken DIESEN Monat
     faelligBald: [],                      // … und in den nächsten zwei
     ruecklageProMonat: 0,                 // was du zurücklegen solltest
+    ruecklagePosten: [],                  // … und woraus sich diese Summe zusammensetzt
     ausnahmen: [],                        // alle Ausnahmen einzeln (für die Rangliste)
     notwendige: [],                       // Miete, Strom & Co. (als Vergleichsmaßstab)
     vertraege: [],                        // Abos + Versicherungen (Kündigungs-Blick)
@@ -625,6 +734,15 @@ function rechne(monat) {
       // Nur nicht-monatliche Posten sind eine Warnung wert.
       if (intervall > 1 && betrag > 0) {
         z.ruecklageProMonat += umlage;
+        // Die Einzelteile mitnehmen, damit die Rücklagen-Karte die Rechnung
+        // zeigen kann und nicht nur das Ergebnis.
+        z.ruecklagePosten.push({
+          label: posten.label || "(ohne Namen)",
+          betrag: betrag,       // der volle Betrag, wie er auf der Rechnung steht
+          intervall: intervall, // durch wie viele Monate er geteilt wird
+          umlage: umlage,       // sein Anteil an einem einzelnen Monat
+          rhythmus: posten.rhythmus,
+        });
         const merker = {
           label: posten.label || "(ohne Namen)",
           betrag: betrag,
@@ -856,6 +974,40 @@ function anzahlAusnahmen() {
   return n;
 }
 
+/* Zwei Dinge, die die Seite sich nur bis zum nächsten Neuladen merkt.
+
+   Beide bewusst NICHT im Speicher: Der Blätter-Stand soll morgen wieder beim
+   Satz des Tages beginnen, und ob du die Sätze-Verwaltung offen hattest, ist
+   nichts, wofür sich eine Sicherung lohnt. Sie leben nur, damit ein render()
+   dir nicht mitten im Tippen alles wieder zuklappt. */
+let affirmationOffset = 0;
+let affirmationenOffen = false;
+
+/* Welcher Satz ist heute dran?
+
+   Wir zählen die Tage seit dem 1.1.1970 durch und teilen mit Rest durch die
+   Anzahl der Sätze. Dadurch rückt der Satz jede Nacht um eins weiter und ist
+   innerhalb DESSELBEN Tages immer derselbe — auch wenn die Seite zwischendurch
+   hundertmal neu gezeichnet wird.
+
+   Metapher: ein Abreißkalender. Ein Blatt pro Tag, und wer zweimal hinschaut,
+   sieht zweimal dasselbe Blatt. */
+function tagesNummer() {
+  const jetzt = new Date();
+  // Auf Mitternacht setzen, damit die Uhrzeit das Ergebnis nicht verschiebt.
+  const mitternacht = new Date(jetzt.getFullYear(), jetzt.getMonth(), jetzt.getDate());
+  return Math.round(mitternacht.getTime() / 86400000);
+}
+
+/* Der Satz, der gerade dran ist — mit seiner Position, damit darunter
+   „3 von 15" stehen kann. Gibt null zurück, wenn die Liste leer ist. */
+function aktuelleAffirmation() {
+  const liste = STATE.einstellungen.affirmationen || [];
+  if (liste.length === 0) return null;
+  const platz = (tagesNummer() + affirmationOffset) % liste.length;
+  return { text: liste[platz], nummer: platz + 1, gesamt: liste.length };
+}
+
 /* ============================================================
    11. ZEICHNEN (render) — STATE als Seite darstellen.
    render() ruft alle Teil-Zeichner auf und wird nach jeder
@@ -871,6 +1023,7 @@ function render() {
   renderKonto(z);
   renderUebersicht(z);
   renderNotgroschen(z);
+  renderAffirmation();
   renderArchiv();
   renderModal();
 }
@@ -1230,11 +1383,35 @@ function renderFaellig(z) {
       ${z.faelligBald.map(e => zeile(e, " · im " + MONATSNAMEN[e.monatNr - 1])).join("")}
     </div>` : "";
 
+  // Die Rechnung hinter der Summe: jeder nicht-monatliche Posten mit seinem
+  // vollen Betrag, der Teilung und dem Anteil, der auf diesen Monat entfällt.
+  // Größter Anteil zuerst — der erklärt die Summe am meisten.
+  const aufschluesselung = [...z.ruecklagePosten]
+    .sort((a, b) => b.umlage - a.umlage)
+    .map(p => `
+      <div class="ruecklage-zeile">
+        <span class="ruecklage-name">${escapeAttr(p.label)}
+          <small>${euro(p.betrag)} ÷ ${p.intervall} Monate</small></span>
+        <span class="ruecklage-anteil">${euro(p.umlage)}</span>
+      </div>`).join("");
+
+  // Die Summenzeile lohnt sich erst ab zwei Posten. Bei einem einzigen stünde
+  // dieselbe Zahl sonst dreimal auf derselben Karte.
+  const summenzeile = z.ruecklagePosten.length > 1 ? `
+    <div class="ruecklage-summe">
+      <span>zusammen jeden Monat weglegen</span>
+      <span>${euro(z.ruecklageProMonat)}</span>
+    </div>` : "";
+
   // Der Schritt, der aus Wissen Handeln macht: das Geld auch wirklich weglegen.
   const ruecklage = z.ruecklageProMonat > 0 ? `
     <div class="karte ruecklage-karte">
       <h3 class="faellig-titel">🏦 Deine Rücklage für diesen Monat</h3>
       <p class="ruecklage-betrag">${euro(z.ruecklageProMonat)}</p>
+      <div class="ruecklage-rechnung">
+        ${aufschluesselung}
+        ${summenzeile}
+      </div>
       <p class="faellig-unter">So viel kosten deine nicht-monatlichen Posten im Schnitt pro Monat.
         Leg das jetzt zur Seite, dann trifft dich der Fälligkeits-Monat nicht.
         Rechnen tut die App das schon. Weglegen musst du selbst.</p>
@@ -1538,7 +1715,73 @@ function renderNotgroschen(z) {
   `;
 }
 
-/* --- 11i. Archiv der abgeschlossenen Monate --- */
+/* --- 11i. Dein Satz für heute ---
+
+   Der einzige Bereich der App, der nichts von dir will. Er rechnet nicht,
+   er vergleicht nicht, er hält dir nichts vor. Deshalb steht er ganz unten:
+   Nach dem harten Teil ist er das, womit du rausgehst. --- */
+function renderAffirmation() {
+  const ziel = document.getElementById("affirmation");
+  const liste = STATE.einstellungen.affirmationen || [];
+  const a = aktuelleAffirmation();
+
+  // Der Satz oben. Ist die Liste leer, steht dort eine Einladung statt eines Satzes.
+  const kopf = a
+    ? `<p class="affirmation-satz">${escapeAttr(a.text)}</p>
+       <div class="affirmation-fuss">
+         <button id="btn-affirmation-weiter" class="affirmation-weiter">nächster Satz ↻</button>
+         <span class="affirmation-zaehler">${a.nummer} von ${a.gesamt}</span>
+       </div>`
+    : `<p class="affirmation-leer">Hier ist gerade nichts. Schreib dir deinen ersten Satz auf.</p>`;
+
+  // Deine Sammlung, jeder Satz mit ✕ zum Löschen.
+  const eintraege = liste.map((satz, i) => `
+    <li class="affirmation-eintrag">
+      <span>${escapeAttr(satz)}</span>
+      <button class="del" data-affirmation-weg="${i}" title="löschen">✕</button>
+    </li>`).join("");
+
+  /* Der Nachschub-Knopf.
+
+     Deine Sätze liegen im Speicher deines Browsers, die Vorschläge stehen im
+     Programm. Das ist Absicht — nur so überstehen deine eigenen Sätze jedes
+     Update. Es heißt aber auch: Kommen später neue Vorschläge dazu, finden sie
+     von allein nicht mehr den Weg zu dir. Dafür ist dieser Knopf da.
+
+     Er taucht nur auf, wenn wirklich etwas fehlt, und ergänzt ausschließlich —
+     gelöschte Sätze, die du schon hast, kommen nicht doppelt zurück. */
+  const fehlende = AFFIRMATIONEN_START.filter(satz => !liste.includes(satz));
+  const nachschub = fehlende.length
+    ? `<button id="btn-affirmationen-holen" class="affirmation-holen">
+         + ${fehlende.length === 1 ? "1 Vorschlag" : fehlende.length + " Vorschläge"} holen
+       </button>`
+    : "";
+
+  ziel.innerHTML = `
+    <h2 class="nr-titel">Dein Satz für heute</h2>
+    <div class="karte affirmation-karte">
+      ${kopf}
+
+      <details class="affirmation-verwalten" ${affirmationenOffen ? "open" : ""}>
+        <summary>Sätze verwalten</summary>
+
+        <form class="affirmation-form" data-affirmation-form>
+          <input type="text" data-affirmation-neu maxlength="${AFFIRMATION_MAX}"
+                 placeholder="Eigener Satz, z.B. Mein Geld bleibt bei mir." />
+          <button type="submit" class="btn btn-plus">+</button>
+        </form>
+        <p class="feld-hinweis breit">Schreib die Sätze auf, die du dir selbst sagst. Sie mischen
+          sich unter die anderen und kommen ganz normal dran. Und alles, was dir hier nicht
+          passt, fliegt mit dem ✕ raus.</p>
+
+        ${nachschub}
+        ${liste.length ? `<ul class="affirmation-liste">${eintraege}</ul>` : ""}
+      </details>
+    </div>
+  `;
+}
+
+/* --- 11j. Archiv der abgeschlossenen Monate --- */
 function renderArchiv() {
   const ziel = document.getElementById("archiv");
 
@@ -1590,7 +1833,7 @@ function renderArchiv() {
   ziel.innerHTML = `<h2 class="archiv-titel">Archiv</h2>${eintraege}`;
 }
 
-/* --- 11j. Das Willkommens-Fenster beim ersten Besuch --- */
+/* --- 11k. Das Willkommens-Fenster beim ersten Besuch --- */
 function renderModal() {
   const ziel = document.getElementById("modal");
 
@@ -1750,6 +1993,13 @@ document.addEventListener("change", (e) => {
    trotzdem am Dokument mit. Neu gezeichnet wird hier bewusst nichts, wir
    merken uns nur den Zustand. */
 document.addEventListener("toggle", (e) => {
+  // Die Sätze-Verwaltung merkt sich ihren Zustand nur bis zum Neuladen —
+  // gerade genug, damit sie beim Hinzufügen eines Satzes offen bleibt.
+  if (e.target.classList && e.target.classList.contains("affirmation-verwalten")) {
+    affirmationenOffen = e.target.open;
+    return;
+  }
+
   const karte = e.target.closest && e.target.closest("[data-kat]");
   if (!karte) return;
 
@@ -1780,6 +2030,34 @@ document.addEventListener("click", (e) => {
     return;
   }
 
+  // Einen Satz weiterblättern. Nur eine Anzeige-Sache, deshalb nichts speichern.
+  if (e.target.closest("#btn-affirmation-weiter")) {
+    affirmationOffset++;
+    renderAffirmation();
+    return;
+  }
+
+  // Die Vorschläge nachholen, die in deiner Sammlung noch fehlen
+  if (e.target.closest("#btn-affirmationen-holen")) {
+    const meine = STATE.einstellungen.affirmationen;
+    AFFIRMATIONEN_START.forEach(satz => {
+      if (!meine.includes(satz)) meine.push(satz);
+    });
+    speichern();
+    renderAffirmation();
+    return;
+  }
+
+  // Einen Satz aus deiner Sammlung löschen
+  const weg = e.target.closest("[data-affirmation-weg]");
+  if (weg) {
+    const platz = Number(weg.dataset.affirmationWeg);
+    STATE.einstellungen.affirmationen.splice(platz, 1);
+    speichern();
+    renderAffirmation();
+    return;
+  }
+
   if (e.target.closest("#btn-onboarding-fertig")) {
     STATE.onboardingGesehen = true;
     speichern();
@@ -1796,6 +2074,24 @@ document.addEventListener("click", (e) => {
 
 // Neuen Posten hinzufügen (Formular abgeschickt)
 document.addEventListener("submit", (e) => {
+  // Einen eigenen Satz zur Sammlung legen
+  if (e.target.closest("[data-affirmation-form]")) {
+    e.preventDefault();
+    const feld = e.target.querySelector("[data-affirmation-neu]");
+    const satz = feld.value.trim().slice(0, AFFIRMATION_MAX);
+    if (satz === "") return;
+
+    // Doppelte lassen wir gar nicht erst rein, sonst käme derselbe Satz
+    // zweimal so oft dran wie die anderen.
+    if (!STATE.einstellungen.affirmationen.includes(satz)) {
+      STATE.einstellungen.affirmationen.push(satz);
+      speichern();
+    }
+    feld.value = "";
+    renderAffirmation();
+    return;
+  }
+
   const form = e.target.closest("[data-add]");
   if (!form) return;
   e.preventDefault(); // Seite nicht neu laden

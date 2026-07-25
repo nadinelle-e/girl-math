@@ -98,6 +98,32 @@ Alles, was du danach in der App unter „Sparen" einträgst, kommt automatisch o
 bleiben Name, Anzahl der Posten und Summe sichtbar. Welche Karten zu sind, merkt
 sich die App.
 
+## Was dich trägt
+
+**Dein Satz für heute.** Ganz unten steht ein Satz, der nichts von dir will: keine
+Prozente, kein Vergleich, kein Urteil. Er wechselt einmal am Tag von allein, und
+über **nächster Satz ↻** blätterst du weiter, wenn du mehr willst. Am nächsten Tag
+steht wieder der Satz des Tages da.
+
+Es sind Wohlstands-Affirmationen: „Ich bin reich", „Geld kommt auf allen Wegen zu
+mir", „Ich habe passive Einnahmequellen". Reine Behauptung in der Gegenwart, ohne
+Bedingung und ohne Einschränkung. Dass sie größer klingen als dein Kontostand, ist
+der Sinn der Sache und kein Fehler: Sie sollen den Kopf auf Reichtum umgewöhnen,
+nicht beschreiben, wie es gerade steht.
+
+Unter **Sätze verwalten** schreibst du eigene dazu und löschst mit ✕ alles, was dir
+nicht passt. Deine Sätze mischen sich unter die anderen und kommen ganz normal dran.
+Löschst du alle, bleibt der Bereich leer und die App schiebt dir nichts wieder unter.
+
+Deine Sätze liegen im Speicher deines Browsers, die Vorschläge stehen im Programm.
+Das ist Absicht: Nur so überstehen deine eigenen Sätze jedes Update. Es heißt aber
+auch, dass später ergänzte Vorschläge von allein nicht mehr zu dir finden. Dafür
+gibt es den Knopf **+ x Vorschläge holen**. Er erscheint nur, wenn wirklich welche
+fehlen, ergänzt ausschließlich und legt nichts doppelt an.
+
+Der Rest der App zeigt dir, was schiefläuft. Dieser Bereich ist die andere Seite,
+und er steht mit Absicht am Ende: nach dem harten Teil ist er das, womit du rausgehst.
+
 ## Was du nur einmal eintippst
 
 Fixkosten, Abos und Versicherungen sind **wiederkehrend**: Sie wandern beim
@@ -137,6 +163,23 @@ stellen. Nach ein paar Minuten gibt es eine URL wie
 `https://<dein-name>.github.io/girl-math/` — die kannst du teilen. Jede Person
 hat ihre eigenen, privaten Daten im eigenen Browser. Im Repo liegt nur das
 Programm, niemals deine Zahlen.
+
+### Wenn du später etwas änderst
+
+Den Link verschickst du **einmal**. Er bleibt für immer derselbe, egal wie oft die
+App noch umgebaut wird. Nach jedem `git push` baut GitHub die Seite in ein bis zwei
+Minuten neu; wer sie offen hat, lädt einmal neu und hat die neue Fassung.
+
+Damit das sofort greift, hängt in `index.html` ein Versionsstempel an beiden
+Dateien: `styles.css?v=2` und `app.js?v=2`. Für den Browser ist `?v=3` eine andere
+Adresse als `?v=2`, also holt er die Datei frisch, statt bis zu zehn Minuten die
+alte weiterzubenutzen. **Bei jeder Änderung an `app.js` oder `styles.css` die Zahl
+an beiden Stellen um eins hochzählen.** Vergisst man es, ist nichts kaputt, es
+dauert nur wieder bis zu zehn Minuten.
+
+Die gespeicherten Zahlen aller Nutzerinnen überstehen jedes Update unangetastet.
+Der Code ist das Kochbuch, die Daten sind der Kühlschrank: Ein neues Kochbuch
+räumt niemandem den Kühlschrank aus.
 
 ## Nachprüfen, ob noch alles stimmt
 
@@ -221,6 +264,14 @@ ihrer eigenen Miete — nie nur eine geteilte Zahl.
 Die Kategorien stehen direkt darüber in `KATEGORIEN`. Eine neue Kategorie ist
 eine neue Zeile in dieser Liste, mehr braucht es nicht. Die Sofort-Einwürfe stehen
 in `ZAEHL_SPRUECHE`, die 50/30/20-Regel samt Herkunft in `REGEL`.
+
+Die Affirmationen liegen in `AFFIRMATIONEN_START`, aber nur als **Anfangsbestand**:
+Beim allerersten Start werden sie in die Einstellungen kopiert und gehören ab da
+dir. Wer die Sätze in der App löscht, bekommt sie nicht wieder — `migriere`
+unterscheidet dafür zwischen „Liste fehlt" (alter Stand, Anfangsbestand hinein)
+und „Liste ist leer" (bewusst geleert, bleibt leer). Welcher Satz dran ist, rechnet
+`aktuelleAffirmation` aus der Tagesnummer, damit er innerhalb eines Tages stehen
+bleibt und nicht bei jedem Tastendruck springt.
 
 Alte gespeicherte Stände werden beim Laden automatisch auf die aktuelle Struktur
 gehoben (`migriere` in `app.js`) — auch Backup-Dateien aus der ersten Version

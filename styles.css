@@ -836,6 +836,42 @@ body.modal-offen { overflow: hidden; }
   letter-spacing: -0.5px;
 }
 
+/* Die Rechnung hinter der Summe — damit die Zahl nachvollziehbar wird. */
+.ruecklage-rechnung { margin: 0 0 10px; }
+.ruecklage-zeile {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 10px;
+  padding: 6px 0;
+  border-top: 1px dashed var(--linie);
+  font-size: 14px;
+}
+.ruecklage-name { font-weight: 700; }
+.ruecklage-name small {
+  display: block;
+  font-weight: 600;
+  font-size: 11px;
+  color: var(--braun-weich);
+}
+.ruecklage-anteil {
+  font-weight: 800;
+  white-space: nowrap;
+  color: var(--gruen);
+}
+.ruecklage-summe {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 10px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--linie);
+  font-weight: 900;
+  font-size: 14px;
+  color: var(--gruen);
+}
+
 /* ============================================================
    Kündigungs-Blick: Jahreskosten deiner Verträge
    ============================================================ */
@@ -1264,6 +1300,151 @@ body.modal-offen { overflow: hidden; }
   margin: 26px 0 10px;
 }
 
+/* ============================================================
+   Dein Satz für heute (Affirmation)
+
+   Bewusst anders als alles andere: keine Prozente, keine Balken,
+   keine Farbwarnung. Cremefarben statt weiß, Serifenschrift statt
+   der nüchternen Systemschrift, viel Luft ringsum. Die Karte soll
+   sich anfühlen wie eine Pause, nicht wie eine weitere Auswertung.
+   ============================================================ */
+.affirmation-karte {
+  background: var(--creme);
+  border: 1px solid var(--linie-zart);
+  text-align: center;
+  padding: 30px 22px 20px;
+}
+
+.affirmation-satz {
+  font-family: Georgia, "Iowan Old Style", "Times New Roman", serif;
+  font-size: 22px;
+  font-style: italic;
+  line-height: 1.45;
+  color: var(--braun);
+  margin: 0 auto;
+  max-width: 30em;          /* Zeilen, die man in einem Blick erfasst */
+  text-wrap: balance;       /* verteilt die Wörter gleichmäßig auf die Zeilen */
+}
+
+.affirmation-leer {
+  font-size: 15px;
+  font-style: italic;
+  color: var(--braun-weich);
+  margin: 0;
+}
+
+/* Die Zeile unter dem Satz: weiterblättern links, Zähler rechts. */
+.affirmation-fuss {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  margin-top: 18px;
+  flex-wrap: wrap;
+}
+
+/* Der Blätter-Knopf ist absichtlich leiser als die übrigen Knöpfe —
+   er soll da sein, aber nicht vom Satz ablenken. */
+.affirmation-weiter {
+  border: 1px solid var(--linie);
+  background: var(--karte);
+  color: var(--braun-weich);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  padding: 7px 14px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+.affirmation-weiter:hover {
+  border-color: var(--pink);
+  color: var(--pink);
+}
+
+.affirmation-zaehler {
+  font-size: 12px;
+  color: var(--braun-weich);
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- Die Sammlung: aufklappbar, damit die Karte ruhig bleibt --- */
+.affirmation-verwalten {
+  margin-top: 22px;
+  border-top: 1px solid var(--linie-zart);
+  padding-top: 12px;
+  text-align: left;
+}
+.affirmation-verwalten > summary {
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--braun-weich);
+  text-align: center;
+  list-style: none;
+}
+.affirmation-verwalten > summary::-webkit-details-marker { display: none; }
+.affirmation-verwalten > summary:hover { color: var(--pink); }
+
+.affirmation-form {
+  display: flex;
+  gap: 8px;
+  margin: 14px 0 6px;
+}
+.affirmation-form input {
+  flex: 1;
+  min-width: 0;                /* damit das Feld auf dem Handy schrumpfen darf */
+  border: 1px solid var(--linie);
+  background: var(--feld);
+  border-radius: var(--radius-klein);
+  padding: 10px 12px;
+  font-family: inherit;
+  font-size: 14px;
+  color: var(--braun);
+}
+.affirmation-form input:focus {
+  outline: none;
+  border-color: var(--pink);
+}
+
+/* Der Nachschub-Knopf. Pink, weil er etwas tut, aber klein und rund —
+   er soll auffindbar sein, ohne der Star der Karte zu werden. */
+.affirmation-holen {
+  display: block;
+  margin: 12px auto 0;
+  border: 1px dashed var(--pink);
+  background: var(--pink-weich);
+  color: var(--pink);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 800;
+  padding: 8px 16px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+.affirmation-holen:hover {
+  background: var(--pink);
+  color: #fff;
+  border-style: solid;
+}
+
+.affirmation-liste {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+}
+.affirmation-eintrag {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+  border-top: 1px solid var(--linie-zart);
+  font-size: 14px;
+  line-height: 1.4;
+  color: var(--braun);
+}
+.affirmation-eintrag span { flex: 1; }
+.affirmation-eintrag .del { flex: none; }
+
 /* Auf schmalen Handys die Gitter etwas entspannen */
 @media (max-width: 460px) {
   .marke { font-size: 29px; }
@@ -1272,4 +1453,6 @@ body.modal-offen { overflow: hidden; }
   .donut-bereich { gap: 4px 16px; }
   .legende { min-width: 0; width: 100%; }
   .konto-block input { width: 130px; }
+  .affirmation-satz { font-size: 19px; }
+  .affirmation-karte { padding: 24px 16px 16px; }
 }
