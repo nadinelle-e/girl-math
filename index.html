@@ -11,6 +11,33 @@
   <!-- Sorgt dafür, dass die Seite auf dem Handy korrekt skaliert -->
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>girl math</title>
+
+  <!--
+    Das Symbol im Browser-Tab (Favicon).
+
+    Der lange Buchstabensalat unten IST die Zeichnung — ein Bild, in
+    Text übersetzt, damit keine extra Bilddatei nötig ist. Er muss
+    „adressgerecht" geschrieben sein: %3C steht für <, %22 für ",
+    %20 für ein Leerzeichen, %23 für #. In Klartext gelesen steht da:
+
+      <svg viewBox="0 0 100 100">
+        <rect width="100" height="100" rx="24" fill="#FDFAF5"/>
+        <text x="51" y="58" text-anchor="middle" font-family="Georgia, serif"
+              font-size="60" font-weight="700" font-style="italic">
+          <tspan fill="#6B4226">g</tspan><tspan fill="#FF2D78">m</tspan>
+        </text>
+      </svg>
+
+    Also: perlweiße Kachel mit runden Ecken, darauf das Monogramm „gm"
+    — g in Warmbraun, m in Pink. Der Ring fehlt hier bewusst, denn im
+    Tab ist das Bild nur etwa 16 Pixel groß und er wäre ein Krümel.
+
+    Wichtig: Dieser Verweis muss FEST hier stehen. Setzt man ihn erst
+    später per JavaScript, ignoriert Safari ihn komplett und sucht
+    stattdessen eine Datei namens favicon.ico.
+  -->
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20100%20100%22%3E%3Crect%20width%3D%22100%22%20height%3D%22100%22%20rx%3D%2224%22%20fill%3D%22%23FDFAF5%22%2F%3E%3Ctext%20x%3D%2251%22%20y%3D%2258%22%20text-anchor%3D%22middle%22%20font-family%3D%22Georgia%2C%20serif%22%20font-size%3D%2260%22%20font-weight%3D%22700%22%20font-style%3D%22italic%22%3E%3Ctspan%20fill%3D%22%236B4226%22%3Eg%3C%2Ftspan%3E%3Ctspan%20fill%3D%22%23FF2D78%22%3Em%3C%2Ftspan%3E%3C%2Ftext%3E%3C%2Fsvg%3E" />
+
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
@@ -20,7 +47,13 @@
          Wird von app.js gefüllt (renderKopf). -->
     <header id="kopf"></header>
 
-    <!-- Alle Eingabe-Kategorien (Einnahmen, Fixkosten, Abos, Einkauf, Konsum, Sparen).
+    <!-- Deine Abmachung für diesen Monat: max. X % Ausnahmen, plus die Serie
+         der Monate, in denen du sie gehalten hast.
+         Wird von app.js gefüllt (renderZiel). -->
+    <section id="ziel"></section>
+
+    <!-- Alle Eingabe-Kategorien (Einnahmen, Fixkosten, Abos, Versicherungen,
+         Einkauf, Ausnahmen, Sparen).
          Wird von app.js gefüllt (renderKategorien). -->
     <section id="kategorien"></section>
 
@@ -30,23 +63,46 @@
          nichts zu warnen gibt. -->
     <section id="faellig"></section>
 
+    <!-- Kündigungs-Blick: alle Abos und Versicherungen nach JAHRESkosten
+         sortiert, damit „nur 20 € im Monat" auffliegt.
+         Wird von app.js gefüllt (renderVertraege). -->
+    <section id="vertraege"></section>
+
     <!-- Kontostand-Bereich: Startguthaben eingeben + errechneter aktueller Stand.
          Wird von app.js gefüllt (renderKonto). -->
     <section id="konto"></section>
 
-    <!-- Monats-Übersicht: Prozente, 50/30/20-Vergleich, Verdikt.
+    <!-- Monats-Übersicht: Kreisdiagramm, Prozente, Rangliste der teuersten
+         Ausnahmen, Realitäts-Check.
          Wird von app.js gefüllt (renderUebersicht). -->
     <section id="uebersicht"></section>
+
+    <!-- Notgroschen: 3 Monatsausgaben als Puffer, mit Fortschritt.
+         Wird von app.js gefüllt (renderNotgroschen). -->
+    <section id="notgroschen"></section>
 
     <!-- Werkzeugleiste: Monat abschließen, Sichern (Export), Laden (Import). -->
     <div class="werkzeuge">
       <button id="btn-monat-abschliessen" class="btn btn-stark">Monat abschließen</button>
-      <button id="btn-export" class="btn">Sichern (Export)</button>
+      <button id="btn-bericht" class="btn">Monatsbericht (PDF)</button>
+      <button id="btn-export" class="btn">Sicherung speichern</button>
       <!-- Für den Import brauchen wir ein verstecktes Datei-Auswahlfeld,
            das der Button per Klick auslöst. -->
-      <button id="btn-import" class="btn">Laden (Import)</button>
+      <button id="btn-import" class="btn">Sicherung laden</button>
       <input id="import-datei" type="file" accept="application/json" hidden />
     </div>
+
+    <!-- Erklärt, wofür die beiden Sicherungs-Knöpfe gut sind. Ohne diesen
+         Satz landet man auf einer Datei voller geschweifter Klammern und
+         weiß nicht, was das soll. -->
+    <p class="werkzeuge-hinweis">
+      <strong>Sicherung speichern</strong> legt alle deine Zahlen in einer Datei ab,
+      als Kopie für den Notfall. Deine Daten liegen nämlich nur in diesem Browser:
+      Wenn du den Verlauf löschst, den Browser wechselst oder ein neues Handy hast,
+      sind sie sonst weg. Mit <strong>Sicherung laden</strong> holst du sie zurück
+      oder nimmst sie auf ein anderes Gerät mit. Die Datei ist kein Bericht zum Lesen,
+      sondern das Futter für die App.
+    </p>
 
     <!-- Archiv: abgeschlossene Monate + einfacher Trend.
          Wird von app.js gefüllt (renderArchiv). -->
@@ -61,6 +117,19 @@
        .wrap, weil es sich über die ganze Seite legt.
        Wird von app.js gefüllt (renderModal) und ist sonst leer. -->
   <div id="modal"></div>
+
+  <!-- Der kurze Einwurf, wenn du eine Ausnahme eintippst. Liegt am unteren
+       Bildschirmrand und verschwindet nach ein paar Sekunden von allein.
+       Wird von app.js gefüllt (zeigeReaktion). -->
+  <div id="toast" aria-live="polite"></div>
+
+  <!-- Der Monatsbericht. Am Bildschirm ist dieser Bereich unsichtbar; er
+       taucht NUR beim Drucken auf, und dann als einzige Seite.
+       Ein eigenes PDF-Programm brauchen wir dafür nicht: Der Browser kann
+       jede Seite als PDF sichern, wir geben ihm über styles.css nur eine
+       saubere Druckfassung vor.
+       Wird von app.js gefüllt (renderBericht). -->
+  <section id="bericht"></section>
 
   <!-- Die Logik ganz am Ende laden, damit die Bereiche oben schon existieren. -->
   <script src="app.js"></script>

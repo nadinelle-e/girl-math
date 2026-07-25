@@ -38,6 +38,22 @@
 /* --- Grund-Reset & Grundlayout --- */
 * { box-sizing: border-box; }
 
+/* Die kleinen Rauf-/Runter-Pfeile in Zahlenfeldern abschalten. Beträge tippt
+   man sowieso ein, und die Pfeile klauen nur Platz und laden zum Verklicken
+   ein. Chrome/Safari brauchen die ersten beiden Zeilen, Firefox die dritte. */
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type="number"] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+/* Blendet ein Element aus, ohne es aus dem HTML zu entfernen */
+.versteckt { display: none !important; }
+
 body {
   margin: 0;
   font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
@@ -82,7 +98,40 @@ body.modal-offen { overflow: hidden; }
   letter-spacing: -0.5px;
   margin: 0;
 }
-.marke span { color: var(--pink); }
+/* „girlmath" wird als EIN Wort geschrieben — die Farbe übernimmt die
+   Trennung, die vorher das Leerzeichen gemacht hat. Der winzige
+   Abstand hier ist kein Leerzeichen, nur ein Sechstel davon: In der
+   kursiven Schrift stößt der Aufstrich des „l" sonst ans „m". */
+.marke span {
+  color: var(--pink);
+  margin-left: 0.06em;
+}
+
+/* Das Markenzeichen (der Ring mit „gm", gezeichnet in app.js).
+
+   Alle Maße hier stehen in em statt in Pixeln. em heißt „so groß wie
+   die Schrift daneben" — dadurch wächst und schrumpft das Zeichen
+   automatisch mit der Marke mit, auch in der Handy-Ansicht weiter
+   unten, ohne dass wir es dort erneut einstellen müssen.
+
+   vertical-align schiebt das Zeichen so weit nach unten, dass seine
+   Mitte auf der Mitte der Schrift sitzt und nicht auf der Grundlinie
+   klebt. Absichtlich KEIN Flexbox hier: Flexbox würde das ganz
+   normale Leerzeichen zwischen „girl" und „math" verschlucken. */
+.marke-zeichen {
+  width: 1.45em;
+  height: 1.45em;
+  vertical-align: -0.48em;
+  margin-right: 0.14em;
+}
+
+/* Das „gm" im Ring. Schriftart, Kursive und Fettung erbt es von
+   .marke — nur die Größe legen wir hier fest. Die Zahl bezieht sich
+   auf das 100×100-Koordinatensystem des SVG, nicht auf Pixel. */
+.marke-zeichen text {
+  font-size: 43px;
+  letter-spacing: normal;
+}
 
 /* Der kleine Fragezeichen-Knopf, der das Willkommens-Fenster wieder öffnet */
 .hilfe-knopf {
@@ -157,11 +206,44 @@ body.modal-offen { overflow: hidden; }
   box-shadow: var(--schatten);
 }
 
+/* Kategorie-Karten lassen sich ein- und ausklappen. Der Kopf ist die
+   Klappleiste und bleibt immer sichtbar. */
+.kat-karte { padding-bottom: 0; }
+.kat-karte[open] { padding-bottom: 16px; }
+.kat-karte .karte-inhalt { padding-top: 4px; }
+
 .karte-kopf {
   display: flex;
   align-items: baseline;
-  justify-content: space-between;
   gap: 10px;
+  cursor: pointer;
+  list-style: none;                    /* Standard-Dreieck weg */
+  padding-bottom: 2px;
+}
+.karte-kopf::-webkit-details-marker { display: none; }
+
+/* Eigenes Pfeilchen, das sich beim Aufklappen mitdreht */
+.karte-pfeil {
+  flex: none;
+  color: var(--braun-weich);
+  font-size: 13px;
+  transition: transform 0.15s ease;
+  align-self: center;
+}
+.kat-karte[open] .karte-pfeil { transform: rotate(90deg); }
+
+/* Die Anzahl der Posten schiebt die Summe nach rechts und sagt im
+   eingeklappten Zustand, wie viel drinsteckt. */
+.karte-anzahl {
+  margin-left: auto;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--braun-weich);
+  white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .karte-pfeil { transition: none; }
 }
 .karte-titel {
   font-size: 15px;
@@ -268,6 +350,17 @@ body.modal-offen { overflow: hidden; }
   color: var(--braun-weich);
 }
 
+/* Stiller Hinweis an nicht-monatlichen Posten: „alle 3 Monate · ab Sep".
+   Monatliche Posten bekommen bewusst gar nichts, das ist der Normalfall. */
+.rhythmus-schild {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--braun-weich);
+  background: var(--creme);
+  border-radius: 999px;
+  padding: 3px 10px;
+}
+
 /* „= 30,00 € / Monat" — nimmt jährlichen Beträgen den Schrecken */
 .umlage-hinweis {
   font-size: 12px;
@@ -371,7 +464,18 @@ body.modal-offen { overflow: hidden; }
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
-  margin: 22px 0;
+  margin: 22px 0 10px;
+}
+
+/* Der Erklärsatz unter den Sicherungs-Knöpfen */
+.werkzeuge-hinweis {
+  font-size: 12px;
+  color: var(--braun-weich);
+  line-height: 1.55;
+  background: var(--creme);
+  border-radius: var(--radius-klein);
+  padding: 11px 13px;
+  margin: 0 0 22px;
 }
 
 /* ============================================================
@@ -619,6 +723,15 @@ body.modal-offen { overflow: hidden; }
   border-color: var(--pink);
   box-shadow: 0 0 0 3px rgba(255, 45, 120, 0.15);
 }
+/* Der erklärende Halbsatz unter einem Eingabefeld */
+.feld-hinweis {
+  font-size: 11px;
+  color: var(--braun-weich);
+  margin-top: 5px;
+  max-width: 230px;
+  line-height: 1.4;
+}
+
 .konto-stand { font-size: 30px; font-weight: 900; letter-spacing: -0.5px; }
 .konto-stand.negativ { color: var(--rot); }
 
@@ -631,6 +744,284 @@ body.modal-offen { overflow: hidden; }
   font-size: 12px;
   color: var(--braun-weich);
 }
+
+/* ============================================================
+   Die Abmachung: dein eigenes Monatsziel + die Serie
+   ============================================================ */
+.ziel-karte { border-left: 6px solid var(--braun-weich); }
+.ziel-karte.ok       { border-left-color: var(--gruen); }
+.ziel-karte.gerissen { border-left-color: var(--rot); }
+
+.ziel-kopf {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.ziel-titel { font-size: 15px; font-weight: 900; margin: 0; }
+
+.ziel-stand { font-size: 14px; margin: 10px 0 0; }
+.ziel-stand.gut      { color: var(--gruen); }
+.ziel-stand.schlecht { color: var(--rot); }
+
+/* Der Serien-Streifen — der Grund, morgen weiterzumachen */
+.serie {
+  margin-top: 12px;
+  padding: 9px 12px;
+  border-radius: var(--radius-klein);
+  font-size: 13px;
+  font-weight: 700;
+  background: var(--creme);
+  color: var(--braun-weich);
+}
+.serie-laeuft { background: #E8F6EE; color: #2F7F5B; }
+.serie-weg    { background: var(--creme); }
+
+/* Die Ziel-Marke im Archiv */
+.ziel-marke { font-size: 12px; font-weight: 800; margin: 5px 2px 0; }
+.ziel-marke.gut      { color: var(--gruen); }
+.ziel-marke.schlecht { color: var(--rot); }
+
+/* ============================================================
+   Lebenszeit: Wochenstunden-Feld und Arbeitszeit-Schilder
+   ============================================================ */
+.zeit-zeile {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--linie);
+}
+.mini-zahl {
+  width: 62px;
+  border: 1px solid var(--linie);
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 800;
+  text-align: right;
+  color: var(--braun);
+  background: var(--feld);
+}
+.mini-zahl:focus {
+  outline: none;
+  border-color: var(--pink);
+  box-shadow: 0 0 0 3px rgba(255, 45, 120, 0.15);
+}
+.feld-hinweis.breit { flex-basis: 100%; max-width: none; margin-top: 2px; }
+
+/* „⏱ 12 h Arbeit" — steht an jeder Ausnahme */
+.zeit-schild {
+  font-size: 12px;
+  font-weight: 800;
+  color: #8B4A6B;
+  background: #FBEAF2;
+  border-radius: 999px;
+  padding: 3px 10px;
+}
+
+/* ============================================================
+   Rücklage: was du diesen Monat weglegen solltest
+   ============================================================ */
+.ruecklage-karte { border-left: 6px solid var(--gruen); background: #F4FBF7; }
+.ruecklage-betrag {
+  font-size: 28px;
+  font-weight: 900;
+  color: var(--gruen);
+  margin: 2px 0 6px;
+  letter-spacing: -0.5px;
+}
+
+/* ============================================================
+   Kündigungs-Blick: Jahreskosten deiner Verträge
+   ============================================================ */
+.vertrag-zeile {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 9px 0;
+  border-top: 1px dashed var(--linie);
+  font-size: 14px;
+}
+.vertrag-zeile:first-of-type { border-top: none; }
+
+.vertrag-name { font-weight: 700; }
+.vertrag-name small {
+  display: block;
+  font-weight: 600;
+  font-size: 11px;
+  color: var(--braun-weich);
+  margin-top: 2px;
+}
+.kandidat-schild {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #fff;
+  background: var(--rot);
+  border-radius: 999px;
+  padding: 2px 8px;
+  margin-left: 6px;
+  vertical-align: 1px;
+}
+
+.vertrag-jahr {
+  text-align: right;
+  font-weight: 900;
+  font-size: 15px;
+  white-space: nowrap;
+}
+.vertrag-jahr small {
+  display: block;
+  font-weight: 600;
+  font-size: 11px;
+  color: var(--braun-weich);
+}
+.vertrag-zeile.kandidat .vertrag-jahr { color: var(--rot); }
+
+.vertrag-summe {
+  text-align: right;
+  font-weight: 900;
+  font-size: 15px;
+  margin-top: 10px;
+  padding-top: 9px;
+  border-top: 1px solid var(--linie);
+}
+.vertrag-fazit {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-radius: var(--radius-klein);
+  background: var(--creme);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+/* ============================================================
+   Rangliste der teuersten Ausnahmen
+   ============================================================ */
+.rangliste { margin-top: 18px; }
+.rang-zeile {
+  display: grid;
+  grid-template-columns: 24px 1fr auto;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 0;
+  border-top: 1px dashed var(--linie);
+}
+.rang-platz {
+  width: 24px; height: 24px;
+  border-radius: 50%;
+  background: var(--pink-weich);
+  color: var(--pink);
+  font-size: 12px;
+  font-weight: 900;
+  text-align: center;
+  line-height: 24px;
+}
+.rang-name { font-size: 14px; font-weight: 700; }
+/* „2×" hinter dem Namen, wenn derselbe Posten mehrfach eingetragen wurde */
+.rang-anzahl {
+  display: inline-block;
+  margin-left: 7px;
+  font-size: 11px;
+  font-weight: 900;
+  color: var(--pink);
+  background: var(--pink-weich);
+  border-radius: 999px;
+  padding: 2px 7px;
+  vertical-align: 1px;
+}
+.rang-wert {
+  text-align: right;
+  font-weight: 800;
+  font-size: 14px;
+  color: var(--rot);
+  white-space: nowrap;
+}
+.rang-wert small {
+  display: block;
+  font-weight: 600;
+  font-size: 11px;
+  color: var(--braun-weich);
+}
+.rang-rest { font-size: 12px; color: var(--braun-weich); margin: 8px 0 0; }
+
+/* ============================================================
+   Realitäts-Check: die aufklappbare Herkunft der Regel
+   ============================================================ */
+.regel-details {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--linie);
+}
+.regel-details summary {
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--pink);
+  cursor: pointer;
+  list-style: none;
+}
+/* Das Standard-Dreieck durch ein eigenes ersetzen, das sich mitdreht */
+.regel-details summary::-webkit-details-marker { display: none; }
+.regel-details summary::before {
+  content: "▸";
+  display: inline-block;
+  margin-right: 6px;
+  transition: transform 0.15s ease;
+}
+.regel-details[open] summary::before { transform: rotate(90deg); }
+
+.regel-details p {
+  font-size: 13px;
+  color: var(--braun-weich);
+  line-height: 1.6;
+  margin: 10px 0 0;
+}
+
+/* ============================================================
+   Notgroschen
+   ============================================================ */
+.notgroschen-kopf {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.notgroschen-kopf .rechts { text-align: right; }
+.notgroschen-ziel { font-size: 24px; font-weight: 900; letter-spacing: -0.5px; }
+.notgroschen-ist  { font-size: 24px; font-weight: 900; color: var(--gruen); letter-spacing: -0.5px; }
+
+.balken-spur.gross { height: 18px; }
+.notgroschen-quote {
+  text-align: right;
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--braun-weich);
+  margin-top: 6px;
+}
+.notgroschen-text { font-size: 13px; line-height: 1.55; margin: 12px 0 0; }
+.notgroschen-text.gut { color: var(--gruen); font-weight: 700; }
+
+/* Das Feld für einen Notgroschen, den es schon vor der App gab */
+.notgroschen-vorhanden {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--linie);
+}
+.mini-zahl.breit { width: 110px; }
 
 /* ============================================================
    Willkommens-Fenster (Onboarding)
@@ -684,6 +1075,171 @@ body.modal-offen { overflow: hidden; }
   margin: 0 0 18px;
 }
 .modal-knopf { width: 100%; padding: 13px; font-size: 15px; }
+
+/* ============================================================
+   Sofort-Reaktion beim Eintragen (der kurze Einwurf unten)
+   ============================================================ */
+.toast-box {
+  position: fixed;
+  left: 50%;
+  bottom: 22px;
+  z-index: 60;
+  transform: translateX(-50%);
+  width: calc(100% - 36px);
+  max-width: 420px;
+  background: var(--braun);
+  color: #FFF6EE;
+  border-radius: var(--radius-klein);
+  box-shadow: var(--schatten-hoch);
+  padding: 13px 16px;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.45;
+  /* Kommt von unten hereingerutscht statt einfach aufzuploppen */
+  animation: toast-rein 0.28s ease-out;
+}
+.toast-box strong { color: #FFC9DE; }
+
+@keyframes toast-rein {
+  from { opacity: 0; transform: translateX(-50%) translateY(14px); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
+/* Wer „weniger Bewegung" im System eingestellt hat, bekommt keine Animation */
+@media (prefers-reduced-motion: reduce) {
+  .toast-box { animation: none; }
+}
+
+/* ============================================================
+   Monatsbericht (nur beim Drucken sichtbar)
+
+   Am Bildschirm ist der Bericht komplett ausgeblendet. Erst im
+   Druckdialog tauscht die Seite: die App verschwindet, der Bericht
+   erscheint. So kannst du ihn über „Als PDF sichern" ablegen,
+   ohne dass wir ein PDF-Programm einbauen müssen.
+   ============================================================ */
+#bericht { display: none; }
+
+@media print {
+  /* Die App selbst und alles Schwebende bleiben draußen */
+  .wrap, #modal, #toast { display: none !important; }
+  #bericht { display: block; }
+
+  /* Weißer Grund, schwarze Schrift spart Tinte und liest sich besser */
+  body {
+    background: #fff;
+    color: #2E2018;
+    font-size: 11pt;
+    line-height: 1.45;
+  }
+
+  /* Ohne diese Zeilen lässt der Browser farbige Flächen einfach weg,
+     und das Verdikt-Banner käme weiß heraus. */
+  .bericht-verdikt {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  @page { margin: 16mm 14mm; }
+}
+
+.bericht-kopf {
+  border-bottom: 2px solid var(--braun);
+  padding-bottom: 8px;
+  margin-bottom: 16px;
+}
+.bericht-marke {
+  font-family: Georgia, "Iowan Old Style", "Times New Roman", serif;
+  font-style: italic;
+  font-size: 22pt;
+  font-weight: 700;
+  margin: 0;
+}
+.bericht-marke span { color: var(--pink); margin-left: 0.06em; }
+.bericht-monat {
+  margin: 2px 0 0;
+  font-size: 11pt;
+  font-weight: 700;
+  color: var(--braun-weich);
+}
+
+.bericht-verdikt {
+  color: #fff;
+  border-radius: 10px;
+  padding: 14px 18px;
+  margin-bottom: 14px;
+  break-inside: avoid;
+}
+.bericht-prozent { font-size: 30pt; font-weight: 900; line-height: 1; }
+.bericht-prozent-unter { font-size: 10pt; font-weight: 700; opacity: 0.92; }
+.bericht-spruch { font-size: 11pt; font-weight: 700; margin: 8px 0 0; }
+
+.bericht-abmachung { font-size: 11pt; font-weight: 700; margin: 0 0 16px; }
+.bericht-abmachung.gut      { color: var(--gruen); }
+.bericht-abmachung.schlecht { color: var(--rot); }
+
+.bericht-titel {
+  font-size: 13pt;
+  font-weight: 900;
+  margin: 20px 0 8px;
+  padding-bottom: 3px;
+  border-bottom: 1px solid var(--linie);
+  break-after: avoid;
+}
+.bericht-untertitel {
+  font-size: 11pt;
+  font-weight: 800;
+  margin: 14px 0 4px;
+  break-after: avoid;
+}
+
+/* Eine Zeile = Bezeichnung links, Betrag rechts. Tabellen halten die
+   Beträge sauber untereinander, auch bei langen Namen. */
+.bericht-tabelle {
+  width: 100%;
+  border-collapse: collapse;
+  break-inside: avoid;
+}
+.bericht-tabelle th,
+.bericht-tabelle td {
+  text-align: left;
+  font-weight: 600;
+  padding: 4px 0;
+  border-bottom: 1px dotted var(--linie);
+  vertical-align: baseline;
+}
+.bericht-tabelle td {
+  text-align: right;
+  font-weight: 800;
+  white-space: nowrap;
+  padding-left: 14px;
+}
+.bericht-tabelle td small { font-weight: 600; color: var(--braun-weich); }
+.bericht-tabelle.gross th,
+.bericht-tabelle.gross td { font-size: 12pt; padding: 6px 0; }
+.bericht-tabelle .summe th,
+.bericht-tabelle .summe td {
+  font-weight: 900;
+  border-bottom: none;
+  border-top: 1.5px solid var(--braun);
+  padding-top: 6px;
+}
+
+/* Jede Kategorie im Anhang bleibt möglichst auf einer Seite zusammen */
+.bericht-block { break-inside: avoid; margin-bottom: 10px; }
+
+.bericht-fussnote {
+  font-size: 9pt;
+  color: var(--braun-weich);
+  margin: 8px 0 0;
+}
+.bericht-fuss {
+  margin-top: 22px;
+  padding-top: 8px;
+  border-top: 1px solid var(--linie);
+  font-size: 9pt;
+  color: var(--braun-weich);
+}
 
 /* ============================================================
    Fußzeile & kleine Helfer
