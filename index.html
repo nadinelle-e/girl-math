@@ -39,18 +39,18 @@
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20100%20100%22%3E%3Crect%20width%3D%22100%22%20height%3D%22100%22%20rx%3D%2224%22%20fill%3D%22%23FDFAF5%22%2F%3E%3Ctext%20x%3D%2251%22%20y%3D%2258%22%20text-anchor%3D%22middle%22%20font-family%3D%22Georgia%2C%20serif%22%20font-size%3D%2260%22%20font-weight%3D%22700%22%20font-style%3D%22italic%22%3E%3Ctspan%20fill%3D%22%236B4226%22%3Eg%3C%2Ftspan%3E%3Ctspan%20fill%3D%22%23FF2D78%22%3Em%3C%2Ftspan%3E%3C%2Ftext%3E%3C%2Fsvg%3E" />
 
   <!--
-    Das ?v=2 hinter dem Dateinamen ist ein Versionsstempel.
+    Das ?v=5 hinter dem Dateinamen ist ein Versionsstempel.
 
     Warum: Browser legen Dateien für eine Weile beiseite, statt sie jedes Mal
     neu zu holen. Nach einem Update sähe man deshalb bis zu zehn Minuten lang
-    noch die alte Fassung. Für den Browser ist "styles.css?v=2" aber eine
-    andere Adresse als "styles.css?v=1" — also holt er sie sofort frisch.
+    noch die alte Fassung. Für den Browser ist "styles.css?v=5" aber eine
+    andere Adresse als "styles.css?v=4" — also holt er sie sofort frisch.
 
     ➜ WICHTIG: Bei jeder Änderung an styles.css oder app.js die Zahl an BEIDEN
       Stellen um eins hochzählen (unten beim <script> steht dieselbe). Vergisst
       man es, ist nichts kaputt, es dauert nur wieder bis zu zehn Minuten.
   -->
-  <link rel="stylesheet" href="styles.css?v=2" />
+  <link rel="stylesheet" href="styles.css?v=5" />
 </head>
 <body>
   <div class="wrap">
@@ -93,7 +93,13 @@
          Wird von app.js gefüllt (renderNotgroschen). -->
     <section id="notgroschen"></section>
 
-    <!-- Dein Satz für heute: der aufbauende Gegenpol zum Verdikt oben.
+    <!-- Dein Sparziel: die eine Sache, auf die du zusparst, mit Ankunftsmonat
+         und dem Vergleich, wie viel früher es ginge. Steht bewusst UNTER dem
+         Notgroschen — erst der Puffer, dann die schönen Dinge.
+         Wird von app.js gefüllt (renderSparziel). -->
+    <section id="sparziel"></section>
+
+    <!-- Affirmationen: der aufbauende Gegenpol zum Verdikt oben.
          Wechselt einmal am Tag von allein, eigene Sätze lassen sich
          hinzufügen und löschen.
          Wird von app.js gefüllt (renderAffirmation). -->
@@ -110,22 +116,17 @@
       <input id="import-datei" type="file" accept="application/json" hidden />
     </div>
 
-    <!-- Erklärt, wofür die beiden Sicherungs-Knöpfe gut sind. Ohne diesen
-         Satz landet man auf einer Datei voller geschweifter Klammern und
-         weiß nicht, was das soll. -->
+    <!-- Zwei Sätze, die man nicht sehen kann: dass beim PDF nichts gedruckt wird
+         (und wo der Knopf dafür je nach Gerät sitzt), und dass die Zahlen nur in
+         diesem Browser liegen. Alles andere sagen die Knöpfe selbst. -->
     <p class="werkzeuge-hinweis">
-      <strong>Monatsbericht als PDF sichern</strong> öffnet die Druckansicht. Dort wählst du
-      „Als PDF sichern“ (am iPhone über das Teilen-Symbol, auf Android als Ziel
-      „Als PDF speichern“) und hast den Bericht als Datei. Gedruckt wird dabei nichts.
+      Beim <strong>Monatsbericht</strong> öffnet sich die Druckansicht, gedruckt wird nichts:
+      dort „Als PDF sichern“ wählen (am iPhone über das Teilen-Symbol).
     </p>
 
     <p class="werkzeuge-hinweis">
-      <strong>Sicherung speichern</strong> legt alle deine Zahlen in einer Datei ab,
-      als Kopie für den Notfall. Deine Daten liegen nämlich nur in diesem Browser:
-      Wenn du den Verlauf löschst, den Browser wechselst oder ein neues Handy hast,
-      sind sie sonst weg. Mit <strong>Sicherung laden</strong> holst du sie zurück
-      oder nimmst sie auf ein anderes Gerät mit. Die Datei ist kein Bericht zum Lesen,
-      sondern das Futter für die App.
+      Deine Zahlen liegen nur in diesem Browser. Ohne <strong>Sicherung</strong> sind sie weg,
+      sobald du den Verlauf löschst oder das Gerät wechselst.
     </p>
 
     <!-- Archiv: abgeschlossene Monate + einfacher Trend.
@@ -157,6 +158,6 @@
 
   <!-- Die Logik ganz am Ende laden, damit die Bereiche oben schon existieren. -->
   <!-- Die Zahl hier muss dieselbe sein wie oben beim Stylesheet. -->
-  <script src="app.js?v=2"></script>
+  <script src="app.js?v=5"></script>
 </body>
 </html>

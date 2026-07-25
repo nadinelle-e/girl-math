@@ -474,20 +474,24 @@ with sync_playwright() as p:
            "zusammen jeden Monat weglegen 70,00 €")
     page.screenshot(path=f"{SHOTS}/05-ruecklage.png", full_page=True)
 
-    print("\n=== 26. Affirmationen: Satz des Tages, eigene Saetze, Nachschub ===")
+    print("\n=== 26. Affirmationen: fest im Programm, eigene obendrauf ===")
     neu_starten(page)
-    vorrat = page.evaluate("AFFIRMATIONEN_START.length")
-    pruefe("Anfangsbestand hat mindestens 50 Saetze", vorrat >= 50, True)
+    fest = page.evaluate("AFFIRMATIONEN.length")
+    pruefe("mindestens 111 feste Saetze", fest >= 111, True)
     pruefe("ein Satz steht da", page.locator(".affirmation-satz").count(), 1)
-    pruefe("Zaehler nennt den Vorrat",
-           page.locator(".affirmation-zaehler").inner_text().endswith(f"von {vorrat}"), True)
+    pruefe("Zaehler nennt den vollen Vorrat",
+           page.locator(".affirmation-zaehler").inner_text().endswith(f"von {fest}"), True)
+    pruefe("keine Knoepfe zum Holen oder Zuruecksetzen",
+           page.locator("#btn-affirmationen-holen").count()
+           + page.locator("#btn-affirmationen-reset").count(), 0)
+    pruefe("im Speicher liegt keine Kopie der festen Saetze",
+           page.evaluate("STATE.einstellungen.eigeneAffirmationen.length"), 0)
 
     # Derselbe Tag zeigt denselben Satz, auch nach einer Neuberechnung der Seite
     heute = page.locator(".affirmation-satz").inner_text()
     add(page, "luxus", "Sushi", 20)
     pruefe("Satz bleibt beim Eintragen stehen", page.locator(".affirmation-satz").inner_text(), heute)
 
-    # Weiterblaettern zeigt einen anderen Satz
     page.click("#btn-affirmation-weiter")
     pruefe("Blaettern zeigt einen anderen Satz",
            page.locator(".affirmation-satz").inner_text() != heute, True)
@@ -496,12 +500,18 @@ with sync_playwright() as p:
     page.click(".affirmation-verwalten > summary")
     page.locator("[data-affirmation-neu]").fill("Mein Geld bleibt bei mir.")
     page.locator(".affirmation-form button[type=submit]").click()
-    pruefe("eigener Satz liegt in der Sammlung",
+    pruefe("eigener Satz ist gelistet",
            page.locator(".affirmation-eintrag", has_text="Mein Geld bleibt bei mir.").count(), 1)
+    pruefe("nur der eigene wird gelistet, nicht die festen",
+           page.locator(".affirmation-eintrag").count(), 1)
     pruefe("Vorrat um eins gewachsen",
-           page.locator(".affirmation-zaehler").inner_text().endswith(f"von {vorrat + 1}"), True)
-    pruefe("kein Nachschub-Knopf, solange nichts fehlt",
-           page.locator("#btn-affirmationen-holen").count(), 0)
+           page.locator(".affirmation-zaehler").inner_text().endswith(f"von {fest + 1}"), True)
+
+    # Ein fester Satz laesst sich nicht als eigener doppeln
+    page.locator("[data-affirmation-neu]").fill("Ich bin reich.")
+    page.locator(".affirmation-form button[type=submit]").click()
+    pruefe("fester Satz wird nicht als eigener aufgenommen",
+           page.evaluate("STATE.einstellungen.eigeneAffirmationen.length"), 1)
 
     # Der eigene Satz ueberlebt das Neuladen
     page.reload()
@@ -509,28 +519,173 @@ with sync_playwright() as p:
     pruefe("eigener Satz ueberlebt das Neuladen",
            page.locator(".affirmation-eintrag", has_text="Mein Geld bleibt bei mir.").count(), 1)
 
-    # Alles loeschen: die App schiebt nichts von allein wieder unter
-    page.evaluate("STATE.einstellungen.affirmationen = []; speichern();")
-    page.reload()
-    pruefe("geloeschte Saetze bleiben geloescht", page.locator(".affirmation-satz").count(), 0)
-    pruefe("stattdessen die Einladung", page.locator(".affirmation-leer").count(), 1)
+    # Eigenen Satz loeschen: die festen bleiben unangetastet
+    page.locator(".affirmation-eintrag .del").first.click()
+    pruefe("eigener Satz geloescht",
+           page.evaluate("STATE.einstellungen.eigeneAffirmationen.length"), 0)
+    pruefe("die festen Saetze sind weiterhin alle da",
+           page.locator(".affirmation-zaehler").inner_text().endswith(f"von {fest}"), True)
+    pruefe("es steht immer ein Satz da, nie eine Luecke",
+           page.locator(".affirmation-satz").count(), 1)
 
-    # … aber auf Knopfdruck kommen sie zurueck
-    page.click(".affirmation-verwalten > summary")
-    pruefe("Nachschub-Knopf bietet den vollen Vorrat an",
-           page.locator("#btn-affirmationen-holen").inner_text().strip(), f"+ {vorrat} Vorschläge holen")
-    page.click("#btn-affirmationen-holen")
-    pruefe("nach dem Klick sind alle wieder da", page.locator(".affirmation-eintrag").count(), vorrat)
-    pruefe("und der Knopf ist verschwunden", page.locator("#btn-affirmationen-holen").count(), 0)
-
-    # Zweimal holen darf nichts verdoppeln
-    page.evaluate("STATE.einstellungen.affirmationen.push('Ich bin reich.'); speichern();")
+    # Ein alter Stand aus der Zeit, als die Vorschlaege im Speicher lagen:
+    # die Kopien von damals duerfen NICHT als eigene Saetze wieder auftauchen.
+    page.evaluate("""
+        const roh = JSON.parse(localStorage.getItem('girlmath.v1'));
+        roh.einstellungen.affirmationen =
+          AFFIRMATIONEN.concat(['Ein Vorschlag, den es nicht mehr gibt.']);
+        delete roh.einstellungen.eigeneAffirmationen;
+        localStorage.setItem('girlmath.v1', JSON.stringify(roh));
+    """)
     page.reload()
-    page.click(".affirmation-verwalten > summary")
-    pruefe("Nachschub ergaenzt nur, was fehlt",
-           page.locator("#btn-affirmationen-holen").count(), 0)
+    pruefe("alter Stand bringt keine Altlasten mit",
+           page.evaluate("STATE.einstellungen.eigeneAffirmationen.length"), 0)
+    pruefe("und zeigt genau die festen Saetze",
+           page.locator(".affirmation-zaehler").inner_text().endswith(f"von {fest}"), True)
 
     page.screenshot(path=f"{SHOTS}/06-affirmationen.png", full_page=True)
+
+    print("\n=== 27. Sparziel: Ankunft, Umleitung, Trennung vom Notgroschen ===")
+    neu_starten(page)
+
+    # Ohne Ziel gibt es weder Haekchen an den Sparposten noch eine Rechnung.
+    pruefe("ohne Ziel steht die Einladung da", page.locator(".sparziel-karte.leer").count(), 1)
+    add(page, "sparen", "Ruecklage", 100)
+    pruefe("ohne Ziel kein Haekchen, weder am Posten noch im Formular",
+           page.locator(f'{karte("sparen")} .schalter').count(), 0)
+
+    add(page, "income", "Gehalt", 2000, haken=True)
+    add(page, "fixkosten", "Miete", 800)
+    # Notgroschen-Ziel = 3 x 800 = 2400, bisher 100
+    pruefe("Gespartes zaehlt ohne Ziel voll zum Notgroschen",
+           norm(page.locator(".notgroschen-ist").inner_text()), "100,00 €")
+
+    # Ziel anlegen: 2000 EUR, ohne Termin
+    setze(page, "#sparziel-label", "Lissabon")
+    setze(page, "#sparziel-betrag", 2000)
+    pruefe("Ziel steht mit Namen",
+           page.locator(".sparziel-kopf .beschriftung").first.inner_text(), "Lissabon")
+    pruefe("Zielbetrag", norm(page.locator(".sparziel-summe").inner_text()), "2.000,00 €")
+    pruefe("noch nichts dafuer zurueckgelegt", norm(page.locator(".sparziel-ist").inner_text()), "0,00 €")
+    pruefe("jetzt gibt es das Haekchen am Posten",
+           page.locator(f'{karte("sparen")} .posten .schalter').count(), 1)
+
+    # 200 EUR fuers Ziel weglegen — der Posten wandert damit aus dem Notgroschen raus.
+    add(page, "sparen", "Reisekasse", 200)
+    page.locator(f'{karte("sparen")} .posten:has(input[value="Reisekasse"]) .schalter input').click()
+    pruefe("Ziel-Sparen zaehlt zum Ziel", norm(page.locator(".sparziel-ist").inner_text()), "200,00 €")
+    pruefe("und NICHT mehr zum Notgroschen",
+           norm(page.locator(".notgroschen-ist").inner_text()), "100,00 €")
+    pruefe("Fortschritt 200 von 2000", page.locator(".sparziel-karte .notgroschen-quote").inner_text(),
+           "10% geschafft · noch 1.800,00 €")
+
+    # Ankunft: 1800 fehlen, 200 pro Monat -> 9 Monate
+    heute = page.evaluate("STATE.currentMonth.id")
+    MONATE_DE = ["Januar", "Februar", "März", "April", "Mai", "Juni", "Juli",
+                 "August", "September", "Oktober", "November", "Dezember"]
+
+    def id_plus(mid, n):
+        """Monats-ID um n Monate weiterschieben — unabhaengig von der App gerechnet."""
+        jahr, monat = (int(t) for t in mid.split("-"))
+        gesamt = jahr * 12 + (monat - 1) + n
+        return f"{gesamt // 12}-{(gesamt % 12) + 1:02d}"
+
+    def monat_plus(mid, n):
+        """Dasselbe, aber lesbar: 'Mai 2027'."""
+        jahr, monat = (int(t) for t in id_plus(mid, n).split("-"))
+        return f"{MONATE_DE[monat - 1]} {jahr}"
+
+    pruefe("Ankunft in 9 Monaten",
+           monat_plus(heute, 9) in page.locator(".sparziel-text").inner_text(), True)
+    pruefe("Sparrate wird genannt",
+           "200,00" in norm(page.locator(".sparziel-text").inner_text()), True)
+
+    # Ausnahme: 300 EUR Sushi. Umleitbar ist die Haelfte (150).
+    # 1800 / (200 + 150) = 5,14 -> 6 Monate, also 3 Monate frueher.
+    add(page, "luxus", "Sushi", 300)
+    pruefe("Umleitungs-Rechnung erscheint", page.locator(".sparziel-umleitung").count(), 1)
+    umleitung = norm(page.locator(".sparziel-umleitung").inner_text())
+    pruefe("3 Monate frueher", "3 Monate früher" in umleitung, True)
+    pruefe("mit dem Ankunftsmonat", monat_plus(heute, 6) in umleitung, True)
+
+    # Das Ziel-Schild am Posten: 300 / 200 = 1,5 -> gerundet 2 Monate
+    pruefe("Ziel-Schild am Ausnahme-Posten",
+           page.locator(f'{karte("luxus")} .ziel-schild').inner_text().strip(),
+           "🎯 2 Monate später: Lissabon")
+
+    # Der Notgroschen-Vorrang steht da, solange der Puffer nicht steht.
+    pruefe("Notgroschen-Vorrang wird gesagt", page.locator(".sparziel-vorrang").count(), 1)
+
+    # Wunschtermin, der nicht zu schaffen ist: naechster Monat, 1800 EUR offen.
+    # Das "toggle"-Ereignis meldet sich erst im naechsten Frame — ein Mensch
+    # braucht laenger zum Tippen, der Automat nicht. Deshalb hier kurz warten.
+    page.click(".sparziel-aendern > summary")
+    page.wait_for_timeout(100)
+    # Eine Auswahlliste, kein <input type="month"> — das kennt Safari am Mac nicht.
+    pruefe("Termin ist eine Auswahlliste",
+           page.locator("select#sparziel-termin").count(), 1)
+    page.locator("#sparziel-termin").select_option(id_plus(heute, 1))
+    pruefe("„Ziel ändern\" bleibt beim Tippen offen",
+           page.locator(".sparziel-aendern[open]").count(), 1)
+    pruefe("zu knapper Termin wird als solcher benannt",
+           page.locator(".sparziel-termin.warn").count(), 1)
+    pruefe("und nennt die noetige Rate",
+           "1.800,00" in norm(page.locator(".sparziel-termin").inner_text()), True)
+
+    page.screenshot(path=f"{SHOTS}/07-sparziel.png", full_page=True)
+
+    # Sofort-Einwurf: ein Kauf verschiebt das Ziel.
+    add(page, "luxus", "Jacke", 400)
+    pruefe("Einwurf nennt das Ziel",
+           "Lissabon" in page.locator("#toast").inner_text(), True)
+
+    # Ziel loeschen: das Gesparte faellt zurueck an den Notgroschen.
+    page.click("#btn-sparziel-weg")
+    pruefe("Karte ist wieder die Einladung", page.locator(".sparziel-karte.leer").count(), 1)
+    pruefe("Gespartes gehoert wieder dem Notgroschen",
+           norm(page.locator(".notgroschen-ist").inner_text()), "300,00 €")
+    pruefe("und die Haekchen sind weg",
+           page.locator(f'{karte("sparen")} .schalter').count(), 0)
+
+    print("\n=== 28. Sparziel: alte Staende und der Monatswechsel ===")
+    neu_starten(page)
+    # Ein Stand aus der Zeit vor dem Sparziel: kennt weder das Feld noch die
+    # getrennten Summen im Archiv. Er darf weder abstuerzen noch Puffer verlieren.
+    page.evaluate("""
+      localStorage.setItem("girlmath.v1", JSON.stringify({
+        version: 3,
+        einstellungen: { wochenstunden: 40, notgroschenStart: 0, zugeklappt: [] },
+        currentMonth: { id: "2026-03", startBalance: 0,
+          income: [{ id: "a", label: "Gehalt", amount: 2000, gearbeitet: true }],
+          fixkosten: [{ id: "b", label: "Miete", amount: 800, rhythmus: "monatlich", faellig: 3 }],
+          sparen: [{ id: "c", label: "Rücklage", amount: 150 }] },
+        archive: [{ id: "2026-02", summary: { gespart: 250, quoteNicht: 10, regelErreicht: true }, snapshot: {} }],
+        onboardingGesehen: true
+      }));
+    """)
+    page.reload()
+    pruefe("alter Stand laedt ohne Ziel", page.locator(".sparziel-karte.leer").count(), 1)
+    pruefe("alter Puffer bleibt vollstaendig",
+           norm(page.locator(".notgroschen-ist").inner_text()), "400,00 €")
+
+    # Jetzt ein Ziel setzen: das alte Gesparte bleibt beim Notgroschen,
+    # weil es damals nie fuer ein Ziel markiert war.
+    setze(page, "#sparziel-label", "Führerschein")
+    setze(page, "#sparziel-betrag", 3000)
+    pruefe("altes Gespartes bleibt Puffer",
+           norm(page.locator(".notgroschen-ist").inner_text()), "400,00 €")
+    pruefe("das Ziel startet bei null", norm(page.locator(".sparziel-ist").inner_text()), "0,00 €")
+
+    # Monatswechsel: die getrennten Summen landen im Archiv und werden weitergezaehlt.
+    page.locator(f'{karte("sparen")} .posten:has(input[value="Rücklage"]) .schalter input').click()
+    pruefe("umgehaengt aufs Ziel", norm(page.locator(".sparziel-ist").inner_text()), "150,00 €")
+    page.click("#btn-monat-abschliessen")
+    pruefe("nach dem Abschluss zaehlt das Ziel weiter",
+           norm(page.locator(".sparziel-ist").inner_text()), "150,00 €")
+    pruefe("und der Puffer auch",
+           norm(page.locator(".notgroschen-ist").inner_text()), "250,00 €")
+    pruefe("Archiv haelt beide Summen getrennt",
+           page.evaluate("STATE.archive[0].summary.gespartZiel"), 150)
 
     browser.close()
 

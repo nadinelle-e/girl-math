@@ -94,32 +94,59 @@ Nein sagen, ohne vorher zu rechnen.
 Hast du schon etwas zurückgelegt, trag es einmal unter **„Schon vorhanden"** ein.
 Alles, was du danach in der App unter „Sparen" einträgst, kommt automatisch obendrauf.
 
+**Sparziel.** Eine Sache, auf die du zusparst: eine Reise, ein Führerschein, ein
+Umzug. Du trägst ein, was sie kostet, und optional bis wann. Daraus rechnet die
+App zwei Daten aus, und der Abstand zwischen ihnen ist der eigentliche Punkt:
+
+- **Wann du ankommst**, wenn du weitermachst wie bisher.
+- **Wann du ankommst**, wenn die Hälfte deiner Ausnahmen stattdessen dorthin geht.
+
+Damit wird aus „ich gebe zu viel für Sushi aus" ein „das Sushi kostet mich drei
+Monate Lissabon". Dasselbe steht als Schild an jedem Ausnahme-Posten, neben der
+Arbeitszeit, und der Sofort-Einwurf nennt es zuerst: Ein Termin, den du dir selbst
+gesetzt hast, lässt sich schlechter wegdiskutieren als eine Prozentzahl.
+
+Bewusst nur **ein** Ziel. Fünf halbvolle Fortschrittsbalken nebeneinander sind
+kein Plan, sondern eine Wunschliste.
+
+Zurückgelegt wird über die Kategorie **Sparen**: Jeder Posten dort hat, sobald ein
+Ziel steht, ein Häkchen **„fürs Sparziel?"**. Ohne Häkchen geht das Geld an den
+Notgroschen, mit Häkchen ans Ziel. Beide Töpfe bleiben getrennt, und zwar aus
+einem Grund: Das Geld für die Reise ist kein Puffer. Geht die Waschmaschine
+kaputt, ist entweder die Reise weg oder du im Dispo. Solange dein Notgroschen
+nicht steht, sagt die App das dazu — verbieten tut sie nichts, die Reihenfolge
+steht trotzdem fest.
+
+Löschst du das Ziel, bleibt dein Gespartes erhalten und zählt wieder zum
+Notgroschen.
+
 **Platz sparen.** Jede Kategorie lässt sich am Kopf ein- und ausklappen. Zugeklappt
 bleiben Name, Anzahl der Posten und Summe sichtbar. Welche Karten zu sind, merkt
 sich die App.
 
 ## Was dich trägt
 
-**Dein Satz für heute.** Ganz unten steht ein Satz, der nichts von dir will: keine
+**Affirmationen.** Ganz unten steht ein Satz, der nichts von dir will: keine
 Prozente, kein Vergleich, kein Urteil. Er wechselt einmal am Tag von allein, und
 über **nächster Satz ↻** blätterst du weiter, wenn du mehr willst. Am nächsten Tag
 steht wieder der Satz des Tages da.
 
-Es sind Wohlstands-Affirmationen: „Ich bin reich", „Geld kommt auf allen Wegen zu
-mir", „Ich habe passive Einnahmequellen". Reine Behauptung in der Gegenwart, ohne
-Bedingung und ohne Einschränkung. Dass sie größer klingen als dein Kontostand, ist
-der Sinn der Sache und kein Fehler: Sie sollen den Kopf auf Reichtum umgewöhnen,
-nicht beschreiben, wie es gerade steht.
+111 Wohlstands-Affirmationen liegen von Anfang an drin, und sie mischen zwei
+Tonlagen. Die eine besitzt: „Ich bin reich", „Mein Konto ist immer gedeckt". Die
+andere empfängt, und sie ist die wichtigere: „Geld kommt in Leichtigkeit zu mir",
+„Ich werde dafür bezahlt, dass ich existiere". Geld muss hier weder verdient noch
+erkämpft werden, es darf einfach kommen.
 
-Unter **Sätze verwalten** schreibst du eigene dazu und löschst mit ✕ alles, was dir
-nicht passt. Deine Sätze mischen sich unter die anderen und kommen ganz normal dran.
-Löschst du alle, bleibt der Bereich leer und die App schiebt dir nichts wieder unter.
+Reine Behauptung in der Gegenwart, ohne Bedingung und ohne Vertröstung. Dass sie
+größer klingen als dein Kontostand, ist der Sinn der Sache und kein Fehler: Sie
+sollen den Kopf auf Reichtum umgewöhnen, nicht beschreiben, wie es gerade steht.
 
-Deine Sätze liegen im Speicher deines Browsers, die Vorschläge stehen im Programm.
-Das ist Absicht: Nur so überstehen deine eigenen Sätze jedes Update. Es heißt aber
-auch, dass später ergänzte Vorschläge von allein nicht mehr zu dir finden. Dafür
-gibt es den Knopf **+ x Vorschläge holen**. Er erscheint nur, wenn wirklich welche
-fehlen, ergänzt ausschließlich und legt nichts doppelt an.
+Die 111 stehen fest im Programm und sind immer vollständig da. Ändert sich die
+Liste, hat sie jede beim nächsten Öffnen, ohne einen Knopf dafür zu drücken.
+
+Unter **eigenen Satz hinzufügen** schreibst du deine eigenen dazu. Sie mischen sich
+unter die 111 und kommen ganz normal dran. Aufgelistet werden dort nur deine, jeder
+mit ✕ zum Löschen, denn nur sie gehören dir.
 
 Der Rest der App zeigt dir, was schiefläuft. Dieser Bereich ist die andere Seite,
 und er steht mit Absicht am Ende: nach dem harten Teil ist er das, womit du rausgehst.
@@ -265,13 +292,21 @@ Die Kategorien stehen direkt darüber in `KATEGORIEN`. Eine neue Kategorie ist
 eine neue Zeile in dieser Liste, mehr braucht es nicht. Die Sofort-Einwürfe stehen
 in `ZAEHL_SPRUECHE`, die 50/30/20-Regel samt Herkunft in `REGEL`.
 
-Die Affirmationen liegen in `AFFIRMATIONEN_START`, aber nur als **Anfangsbestand**:
-Beim allerersten Start werden sie in die Einstellungen kopiert und gehören ab da
-dir. Wer die Sätze in der App löscht, bekommt sie nicht wieder — `migriere`
-unterscheidet dafür zwischen „Liste fehlt" (alter Stand, Anfangsbestand hinein)
-und „Liste ist leer" (bewusst geleert, bleibt leer). Welcher Satz dran ist, rechnet
-`aktuelleAffirmation` aus der Tagesnummer, damit er innerhalb eines Tages stehen
-bleibt und nicht bei jedem Tastendruck springt.
+Die Affirmationen stehen in `AFFIRMATIONEN` und liegen damit **fest im Programm**.
+Ein Satz mehr oder weniger ist eine Zeile in dieser Liste, und beim nächsten Öffnen
+hat ihn jede. Im Speicher landen nur selbst getippte Sätze
+(`einstellungen.eigeneAffirmationen`), `alleAffirmationen()` hängt beides zusammen.
+
+Das war einmal andersherum, und es ging schief: Lag die Vorschlagsliste im Speicher,
+war sie dort ein Stand von früher. Gestrichene Sätze blieben liegen, umformulierte
+standen doppelt da, und die Liste wuchs bei jeder Änderung, statt zu stimmen. Kein
+Nachhol-Knopf repariert das, weil Nachholen nur hinzufügen kann. Deshalb liest
+`migriere` das alte Feld `affirmationen` bewusst **nicht** mehr: Der neue Feldname
+zieht die Grenze zwischen „gehört dem Programm" und „gehört der Nutzerin", ohne
+raten zu müssen.
+
+Welcher Satz dran ist, rechnet `aktuelleAffirmation` aus der Tagesnummer, damit er
+innerhalb eines Tages stehen bleibt und nicht bei jedem Tastendruck springt.
 
 Alte gespeicherte Stände werden beim Laden automatisch auf die aktuelle Struktur
 gehoben (`migriere` in `app.js`) — auch Backup-Dateien aus der ersten Version

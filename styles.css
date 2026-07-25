@@ -28,6 +28,8 @@
   --rot:        #E2415F;    /* für „das kostet dich" */
   --mauve:      #B89AD8;    /* für notwendige Ausgaben — ruhig, nicht anklagend */
   --sand:       #E6D3BA;    /* für „noch übrig" */
+  --gold:       #D9A441;    /* fürs Sparziel — warm, aber nicht das Grün des Notgroschens */
+  --gold-weich: #FBF1DC;
 
   --radius: 20px;
   --radius-klein: 12px;
@@ -1060,6 +1062,128 @@ body.modal-offen { overflow: hidden; }
 .mini-zahl.breit { width: 110px; }
 
 /* ============================================================
+   Sparziel
+
+   Bewusst in Gold statt im Grün des Notgroschens: Die beiden Karten
+   stehen untereinander und rechnen beide mit Gespartem — sie dürfen
+   auf einen Blick nicht dasselbe sein.
+   ============================================================ */
+.sparziel-karte { border-top: 3px solid var(--gold); }
+.sparziel-karte.leer { border-top-color: var(--linie); }
+
+.sparziel-kopf {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.sparziel-kopf .rechts { text-align: right; }
+.sparziel-summe { font-size: 24px; font-weight: 900; letter-spacing: -0.5px; }
+.sparziel-ist   { font-size: 24px; font-weight: 900; color: var(--gold); letter-spacing: -0.5px; }
+
+.fuell-ziel { background: var(--gold); }
+
+.sparziel-text { font-size: 13px; line-height: 1.55; margin: 12px 0 0; }
+.sparziel-text.gut { color: var(--gruen); font-weight: 700; }
+
+/* Die Umleitungs-Rechnung — der eigentliche Punkt der Karte, deshalb
+   als einziger Block hier farbig hinterlegt. */
+.sparziel-umleitung {
+  margin-top: 12px;
+  padding: 12px 14px;
+  background: var(--gold-weich);
+  border-radius: var(--radius-klein);
+}
+.sparziel-umleitung p { margin: 0; font-size: 13px; line-height: 1.55; }
+
+.sparziel-termin { font-size: 13px; line-height: 1.55; margin: 12px 0 0; }
+.sparziel-termin.gut  { color: var(--gruen); font-weight: 700; }
+.sparziel-termin.warn { color: var(--rot); font-weight: 700; }
+
+/* Der Notgroschen-Vorrang. Steht abgesetzt unten: kein Verbot, aber
+   auch nichts, worüber man hinwegliest. */
+.sparziel-vorrang {
+  margin: 14px 0 0;
+  padding-top: 12px;
+  border-top: 1px dashed var(--linie);
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--braun-weich);
+}
+
+.sparziel-felder {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 10px 14px;
+  margin-top: 12px;
+}
+/* Die breiten Felder (Name, „schon zurückgelegt") bekommen ihre Beschriftung
+   DARÜBER statt daneben. Nebeneinander bräche der Text um und ließe das Feld
+   in einer eigenen Zeile hängen. */
+.sparziel-felder .mini-label.breit,
+.sparziel-aendern > .mini-label.breit {
+  flex-basis: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 5px;
+}
+.sparziel-aendern > .mini-label.breit { margin-top: 12px; }
+.sparziel-felder input[type="text"] {
+  width: 100%;
+  padding: 9px 12px;
+  border: 1px solid var(--linie);
+  border-radius: var(--radius-klein);
+  background: var(--feld);
+  color: var(--braun);
+  font: inherit;
+  font-size: 14px;
+}
+.sparziel-felder input[type="text"]:focus {
+  outline: none;
+  border-color: var(--gold);
+}
+.optional { font-weight: 400; color: var(--braun-weich); }
+
+.sparziel-aendern { margin-top: 16px; }
+.sparziel-aendern > summary {
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--braun-weich);
+  padding-top: 12px;
+  border-top: 1px dashed var(--linie);
+}
+.sparziel-aendern > summary::-webkit-details-marker { display: none; }
+
+/* Ein zurückhaltender Knopf für das, was man selten und mit Bedacht tut. */
+.btn-leise {
+  margin-top: 14px;
+  font-size: 12px;
+  padding: 7px 14px;
+  border-color: var(--linie);
+  color: var(--braun-weich);
+}
+.btn-leise:hover { background: var(--pink-weich); color: var(--pink); }
+
+/* Das Ziel-Schild an einem Ausnahme-Posten, Gegenstück zum Zeit-Schild. */
+.ziel-schild {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: var(--gold-weich);
+  color: #8A6410;
+  font-size: 11px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+/* ============================================================
    Willkommens-Fenster (Onboarding)
    ============================================================ */
 .modal-hintergrund {
@@ -1301,7 +1425,7 @@ body.modal-offen { overflow: hidden; }
 }
 
 /* ============================================================
-   Dein Satz für heute (Affirmation)
+   Affirmationen
 
    Bewusst anders als alles andere: keine Prozente, keine Balken,
    keine Farbwarnung. Cremefarben statt weiß, Serifenschrift statt
@@ -1324,13 +1448,6 @@ body.modal-offen { overflow: hidden; }
   margin: 0 auto;
   max-width: 30em;          /* Zeilen, die man in einem Blick erfasst */
   text-wrap: balance;       /* verteilt die Wörter gleichmäßig auf die Zeilen */
-}
-
-.affirmation-leer {
-  font-size: 15px;
-  font-style: italic;
-  color: var(--braun-weich);
-  margin: 0;
 }
 
 /* Die Zeile unter dem Satz: weiterblättern links, Zähler rechts. */
@@ -1404,27 +1521,6 @@ body.modal-offen { overflow: hidden; }
 .affirmation-form input:focus {
   outline: none;
   border-color: var(--pink);
-}
-
-/* Der Nachschub-Knopf. Pink, weil er etwas tut, aber klein und rund —
-   er soll auffindbar sein, ohne der Star der Karte zu werden. */
-.affirmation-holen {
-  display: block;
-  margin: 12px auto 0;
-  border: 1px dashed var(--pink);
-  background: var(--pink-weich);
-  color: var(--pink);
-  font-family: inherit;
-  font-size: 13px;
-  font-weight: 800;
-  padding: 8px 16px;
-  border-radius: 999px;
-  cursor: pointer;
-}
-.affirmation-holen:hover {
-  background: var(--pink);
-  color: #fff;
-  border-style: solid;
 }
 
 .affirmation-liste {
