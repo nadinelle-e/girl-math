@@ -24,6 +24,12 @@
          Wird von app.js gefüllt (renderKategorien). -->
     <section id="kategorien"></section>
 
+    <!-- Warnung vor nicht-monatlichen Zahlungen (vierteljährlich, jährlich):
+         was diesen Monat zusätzlich abgeht und was bald kommt.
+         Wird von app.js gefüllt (renderFaellig) und bleibt leer, wenn es
+         nichts zu warnen gibt. -->
+    <section id="faellig"></section>
+
     <!-- Kontostand-Bereich: Startguthaben eingeben + errechneter aktueller Stand.
          Wird von app.js gefüllt (renderKonto). -->
     <section id="konto"></section>
@@ -50,6 +56,11 @@
       <p>girl math · deine Zahlen bleiben nur in diesem Browser · niemand sieht sie außer dir</p>
     </footer>
   </div>
+
+  <!-- Das Willkommens-Fenster beim allerersten Besuch. Liegt außerhalb von
+       .wrap, weil es sich über die ganze Seite legt.
+       Wird von app.js gefüllt (renderModal) und ist sonst leer. -->
+  <div id="modal"></div>
 
   <!-- Die Logik ganz am Ende laden, damit die Bereiche oben schon existieren. -->
   <script src="app.js"></script>

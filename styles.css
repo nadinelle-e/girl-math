@@ -1,24 +1,38 @@
 /* ============================================================
    girl math — Aussehen
-   Ton: frech, direkt, ein bisschen böse. Hot-Pink trifft auf
-   harte schwarze Kanten. Die Konsumopfer-Farben werden umso
-   heißer, je mehr du für Unnötiges raushaust.
+   Ton: frech und direkt, aber warm. Hot-Pink und Grün auf
+   Perlweiß, alle harten Kanten in Warmbraun statt Schwarz
+   (dieselbe Grundfarbe wie in der Idalia-App).
+   Die Verdikt-Farben werden heißer, je mehr du für Ausnahmen
+   raushaust.
    ============================================================ */
 
 /* --- Farb-Variablen an einer Stelle, damit man sie leicht ändern kann --- */
 :root {
-  --pink:        #ff2d78;   /* Signalfarbe der App */
-  --pink-weich:  #ffd9e7;
-  --tinte:       #1a1220;   /* fast-schwarz mit Beeren-Ton */
-  --papier:      #fff6fb;   /* zarter Rosé-Hintergrund */
-  --karte:       #ffffff;
-  --grau:        #8a8090;
-  --linie:       #f0d6e4;
-  --gruen:       #0f9d58;   /* für Positives: Einnahmen, Sparen */
-  --rot:         #e0245e;   /* für „das kostet dich" */
+  /* Warmbraun ersetzt überall Schwarz — Schrift, Rahmen, Schatten */
+  --braun:       #6B4226;   /* Tiefes Warmbraun: Überschriften, Schrift */
+  --braun-weich: #8B6355;   /* Warmes Braun: Subtexte, Labels */
+  --linie:       rgba(107, 66, 38, 0.14);
+  --linie-zart:  rgba(107, 66, 38, 0.07);
 
-  --radius: 16px;
-  --schatten: 0 8px 24px rgba(255, 45, 120, 0.10);
+  /* Hintergründe */
+  --papier: #FDFAF5;        /* Perlweiß */
+  --karte:  #FFFFFF;
+  --creme:  #F7F1E8;        /* Milchcreme für ruhige Flächen */
+  --feld:   #FFFCF8;        /* Eingabefelder, minimal wärmer als Weiß */
+
+  /* Signalfarben */
+  --pink:       #FF2D78;
+  --pink-weich: #FFE4EF;
+  --gruen:      #3E9B70;    /* für Positives: Einnahmen, Sparen */
+  --rot:        #E2415F;    /* für „das kostet dich" */
+  --mauve:      #B89AD8;    /* für notwendige Ausgaben — ruhig, nicht anklagend */
+  --sand:       #E6D3BA;    /* für „noch übrig" */
+
+  --radius: 20px;
+  --radius-klein: 12px;
+  --schatten:      0 8px 24px rgba(107, 66, 38, 0.08);
+  --schatten-hoch: 0 18px 44px rgba(107, 66, 38, 0.18);
 }
 
 /* --- Grund-Reset & Grundlayout --- */
@@ -27,12 +41,17 @@
 body {
   margin: 0;
   font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  color: var(--tinte);
+  color: var(--braun);
   background:
-    radial-gradient(1200px 500px at 100% -10%, var(--pink-weich), transparent 60%),
+    radial-gradient(900px 420px at 100% -8%, var(--pink-weich), transparent 62%),
+    radial-gradient(700px 380px at -10% 8%, #E8F3EC, transparent 60%),
     var(--papier);
-  line-height: 1.5;
+  background-attachment: fixed;
+  line-height: 1.55;
 }
+
+/* Wenn das Willkommens-Fenster offen ist, soll die Seite dahinter nicht scrollen */
+body.modal-offen { overflow: hidden; }
 
 /* Zentrierter Inhalts-Container mit angenehmer Lesebreite */
 .wrap {
@@ -42,20 +61,52 @@ body {
 }
 
 /* ============================================================
-   Kopf & Konsumopfer-Banner
+   Kopf & Verdikt-Banner
    ============================================================ */
 #kopf { margin-bottom: 8px; }
 
+.kopf-zeile {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+/* Der Titel bekommt eine Serifenschrift — das hebt ihn vom Rest ab.
+   Georgia ist auf jedem Rechner da, wir laden also nichts nach. */
 .marke {
-  font-size: 30px;
-  font-weight: 900;
+  font-family: Georgia, "Iowan Old Style", "Times New Roman", serif;
+  font-size: 34px;
+  font-weight: 700;
+  font-style: italic;
   letter-spacing: -0.5px;
   margin: 0;
 }
 .marke span { color: var(--pink); }
 
+/* Der kleine Fragezeichen-Knopf, der das Willkommens-Fenster wieder öffnet */
+.hilfe-knopf {
+  flex: none;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 1px solid var(--linie);
+  background: var(--karte);
+  color: var(--braun-weich);
+  font-size: 15px;
+  font-weight: 800;
+  font-family: inherit;
+  cursor: pointer;
+  line-height: 1;
+}
+.hilfe-knopf:hover {
+  background: var(--pink-weich);
+  color: var(--pink);
+  border-color: var(--pink);
+}
+
 .monat-zeile {
-  color: var(--grau);
+  color: var(--braun-weich);
   font-weight: 600;
   margin: 2px 0 16px;
 }
@@ -63,42 +114,45 @@ body {
 /* Das große Verdikt-Banner. Die Farbe kommt aus den .v0…v6-Klassen. */
 .verdikt {
   border-radius: var(--radius);
-  padding: 20px 22px;
+  padding: 22px 24px;
   color: #fff;
   box-shadow: var(--schatten);
   margin-bottom: 22px;
 }
 .verdikt .prozent {
-  font-size: 44px;
+  font-size: 46px;
   font-weight: 900;
   line-height: 1;
   margin: 0;
+  letter-spacing: -1px;
 }
-.verdikt .prozent small { font-size: 18px; font-weight: 700; opacity: 0.9; }
+.verdikt .prozent small { font-size: 17px; font-weight: 700; opacity: 0.92; letter-spacing: 0; }
 .verdikt .spruch {
   font-size: 17px;
   font-weight: 700;
-  margin: 8px 0 0;
+  margin: 10px 0 0;
+  line-height: 1.4;
 }
 
-/* Verdikt-Stufen: von entspannt (grün) bis Katastrophe (dunkelrot).
-   v0 = Spar-Königin … v6 = Insolvenz-Vibes */
-.v0 { background: linear-gradient(135deg, #12b56a, #0f9d58); }
-.v1 { background: linear-gradient(135deg, #4caf7d, #2e9e6b); }
-.v2 { background: linear-gradient(135deg, #f5a623, #f08c00); }
-.v3 { background: linear-gradient(135deg, #ff7a45, #fb5607); }
-.v4 { background: linear-gradient(135deg, #ff4d6d, #e0245e); }
-.v5 { background: linear-gradient(135deg, #d61a5c, #a4133c); }
-.v6 { background: linear-gradient(135deg, #7a0b2e, #3a0517); }
+/* Verdikt-Stufen: von entspannt (grün) bis Katastrophe (dunkle Beere).
+   v0 = Spar-Königin … v6 = Insolvenz-Vibes. Kein Schwarz, auch nicht ganz unten. */
+.v-neutral { background: linear-gradient(135deg, #B49685, #8B6355); }
+.v0 { background: linear-gradient(135deg, #5FBE92, #3E9B70); }
+.v1 { background: linear-gradient(135deg, #86C9A6, #5FB48A); }
+.v2 { background: linear-gradient(135deg, #F3C05E, #E9A72E); }
+.v3 { background: linear-gradient(135deg, #F79A6B, #EF7A45); }
+.v4 { background: linear-gradient(135deg, #F5738F, #E2415F); }
+.v5 { background: linear-gradient(135deg, #DE4E7C, #B82C58); }
+.v6 { background: linear-gradient(135deg, #93374F, #63213A); }
 
 /* ============================================================
    Karten für jede Kategorie
    ============================================================ */
 .karte {
   background: var(--karte);
-  border: 1px solid var(--linie);
+  border: 1px solid var(--linie-zart);
   border-radius: var(--radius);
-  padding: 16px 16px 14px;
+  padding: 18px 18px 16px;
   margin-bottom: 14px;
   box-shadow: var(--schatten);
 }
@@ -108,7 +162,6 @@ body {
   align-items: baseline;
   justify-content: space-between;
   gap: 10px;
-  margin-bottom: 10px;
 }
 .karte-titel {
   font-size: 15px;
@@ -124,56 +177,115 @@ body {
 .summe-positiv { color: var(--gruen); }
 .summe-nicht   { color: var(--rot); }
 
-/* Eine Zeile pro Posten: Bezeichnung, Betrag, (Abo-Schalter), Löschen */
+/* Der kleine erklärende Satz unter einer Karten-Überschrift */
+.kat-hinweis {
+  font-size: 12px;
+  color: var(--braun-weich);
+  margin: 2px 0 10px;
+}
+.kat-hinweis.mittig { text-align: center; margin: 0 0 14px; }
+
+/* ============================================================
+   Eine Posten-Zeile: oben Text/Betrag/Löschen,
+   darunter bei Bedarf Häkchen, Rhythmus und Umlage-Hinweis.
+   ============================================================ */
 .posten {
-  display: grid;
-  grid-template-columns: 1fr 96px auto;
-  gap: 8px;
-  align-items: center;
-  padding: 6px 0;
+  padding: 9px 0;
   border-top: 1px dashed var(--linie);
 }
 .posten:first-of-type { border-top: none; }
-.posten.hat-schalter { grid-template-columns: 1fr 96px auto auto; }
+
+.posten-zeile {
+  display: grid;
+  grid-template-columns: 1fr 100px auto;
+  gap: 8px;
+  align-items: center;
+}
+
+/* Die zweite Zeile mit den Einstellungen zum Posten */
+.posten-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin: 8px 0 0 2px;
+}
 
 .posten input[type="text"],
 .posten input[type="number"] {
   width: 100%;
   border: 1px solid var(--linie);
-  border-radius: 10px;
-  padding: 7px 9px;
+  border-radius: var(--radius-klein);
+  padding: 9px 11px;
   font-size: 14px;
   font-family: inherit;
-  background: #fffafc;
+  color: var(--braun);
+  background: var(--feld);
 }
 .posten input[type="number"] { text-align: right; }
 .posten input:focus {
   outline: none;
   border-color: var(--pink);
-  box-shadow: 0 0 0 3px rgba(255,45,120,0.15);
+  box-shadow: 0 0 0 3px rgba(255, 45, 120, 0.15);
 }
 
-/* Der „notwendig?"-Schalter bei Abos */
+/* Der „notwendig?"-Schalter bei Abos und Versicherungen */
 .schalter {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
-  color: var(--grau);
+  color: var(--braun-weich);
   white-space: nowrap;
   cursor: pointer;
 }
 .schalter input { accent-color: var(--pink); }
+
+/* Die kleinen Auswahlfelder (Rhythmus, Fälligkeits-Monat) */
+.mini-auswahl {
+  border: 1px solid var(--linie);
+  border-radius: 999px;
+  background: var(--creme);
+  color: var(--braun);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 4px 10px;
+  cursor: pointer;
+}
+.mini-auswahl:focus {
+  outline: none;
+  border-color: var(--pink);
+  box-shadow: 0 0 0 3px rgba(255, 45, 120, 0.15);
+}
+.mini-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--braun-weich);
+}
+
+/* „= 30,00 € / Monat" — nimmt jährlichen Beträgen den Schrecken */
+.umlage-hinweis {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--pink);
+  background: var(--pink-weich);
+  border-radius: 999px;
+  padding: 3px 10px;
+}
 
 /* Löschen-Knopf (das kleine ✕) */
 .del {
   border: none;
   background: var(--pink-weich);
   color: var(--pink);
-  width: 28px;
-  height: 28px;
-  border-radius: 8px;
+  width: 30px;
+  height: 30px;
+  border-radius: 10px;
   font-size: 15px;
   font-weight: 900;
   cursor: pointer;
@@ -181,63 +293,79 @@ body {
 }
 .del:hover { background: var(--pink); color: #fff; }
 
-/* Das Formular zum Hinzufügen eines neuen Postens */
-.hinzufuegen {
+/* ============================================================
+   Das Formular zum Hinzufügen eines neuen Postens
+   ============================================================ */
+.hinzufuegen { margin-top: 12px; }
+
+.form-zeile {
   display: grid;
-  grid-template-columns: 1fr 96px auto;
+  grid-template-columns: 1fr 100px auto;
   gap: 8px;
-  margin-top: 10px;
 }
-.hinzufuegen.hat-schalter { grid-template-columns: 1fr 96px auto auto; }
+.form-extras {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin: 8px 0 0 2px;
+}
+
 .hinzufuegen input {
   border: 1px solid var(--linie);
-  border-radius: 10px;
-  padding: 8px 10px;
+  border-radius: var(--radius-klein);
+  padding: 9px 11px;
   font-size: 14px;
   font-family: inherit;
-  background: #fffafc;
+  color: var(--braun);
+  background: var(--feld);
 }
 .hinzufuegen input[type="number"] { text-align: right; }
 .hinzufuegen input:focus {
   outline: none;
   border-color: var(--pink);
-  box-shadow: 0 0 0 3px rgba(255,45,120,0.15);
+  box-shadow: 0 0 0 3px rgba(255, 45, 120, 0.15);
 }
 
 .leer-hinweis {
-  color: var(--grau);
+  color: var(--braun-weich);
   font-size: 13px;
   font-style: italic;
   padding: 4px 0;
 }
+.leer-hinweis.mittig { text-align: center; padding: 18px 0; }
 
 /* ============================================================
    Knöpfe
    ============================================================ */
 .btn {
   border: 1px solid var(--pink);
-  background: #fff;
+  background: var(--karte);
   color: var(--pink);
   font-weight: 800;
   font-size: 14px;
-  padding: 9px 14px;
-  border-radius: 12px;
+  padding: 10px 16px;
+  border-radius: var(--radius-klein);
   cursor: pointer;
   font-family: inherit;
 }
 .btn:hover { background: var(--pink-weich); }
+
 .btn-plus {
   background: var(--pink);
   color: #fff;
   border-color: var(--pink);
+  padding: 9px 14px;
 }
-.btn-plus:hover { background: #e0245e; }
+.btn-plus:hover { background: #E0245E; color: #fff; }
+
+/* Der starke Knopf ist jetzt braun statt schwarz */
 .btn-stark {
-  background: var(--tinte);
+  background: var(--braun);
   color: #fff;
-  border-color: var(--tinte);
+  border-color: var(--braun);
 }
-.btn-stark:hover { background: #000; }
+.btn-stark:hover { background: #563520; }
 
 .werkzeuge {
   display: flex;
@@ -247,14 +375,136 @@ body {
 }
 
 /* ============================================================
-   Monats-Übersicht (Prozente + 50/30/20)
+   Fälligkeits-Warnung für vierteljährliche und jährliche Posten
+   ============================================================ */
+.faellig-karte { border-left: 6px solid var(--sand); }
+.faellig-karte.jetzt { border-left-color: var(--rot); background: #FFF7F3; }
+.faellig-karte.bald  { border-left-color: var(--mauve); }
+
+.faellig-titel {
+  font-size: 15px;
+  font-weight: 900;
+  margin: 0;
+}
+.faellig-unter {
+  font-size: 12px;
+  color: var(--braun-weich);
+  margin: 2px 0 10px;
+}
+
+.faellig-zeile {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 10px;
+  padding: 6px 0;
+  border-top: 1px dashed var(--linie);
+  font-size: 14px;
+}
+.faellig-name { font-weight: 700; }
+.faellig-name small {
+  display: block;
+  font-weight: 600;
+  font-size: 11px;
+  color: var(--braun-weich);
+}
+.faellig-betrag { font-weight: 800; white-space: nowrap; }
+
+.faellig-summe {
+  text-align: right;
+  font-weight: 900;
+  font-size: 15px;
+  color: var(--rot);
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid var(--linie);
+}
+
+/* ============================================================
+   Monats-Übersicht: Kreisdiagramm, Zahlen, 50/30/20
    ============================================================ */
 .uebersicht-karte { background: var(--karte); }
 
+/* --- Das Kreisdiagramm (Donut) --- */
+.donut-bereich {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px 26px;
+  margin: 4px 0 18px;
+}
+
+.donut {
+  width: 176px;
+  height: 176px;
+  flex: none;
+}
+/* Die graue Spur unter den Segmenten — schließt kleine Lücken optisch */
+.donut-spur {
+  fill: none;
+  stroke: var(--creme);
+  stroke-width: 20;
+}
+.segment {
+  fill: none;
+  stroke-width: 20;
+  stroke-linecap: butt;
+}
+.seg-notwendig { stroke: var(--mauve); }
+.seg-nicht     { stroke: var(--pink); }
+.seg-sparen    { stroke: var(--gruen); }
+.seg-uebrig    { stroke: var(--sand); }
+
+.donut-zahl {
+  font-family: Georgia, "Iowan Old Style", "Times New Roman", serif;
+  font-size: 30px;
+  font-weight: 700;
+  fill: var(--braun);
+}
+.donut-unter {
+  font-family: system-ui, sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  fill: var(--braun-weich);
+}
+
+/* --- Legende neben dem Diagramm --- */
+.legende {
+  display: grid;
+  gap: 7px;
+  min-width: 180px;
+}
+.legende-eintrag {
+  display: grid;
+  grid-template-columns: 12px 1fr auto;
+  align-items: center;
+  gap: 9px;
+  font-size: 13px;
+  font-weight: 700;
+}
+.legende-punkt {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  /* Die Segment-Klassen setzen "stroke" — für den Punkt brauchen wir
+     dieselbe Farbe als Hintergrund, deshalb hier noch mal einzeln. */
+}
+.legende-punkt.seg-notwendig { background: var(--mauve); }
+.legende-punkt.seg-nicht     { background: var(--pink); }
+.legende-punkt.seg-sparen    { background: var(--gruen); }
+.legende-punkt.seg-uebrig    { background: var(--sand); }
+.legende-text { color: var(--braun-weich); }
+.legende-wert { color: var(--braun); }
+
+/* --- Die Zahlen darunter --- */
 .zahlenzeile {
   display: flex;
   justify-content: space-between;
-  padding: 7px 0;
+  gap: 12px;
+  padding: 8px 0;
   border-top: 1px dashed var(--linie);
   font-size: 14px;
 }
@@ -264,25 +514,25 @@ body {
 .wert-positiv { color: var(--gruen); font-weight: 800; }
 .wert-nicht   { color: var(--rot);   font-weight: 800; }
 
-/* Die kleinen Balken für den 50/30/20-Vergleich */
+/* --- Die kleinen Balken für den 50/30/20-Vergleich --- */
 .regel-titel {
   font-weight: 800;
   font-size: 14px;
-  margin: 16px 0 8px;
+  margin: 18px 0 10px;
 }
-.balken-zeile { margin-bottom: 10px; }
+.balken-zeile { margin-bottom: 11px; }
 .balken-label {
   display: flex;
   justify-content: space-between;
   font-size: 12px;
   font-weight: 700;
-  margin-bottom: 3px;
+  margin-bottom: 4px;
 }
-.balken-label .ziel { color: var(--grau); font-weight: 600; }
+.balken-label .ziel { color: var(--braun-weich); font-weight: 600; }
 .balken-spur {
   position: relative;
   height: 12px;
-  background: var(--pink-weich);
+  background: var(--creme);
   border-radius: 999px;
   overflow: hidden;
 }
@@ -291,45 +541,46 @@ body {
   left: 0; top: 0; bottom: 0;
   border-radius: 999px;
 }
-.fuell-notwendig { background: #6c8cff; }
-.fuell-nicht     { background: var(--rot); }
+.fuell-notwendig { background: var(--mauve); }
+.fuell-nicht     { background: var(--pink); }
 .fuell-sparen    { background: var(--gruen); }
 /* Ziel-Markierung als senkrechter Strich */
 .ziel-strich {
   position: absolute;
   top: -2px; bottom: -2px;
   width: 2px;
-  background: var(--tinte);
-  opacity: 0.55;
+  background: var(--braun);
+  opacity: 0.45;
 }
 
 /* ============================================================
    Archiv
    ============================================================ */
-.archiv-titel { font-size: 18px; font-weight: 900; margin: 26px 0 10px; }
+.archiv-titel { font-size: 19px; font-weight: 900; margin: 26px 0 10px; }
 .archiv-eintrag {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
   background: var(--karte);
-  border: 1px solid var(--linie);
+  border: 1px solid var(--linie-zart);
   border-left: 6px solid var(--pink);
-  border-radius: 12px;
-  padding: 12px 14px;
+  border-radius: var(--radius-klein);
+  padding: 13px 15px;
   margin-bottom: 8px;
+  box-shadow: var(--schatten);
 }
 .archiv-monat { font-weight: 800; }
-.archiv-detail { color: var(--grau); font-size: 13px; }
+.archiv-detail { color: var(--braun-weich); font-size: 13px; }
 .archiv-badge {
   font-weight: 900;
   font-size: 15px;
-  padding: 4px 10px;
+  padding: 5px 12px;
   border-radius: 999px;
   color: #fff;
   white-space: nowrap;
 }
-.trend { font-size: 13px; font-weight: 700; margin: 6px 2px 0; }
+.trend { font-size: 13px; font-weight: 700; margin: 6px 2px 0; color: var(--braun-weich); }
 .trend-besser { color: var(--gruen); }
 .trend-schlechter { color: var(--rot); }
 
@@ -343,49 +594,118 @@ body {
   justify-content: space-between;
   gap: 14px;
 }
+.konto-block.rechts { text-align: right; }
 .konto-block .beschriftung {
   font-size: 12px;
   font-weight: 700;
-  color: var(--grau);
+  color: var(--braun-weich);
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
 .konto-block input {
   border: 1px solid var(--linie);
-  border-radius: 10px;
-  padding: 8px 10px;
+  border-radius: var(--radius-klein);
+  padding: 9px 11px;
   font-size: 16px;
   font-weight: 700;
-  width: 140px;
+  width: 150px;
   text-align: right;
   font-family: inherit;
-  background: #fffafc;
+  color: var(--braun);
+  background: var(--feld);
 }
-.konto-stand { font-size: 28px; font-weight: 900; }
+.konto-block input:focus {
+  outline: none;
+  border-color: var(--pink);
+  box-shadow: 0 0 0 3px rgba(255, 45, 120, 0.15);
+}
+.konto-stand { font-size: 30px; font-weight: 900; letter-spacing: -0.5px; }
 .konto-stand.negativ { color: var(--rot); }
+
+/* Die Erklärung, warum Kontostand und Übersicht auseinandergehen dürfen */
+.konto-fussnote {
+  flex-basis: 100%;
+  margin: 0;
+  padding-top: 12px;
+  border-top: 1px dashed var(--linie);
+  font-size: 12px;
+  color: var(--braun-weich);
+}
+
+/* ============================================================
+   Willkommens-Fenster (Onboarding)
+   ============================================================ */
+.modal-hintergrund {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(107, 66, 38, 0.42);
+  backdrop-filter: blur(3px);
+  overflow-y: auto;
+}
+
+.modal-box {
+  background: var(--papier);
+  border-radius: var(--radius);
+  box-shadow: var(--schatten-hoch);
+  padding: 26px 26px 22px;
+  max-width: 460px;
+  width: 100%;
+  margin: auto;
+}
+
+.modal-titel {
+  font-family: Georgia, "Iowan Old Style", "Times New Roman", serif;
+  font-size: 26px;
+  font-style: italic;
+  font-weight: 700;
+  margin: 0 0 8px;
+}
+.modal-text { font-size: 15px; margin: 0 0 14px; }
+
+.modal-liste {
+  margin: 0 0 16px;
+  padding-left: 22px;
+  font-size: 14px;
+}
+.modal-liste li { margin-bottom: 9px; }
+.modal-liste li::marker { color: var(--pink); font-weight: 900; }
+
+.modal-fuss {
+  font-size: 12px;
+  color: var(--braun-weich);
+  background: var(--creme);
+  border-radius: var(--radius-klein);
+  padding: 10px 12px;
+  margin: 0 0 18px;
+}
+.modal-knopf { width: 100%; padding: 13px; font-size: 15px; }
 
 /* ============================================================
    Fußzeile & kleine Helfer
    ============================================================ */
 .fuss {
   text-align: center;
-  color: var(--grau);
+  color: var(--braun-weich);
   font-size: 12px;
   margin-top: 30px;
 }
 .nr-titel {
   font-size: 20px;
   font-weight: 900;
-  margin: 24px 0 10px;
+  margin: 26px 0 10px;
 }
 
 /* Auf schmalen Handys die Gitter etwas entspannen */
 @media (max-width: 460px) {
-  .posten, .hinzufuegen { grid-template-columns: 1fr 80px auto; }
-  .posten.hat-schalter, .hinzufuegen.hat-schalter {
-    grid-template-columns: 1fr 80px auto;
-  }
-  /* Der Abo-Schalter rutscht dann in eine eigene Zeile darunter */
-  .posten.hat-schalter .schalter,
-  .hinzufuegen.hat-schalter .schalter { grid-column: 1 / -1; }
+  .marke { font-size: 29px; }
+  .verdikt .prozent { font-size: 38px; }
+  .posten-zeile, .form-zeile { grid-template-columns: 1fr 84px auto; }
+  .donut-bereich { gap: 4px 16px; }
+  .legende { min-width: 0; width: 100%; }
+  .konto-block input { width: 130px; }
 }
