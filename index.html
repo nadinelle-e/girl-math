@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<!--
+  girl math — dein konfrontativer Finanzplaner.
+  Diese Datei beschreibt nur den AUFBAU der Seite (welche Bereiche es gibt).
+  Das Aussehen steckt in styles.css, die Logik (Rechnen, Speichern) in app.js.
+  Die meisten Inhalte werden von app.js zur Laufzeit hier hineingeschrieben.
+-->
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <!-- Sorgt dafür, dass die Seite auf dem Handy korrekt skaliert -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>girl math</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="wrap">
+
+    <!-- Kopfzeile: Titel + aktueller Monat + großer Konsumopfer-Status.
+         Wird von app.js gefüllt (renderKopf). -->
+    <header id="kopf"></header>
+
+    <!-- Alle Eingabe-Kategorien (Einnahmen, Fixkosten, Abos, Einkauf, Konsum, Sparen).
+         Wird von app.js gefüllt (renderKategorien). -->
+    <section id="kategorien"></section>
+
+    <!-- Kontostand-Bereich: Startguthaben eingeben + errechneter aktueller Stand.
+         Wird von app.js gefüllt (renderKonto). -->
+    <section id="konto"></section>
+
+    <!-- Monats-Übersicht: Prozente, 50/30/20-Vergleich, Verdikt.
+         Wird von app.js gefüllt (renderUebersicht). -->
+    <section id="uebersicht"></section>
+
+    <!-- Werkzeugleiste: Monat abschließen, Sichern (Export), Laden (Import). -->
+    <div class="werkzeuge">
+      <button id="btn-monat-abschliessen" class="btn btn-stark">Monat abschließen</button>
+      <button id="btn-export" class="btn">Sichern (Export)</button>
+      <!-- Für den Import brauchen wir ein verstecktes Datei-Auswahlfeld,
+           das der Button per Klick auslöst. -->
+      <button id="btn-import" class="btn">Laden (Import)</button>
+      <input id="import-datei" type="file" accept="application/json" hidden />
+    </div>
+
+    <!-- Archiv: abgeschlossene Monate + einfacher Trend.
+         Wird von app.js gefüllt (renderArchiv). -->
+    <section id="archiv"></section>
+
+    <footer class="fuss">
+      <p>girl math · deine Zahlen bleiben nur in diesem Browser · niemand sieht sie außer dir</p>
+    </footer>
+  </div>
+
+  <!-- Die Logik ganz am Ende laden, damit die Bereiche oben schon existieren. -->
+  <script src="app.js"></script>
+</body>
+</html>

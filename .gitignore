@@ -1,0 +1,5 @@
+# macOS-Systemkram, der nicht ins Repo gehört
+.DS_Store
+
+# Exportierte Sicherungen (enthalten deine echten Zahlen — nie hochladen!)
+girl-math-*.json

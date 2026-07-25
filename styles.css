@@ -1,0 +1,391 @@
+/* ============================================================
+   girl math — Aussehen
+   Ton: frech, direkt, ein bisschen böse. Hot-Pink trifft auf
+   harte schwarze Kanten. Die Konsumopfer-Farben werden umso
+   heißer, je mehr du für Unnötiges raushaust.
+   ============================================================ */
+
+/* --- Farb-Variablen an einer Stelle, damit man sie leicht ändern kann --- */
+:root {
+  --pink:        #ff2d78;   /* Signalfarbe der App */
+  --pink-weich:  #ffd9e7;
+  --tinte:       #1a1220;   /* fast-schwarz mit Beeren-Ton */
+  --papier:      #fff6fb;   /* zarter Rosé-Hintergrund */
+  --karte:       #ffffff;
+  --grau:        #8a8090;
+  --linie:       #f0d6e4;
+  --gruen:       #0f9d58;   /* für Positives: Einnahmen, Sparen */
+  --rot:         #e0245e;   /* für „das kostet dich" */
+
+  --radius: 16px;
+  --schatten: 0 8px 24px rgba(255, 45, 120, 0.10);
+}
+
+/* --- Grund-Reset & Grundlayout --- */
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  color: var(--tinte);
+  background:
+    radial-gradient(1200px 500px at 100% -10%, var(--pink-weich), transparent 60%),
+    var(--papier);
+  line-height: 1.5;
+}
+
+/* Zentrierter Inhalts-Container mit angenehmer Lesebreite */
+.wrap {
+  max-width: 780px;
+  margin: 0 auto;
+  padding: 24px 18px 80px;
+}
+
+/* ============================================================
+   Kopf & Konsumopfer-Banner
+   ============================================================ */
+#kopf { margin-bottom: 8px; }
+
+.marke {
+  font-size: 30px;
+  font-weight: 900;
+  letter-spacing: -0.5px;
+  margin: 0;
+}
+.marke span { color: var(--pink); }
+
+.monat-zeile {
+  color: var(--grau);
+  font-weight: 600;
+  margin: 2px 0 16px;
+}
+
+/* Das große Verdikt-Banner. Die Farbe kommt aus den .v0…v6-Klassen. */
+.verdikt {
+  border-radius: var(--radius);
+  padding: 20px 22px;
+  color: #fff;
+  box-shadow: var(--schatten);
+  margin-bottom: 22px;
+}
+.verdikt .prozent {
+  font-size: 44px;
+  font-weight: 900;
+  line-height: 1;
+  margin: 0;
+}
+.verdikt .prozent small { font-size: 18px; font-weight: 700; opacity: 0.9; }
+.verdikt .spruch {
+  font-size: 17px;
+  font-weight: 700;
+  margin: 8px 0 0;
+}
+
+/* Verdikt-Stufen: von entspannt (grün) bis Katastrophe (dunkelrot).
+   v0 = Spar-Königin … v6 = Insolvenz-Vibes */
+.v0 { background: linear-gradient(135deg, #12b56a, #0f9d58); }
+.v1 { background: linear-gradient(135deg, #4caf7d, #2e9e6b); }
+.v2 { background: linear-gradient(135deg, #f5a623, #f08c00); }
+.v3 { background: linear-gradient(135deg, #ff7a45, #fb5607); }
+.v4 { background: linear-gradient(135deg, #ff4d6d, #e0245e); }
+.v5 { background: linear-gradient(135deg, #d61a5c, #a4133c); }
+.v6 { background: linear-gradient(135deg, #7a0b2e, #3a0517); }
+
+/* ============================================================
+   Karten für jede Kategorie
+   ============================================================ */
+.karte {
+  background: var(--karte);
+  border: 1px solid var(--linie);
+  border-radius: var(--radius);
+  padding: 16px 16px 14px;
+  margin-bottom: 14px;
+  box-shadow: var(--schatten);
+}
+
+.karte-kopf {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.karte-titel {
+  font-size: 15px;
+  font-weight: 800;
+  margin: 0;
+}
+.karte-summe {
+  font-weight: 800;
+  font-size: 15px;
+  white-space: nowrap;
+}
+/* Farbige Summen je nach Charakter der Kategorie */
+.summe-positiv { color: var(--gruen); }
+.summe-nicht   { color: var(--rot); }
+
+/* Eine Zeile pro Posten: Bezeichnung, Betrag, (Abo-Schalter), Löschen */
+.posten {
+  display: grid;
+  grid-template-columns: 1fr 96px auto;
+  gap: 8px;
+  align-items: center;
+  padding: 6px 0;
+  border-top: 1px dashed var(--linie);
+}
+.posten:first-of-type { border-top: none; }
+.posten.hat-schalter { grid-template-columns: 1fr 96px auto auto; }
+
+.posten input[type="text"],
+.posten input[type="number"] {
+  width: 100%;
+  border: 1px solid var(--linie);
+  border-radius: 10px;
+  padding: 7px 9px;
+  font-size: 14px;
+  font-family: inherit;
+  background: #fffafc;
+}
+.posten input[type="number"] { text-align: right; }
+.posten input:focus {
+  outline: none;
+  border-color: var(--pink);
+  box-shadow: 0 0 0 3px rgba(255,45,120,0.15);
+}
+
+/* Der „notwendig?"-Schalter bei Abos */
+.schalter {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--grau);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.schalter input { accent-color: var(--pink); }
+
+/* Löschen-Knopf (das kleine ✕) */
+.del {
+  border: none;
+  background: var(--pink-weich);
+  color: var(--pink);
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  font-size: 15px;
+  font-weight: 900;
+  cursor: pointer;
+  line-height: 1;
+}
+.del:hover { background: var(--pink); color: #fff; }
+
+/* Das Formular zum Hinzufügen eines neuen Postens */
+.hinzufuegen {
+  display: grid;
+  grid-template-columns: 1fr 96px auto;
+  gap: 8px;
+  margin-top: 10px;
+}
+.hinzufuegen.hat-schalter { grid-template-columns: 1fr 96px auto auto; }
+.hinzufuegen input {
+  border: 1px solid var(--linie);
+  border-radius: 10px;
+  padding: 8px 10px;
+  font-size: 14px;
+  font-family: inherit;
+  background: #fffafc;
+}
+.hinzufuegen input[type="number"] { text-align: right; }
+.hinzufuegen input:focus {
+  outline: none;
+  border-color: var(--pink);
+  box-shadow: 0 0 0 3px rgba(255,45,120,0.15);
+}
+
+.leer-hinweis {
+  color: var(--grau);
+  font-size: 13px;
+  font-style: italic;
+  padding: 4px 0;
+}
+
+/* ============================================================
+   Knöpfe
+   ============================================================ */
+.btn {
+  border: 1px solid var(--pink);
+  background: #fff;
+  color: var(--pink);
+  font-weight: 800;
+  font-size: 14px;
+  padding: 9px 14px;
+  border-radius: 12px;
+  cursor: pointer;
+  font-family: inherit;
+}
+.btn:hover { background: var(--pink-weich); }
+.btn-plus {
+  background: var(--pink);
+  color: #fff;
+  border-color: var(--pink);
+}
+.btn-plus:hover { background: #e0245e; }
+.btn-stark {
+  background: var(--tinte);
+  color: #fff;
+  border-color: var(--tinte);
+}
+.btn-stark:hover { background: #000; }
+
+.werkzeuge {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 22px 0;
+}
+
+/* ============================================================
+   Monats-Übersicht (Prozente + 50/30/20)
+   ============================================================ */
+.uebersicht-karte { background: var(--karte); }
+
+.zahlenzeile {
+  display: flex;
+  justify-content: space-between;
+  padding: 7px 0;
+  border-top: 1px dashed var(--linie);
+  font-size: 14px;
+}
+.zahlenzeile:first-of-type { border-top: none; }
+.zahlenzeile strong { font-weight: 800; }
+.zahlenzeile.dick { font-size: 16px; }
+.wert-positiv { color: var(--gruen); font-weight: 800; }
+.wert-nicht   { color: var(--rot);   font-weight: 800; }
+
+/* Die kleinen Balken für den 50/30/20-Vergleich */
+.regel-titel {
+  font-weight: 800;
+  font-size: 14px;
+  margin: 16px 0 8px;
+}
+.balken-zeile { margin-bottom: 10px; }
+.balken-label {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  font-weight: 700;
+  margin-bottom: 3px;
+}
+.balken-label .ziel { color: var(--grau); font-weight: 600; }
+.balken-spur {
+  position: relative;
+  height: 12px;
+  background: var(--pink-weich);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.balken-fuellung {
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  border-radius: 999px;
+}
+.fuell-notwendig { background: #6c8cff; }
+.fuell-nicht     { background: var(--rot); }
+.fuell-sparen    { background: var(--gruen); }
+/* Ziel-Markierung als senkrechter Strich */
+.ziel-strich {
+  position: absolute;
+  top: -2px; bottom: -2px;
+  width: 2px;
+  background: var(--tinte);
+  opacity: 0.55;
+}
+
+/* ============================================================
+   Archiv
+   ============================================================ */
+.archiv-titel { font-size: 18px; font-weight: 900; margin: 26px 0 10px; }
+.archiv-eintrag {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: var(--karte);
+  border: 1px solid var(--linie);
+  border-left: 6px solid var(--pink);
+  border-radius: 12px;
+  padding: 12px 14px;
+  margin-bottom: 8px;
+}
+.archiv-monat { font-weight: 800; }
+.archiv-detail { color: var(--grau); font-size: 13px; }
+.archiv-badge {
+  font-weight: 900;
+  font-size: 15px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  color: #fff;
+  white-space: nowrap;
+}
+.trend { font-size: 13px; font-weight: 700; margin: 6px 2px 0; }
+.trend-besser { color: var(--gruen); }
+.trend-schlechter { color: var(--rot); }
+
+/* ============================================================
+   Kontostand-Bereich
+   ============================================================ */
+.konto-karte {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+.konto-block .beschriftung {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--grau);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.konto-block input {
+  border: 1px solid var(--linie);
+  border-radius: 10px;
+  padding: 8px 10px;
+  font-size: 16px;
+  font-weight: 700;
+  width: 140px;
+  text-align: right;
+  font-family: inherit;
+  background: #fffafc;
+}
+.konto-stand { font-size: 28px; font-weight: 900; }
+.konto-stand.negativ { color: var(--rot); }
+
+/* ============================================================
+   Fußzeile & kleine Helfer
+   ============================================================ */
+.fuss {
+  text-align: center;
+  color: var(--grau);
+  font-size: 12px;
+  margin-top: 30px;
+}
+.nr-titel {
+  font-size: 20px;
+  font-weight: 900;
+  margin: 24px 0 10px;
+}
+
+/* Auf schmalen Handys die Gitter etwas entspannen */
+@media (max-width: 460px) {
+  .posten, .hinzufuegen { grid-template-columns: 1fr 80px auto; }
+  .posten.hat-schalter, .hinzufuegen.hat-schalter {
+    grid-template-columns: 1fr 80px auto;
+  }
+  /* Der Abo-Schalter rutscht dann in eine eigene Zeile darunter */
+  .posten.hat-schalter .schalter,
+  .hinzufuegen.hat-schalter .schalter { grid-column: 1 / -1; }
+}
