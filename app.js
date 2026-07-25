@@ -1217,7 +1217,7 @@ function renderFaellig(z) {
 
   const jetzt = z.faelligJetzt.length ? `
     <div class="karte faellig-karte jetzt">
-      <h3 class="faellig-titel">💣 Diesen Monat geht zusätzlich ab</h3>
+      <h3 class="faellig-titel">❗️ Diesen Monat geht zusätzlich ab</h3>
       <p class="faellig-unter">Das sind keine monatlichen Posten. Die schlagen jetzt komplett zu.</p>
       ${z.faelligJetzt.map(e => zeile(e)).join("")}
       <div class="faellig-summe">zusammen ${euro(z.faelligJetzt.reduce((s, e) => s + e.betrag, 0))}</div>
