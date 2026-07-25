@@ -138,6 +138,36 @@ stellen. Nach ein paar Minuten gibt es eine URL wie
 hat ihre eigenen, privaten Daten im eigenen Browser. Im Repo liegt nur das
 Programm, niemals deine Zahlen.
 
+## Nachprüfen, ob noch alles stimmt
+
+`test_girlmath.py` fährt die App in einem echten Browser hoch und geht sie
+durch: rechnen, eintragen, Monat abschließen, Bericht, alte Stände laden, und
+das Ganze zusätzlich auf einem Android- und einem iPhone-Bildschirm. Über
+hundert Prüfungen. Wichtig dabei: **Jeder JavaScript-Fehler lässt den Durchlauf
+durchfallen**, auch wenn die sichtbare Prüfung daneben grün wäre.
+
+Einmalig einrichten:
+
+```bash
+pip3 install playwright
+python3 -m playwright install chromium
+```
+
+Dann nach jeder Änderung:
+
+```bash
+cd ~/girl-math
+python3 test_girlmath.py
+```
+
+Am Ende steht entweder „Alle Tests bestanden" oder eine Liste dessen, was nicht
+mehr passt. Screenshots und ein Beispiel-Bericht landen in `.test-ausgabe/`.
+
+Wenn du etwas an der App änderst und ein Test meckert, ist das keine
+Schikane, sondern der Hinweis, dass eine Zahl oder ein Ablauf jetzt anders
+ist als vorher. Entweder war die Änderung nicht gewollt, oder der Test muss
+nachgezogen werden.
+
 ## Aufbau des Codes
 
 | Datei         | Zweck                                                        |
@@ -145,6 +175,7 @@ Programm, niemals deine Zahlen.
 | `index.html`  | Aufbau der Seite (welche Bereiche es gibt)                   |
 | `styles.css`  | Aussehen (Pink & Grün auf Perlweiß, alles Dunkle in Warmbraun) |
 | `app.js`      | Logik: Eingaben, Rechnen, Konsumopfer-Score, Speichern      |
+| `test_girlmath.py` | Prüft im echten Browser, dass alles noch rechnet und läuft |
 
 Die Sprüche stehen oben in `app.js` in der Liste `VERDIKTE` — pro Stufe mehrere,
 damit sich der Witz nicht jeden Monat wiederholt. Welcher kommt, hängt am Monat.

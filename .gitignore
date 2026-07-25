@@ -3,3 +3,6 @@
 
 # Exportierte Sicherungen (enthalten deine echten Zahlen — nie hochladen!)
 girl-math-*.json
+
+# Was die Tests beim Laufen erzeugen: Screenshots und Beispiel-Berichte
+.test-ausgabe/
