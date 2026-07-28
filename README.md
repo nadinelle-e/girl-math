@@ -30,12 +30,74 @@ Beim ersten Besuch erklärt dir ein kurzes Fenster den Ablauf. Später kommst du
 5. **Einkauf** in Lebensmittel (notwendig) und Ausnahmen (Sushi, Snacks).
 6. **Große Ausnahmen** (Klamotten & alles nicht Lebensnotwendige).
 7. **Sparen** (was du zur Seite legst).
-8. **Kontostand am Monatsanfang** eintragen: was am 1. wirklich auf dem Konto lag,
-   vor Gehalt und vor allen Ausgaben. Den aktuellen Stand rechnet die App.
+8. **Kontostand zu Beginn des Monats** eintragen: was auf dem Konto lag, bevor
+   Gehalt und Ausgaben dieses Monats kamen. Alles Weitere rechnet die App und
+   zeigt die Rechnung Zeile für Zeile.
+9. **„Gehalt ist da"** drücken, sobald dein Geld auf dem Konto ist — dann rechnet
+   die App in deinem Takt statt im Kalender (siehe „Dein Gehaltszyklus" unten).
 
 Oben siehst du live dein Konsumopfer-Verdikt, darunter ein Kreisdiagramm mit der
 Aufteilung deines Geldes. Am Monatsende auf **„Monat abschließen"** — der Monat
 wandert ins Archiv, und der neue Monat startet schon vorbefüllt.
+
+## Zwei Zahlen, nicht eine
+
+Ganz oben klebt eine schmale Leiste, die beim Scrollen **immer sichtbar** bleibt.
+Darin stehen beide Zahlen, die zusammen erst ein Bild ergeben:
+
+- **Der Kontostand** sagt, **ob** überhaupt noch Geld da ist.
+- **Die Prozente** sagen, **wofür** es weggeht.
+
+Keine der beiden ersetzt die andere, und genau daran ist die App vorher
+gescheitert: Man konnte tadellos unter 30 % Ausnahmen liegen und trotzdem im
+Minus stehen — Miete, Versicherungen und Rücklagen räumen ein Konto leer, ohne
+dass eine einzige Ausnahme dabei ist. Oben stand dann ein grünes „Spar-Königin",
+und vom Minus erfuhr man erst nach dreimal Scrollen.
+
+Jetzt wird die Leiste rot, sobald der Kontostand unter null geht. Mehr passiert
+nicht, und das ist Absicht: Das Banner darunter urteilt weiter **nur** über die
+Ausnahmen und bleibt schlicht.
+
+Eine Zeit lang stand der Kontostand zusätzlich im Banner, mit rotem Rahmen und
+eigenem Kasten. Das war zu viel auf einmal — vier Blöcke übereinander, und man
+wusste nicht, wo man anfangen soll. Wer alles gleichzeitig anschreit, wird gar
+nicht mehr gelesen. Jede Zahl steht deshalb an genau einer Stelle.
+
+**Die Kontostand-Karte zeigt die Rechnung**, nicht nur das Ergebnis:
+Startwert + Einnahmen − notwendige Ausgaben − Ausnahmen − Gespartes = was bleibt.
+Sieht eine Zahl komisch aus, erkennst du sofort, **welche** Zeile schuld ist,
+statt eine Summe anzustarren und zu raten.
+
+Wichtig dabei: Diese Zahl ist eine **Vorschau aufs Ende des Zeitraums**. Alles,
+was diesen Monat noch abgebucht wird, ist darin schon abgezogen. Deine
+Banking-App zeigt heute deshalb etwas anderes — das ist kein Fehler, sondern ein
+anderer Zeitpunkt.
+
+## Dein Gehaltszyklus
+
+Dein Geld läuft nicht von Monatsanfang bis Monatsende, sondern **von Gehalt zu
+Gehalt**. Wer am 28. sein Gehalt bekommt, hat am 3. keinen frischen Monat vor
+sich, sondern ein Drittel eines längst laufenden.
+
+Der Zyklus startet auf Ansage: Ist dein Gehalt da, drückst du **„Gehalt ist da"**,
+und ab diesem Tag zählt die App. Kein eingestellter Zahltag, weil ein fester Tag
+bei jeder rät, deren Geld mal am 27. und mal am 30. kommt — und lautlos falsch
+rät. Ein Knopf im Monat weiß es immer. Danach zeigt dir die Karte:
+
+- **Tag 7 von 31**, mit Balken und den Daten des Zeitraums. Die Länge ist eine
+  Annahme: vom Starttag bis zum gleichen Tag im Folgemonat.
+- **Noch 24 Tage** bis zum nächsten Gehalt, mit ungefährem Datum. Läuft der
+  Zyklus über, weil du länger nicht gedrückt hast, sagt die Karte genau das,
+  statt weiterzuzählen.
+- **Den Tempo-Check:** „23 % des Zyklus rum, 61 % vom Ausnahmen-Budget weg."
+  Verglichen wird bewusst nur das Ausnahmen-Budget (die 30 % aus der Regel) und
+  nicht dein ganzes Geld — Miete und Versicherungen gehen am Anfang in einem
+  Rutsch ab, da wäre am Tag 3 jeder Monat rot.
+- **Was pro Tag noch da ist**, bis das nächste Gehalt kommt.
+
+Hast du seit deinem letzten Gehaltseingang noch nicht abgeschlossen, erinnert
+dich die Karte daran. Sie tut das nur, wenn die App es **sicher weiß** — bei
+einem frischen Stand schweigt sie lieber, statt falsch zu mahnen.
 
 ## Was dich diszipliniert hält
 
@@ -66,13 +128,16 @@ harmlos aussieht.
 
 **Eine Marke: 30 %.** Mehr als 30 % deiner Einnahmen für Ausnahmen ist zu viel —
 das ist die Zahl aus der 50/30/20-Regel, und daran misst dich die App. Oben steht
-jederzeit, wo du gerade stehst und wie viel Euro dir noch bleiben. Bleibst du
-einen abgeschlossenen Monat lang drunter, läuft eine **Serie**. Gehst du drüber,
-fängt sie bei 0 an.
+jederzeit, wo du gerade stehst. Bleibst du einen abgeschlossenen Monat lang
+drunter, läuft eine **Serie**: „🔥 3 Monate in Folge im Rahmen geblieben." Die
+Flamme zählt Monate und nennt bewusst keine Prozente — die Zahl misst, wie lange
+du das schon hältst, nicht wie knapp. Gehst du drüber, fängt sie bei 0 an.
 
-Ein zusätzliches, selbstgesetztes Ziel gab es hier mal. Es ist raus: Es startete
-bei genau 30 %, durfte die Regel nicht überschreiten, und maß damit nichts, was
-die Regel nicht schon misst. Zwei Messlatten für dieselbe Sache messen am Ende
+Zwei Dinge standen hier mal zusätzlich und sind raus. Ein selbstgesetztes Ziel:
+Es startete bei genau 30 %, durfte die Regel nicht überschreiten, und maß damit
+nichts, was die Regel nicht schon misst. Und eine eigene Karte, die vorrechnete,
+wie viele Euro bis zur Marke noch „Luft" sind. Der Satz stimmte, gelesen hat er
+sich aber wie eine Erlaubnis. Zwei Messlatten für dieselbe Sache messen am Ende
 gar nichts.
 
 **Sofort-Einwurf.** Sobald du eine Ausnahme eintippst, kommt der Kommentar — nicht
@@ -189,6 +254,19 @@ und er steht mit Absicht am Ende: nach dem harten Teil ist er das, womit du raus
 Fixkosten, Abos und Versicherungen sind **wiederkehrend**: Sie wandern beim
 Monatswechsel automatisch mit, inklusive Betrag und Rhythmus. Was weg soll,
 löschst du einfach mit dem ✕.
+
+**Pausieren statt löschen.** Ruht dein Gym diesen Monat, drückst du an dem
+Eintrag auf **⏸ pausieren**. Der Beitrag zählt dann in **keine** Zahl der App
+mehr: nicht in die Prozente, nicht in den Kontostand, nicht in die Summe im
+Kartenkopf und nicht in den Kündigungs-Blick. Der Eintrag selbst bleibt stehen,
+durchgestrichen und mit dem Schild „pausiert bis …", und die Kontostand-Karte
+sagt dir, was dadurch bei dir bleibt.
+
+Eine Pause hat immer ein **Ende** — voreingestellt ist der laufende Monat, mit
+dem Feld daneben schiebst du es weiter. Beim Monatswechsel endet eine abgelaufene
+Pause von allein und der Posten läuft wieder mit. Genau deshalb ist es ein
+Endmonat und kein bloßes Häkchen: Eine Pause ohne Ende wäre eine Kündigung, die
+man vergisst, und die App würde dir monatelang zu viel Geld ausrechnen.
 
 Bei jedem dieser Posten stellst du den **Rhythmus** ein — monatlich, alle
 3 Monate, alle 6 Monate oder einmal im Jahr. Bei allem, was nicht monatlich

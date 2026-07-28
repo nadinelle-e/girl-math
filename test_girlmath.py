@@ -141,10 +141,43 @@ with sync_playwright() as p:
     pruefe("Notwendig umgelegt 1.188", any("1.188,00" in z for z in zahlen), True)
     pruefe("Ausnahmen 370", any("370,00" in z for z in zahlen), True)
 
-    print("\n=== 5. Die 30%-Marke ===")
-    pruefe("unter der Marke -> gruene Karte", page.locator(".ziel-karte.ok").count(), 1)
-    pruefe("kein selbstgesetztes Ziel mehr", page.locator("#ziel-prozent").count(), 0)
-    print("  Stand:", norm(page.locator(".ziel-stand").inner_text()).replace("\n", " "))
+    # Die Zahlenzeilen tragen NUR Euro-Betraege. Der Anteil steht im Diagramm
+    # darueber und in den Regel-Balken darunter — dreimal dieselbe Prozentzahl
+    # auf einer Karte liest niemand als drei Aussagen.
+    pruefe("Zahlenzeilen ohne Prozente", any("%" in z for z in zahlen), False)
+    # Und der Satz, der erklaert, warum diese Zahl eine andere ist als der
+    # Kontostand in der Karte darueber.
+    fussnote = page.locator(".uebersicht-karte .zahlen-fussnote").inner_text()
+    pruefe("Fussnote nennt das Startguthaben", "Startguthaben" in fussnote, True)
+
+    print("\n=== 5. Prozente UND Kontostand, aber jede Zahl nur an EINER Stelle ===")
+    # Dieser Monat ist der Beweisfall: 19% Ausnahmen (also unter der Marke),
+    # aber durch die volle Kfz-Rechnung steht das Konto bei -88 EUR. Frueher
+    # erfuhr man vom Minus erst nach dreimal Scrollen.
+    #
+    # Die Loesung ist NICHT, das Banner rot einzurahmen und einen zweiten Kasten
+    # hineinzuschreiben — das war zu viel auf einmal und wurde deshalb gar nicht
+    # gelesen. Das Banner urteilt weiter nur ueber die Ausnahmen; der Kontostand
+    # steht in der Leiste oben, die beim Scrollen immer sichtbar bleibt.
+    pruefe("Banner bleibt schlicht: kein Einwand-Kasten",
+           page.locator(".verdikt-minus").count(), 0)
+    pruefe("Banner bleibt schlicht: kein roter Rahmen",
+           page.locator(".verdikt.im-minus").count(), 0)
+    pruefe("Banner hat genau drei Zeilen (Prozent, Spruch, Zeit)",
+           page.locator(".verdikt > p").count(), 3)
+
+    # Die Leiste oben traegt beide Zahlen und wird rot.
+    pruefe("Leiste oben im Minus", page.locator(".stand-leiste.im-minus").count(), 1)
+    pruefe("Leiste zeigt den Kontostand",
+           norm(page.locator(".stand-zahl").inner_text()), "-88,00 €")
+    pruefe("Leiste zeigt auch die Prozente",
+           "19 % Ausnahmen" in page.locator(".stand-chips").inner_text(), True)
+
+    # Gegenprobe: Startguthaben rauf, Konto im Plus -> Leiste wieder ruhig.
+    setze(page, "#start-guthaben", 500)
+    pruefe("Leiste nicht mehr rot", page.locator(".stand-leiste.im-minus").count(), 0)
+    pruefe("Banner unveraendert schlicht", page.locator(".verdikt-minus").count(), 0)
+    setze(page, "#start-guthaben", 0)
 
     print("\n=== 6. Lebenszeit aus Arbeitseinkommen ===")
     # 2000 EUR / (40 h * 4,3333 Wochen) = 11,54 EUR pro Stunde
@@ -196,13 +229,34 @@ with sync_playwright() as p:
     pruefe("keine Summenzeile bei einem einzigen Posten",
            page.locator(".ruecklage-summe").count(), 0)
 
-    print("\n=== 9. Kontostand rechnet mit echtem Geld ===")
+    print("\n=== 9. Kontostand rechnet mit echtem Geld — und zeigt die Rechnung ===")
     # real = 800 + 58 + 300 + 360 (Kfz voll!) + 370 = 1888 | 2000 - 1888 - 200 = -88
-    pruefe("Kontostand", page.locator(".konto-stand").inner_text(), "-88,00 €")
-    pruefe("Fussnote zur Umlage", page.locator(".konto-fussnote").count(), 1)
+    ergebnis = page.locator(".konto-zeile.ergebnis")
+    pruefe("Kontostand", norm(ergebnis.locator(".konto-betrag").inner_text()), "-88,00 €")
+    pruefe("Ergebniszeile als negativ markiert",
+           page.locator(".konto-zeile.ergebnis.negativ").count(), 1)
     pruefe("Feld klar beschriftet",
            page.locator(".konto-block .beschriftung").first.inner_text().lower(),
-           "kontostand am monatsanfang")
+           "kontostand zu beginn dieses monats")
+
+    # Die Aufschluesselung macht die Rechnung nachvollziehbar: sechs Zeilen,
+    # und die Summe der fuenf oberen ergibt die sechste. Genau daran haette
+    # man frueher gesehen, welche Zahl nicht stimmt, statt nur das Ergebnis.
+    zeilen = [norm(t).replace("\n", " ") for t in page.locator(".konto-zeile").all_inner_texts()]
+    print("  Aufschluesselung:", zeilen)
+    pruefe("sechs Zeilen (Start, Einnahmen, notwendig, Ausnahmen, Sparen, Ergebnis)",
+           len(zeilen), 6)
+    pruefe("Einnahmen-Zeile", any("2.000,00 €" in z for z in zeilen), True)
+    pruefe("notwendige Ausgaben real (mit voller Kfz)",
+           any("1.518,00 €" in z for z in zeilen), True)
+    pruefe("Ausnahmen-Zeile", any("370,00 €" in z for z in zeilen), True)
+    pruefe("Sparen-Zeile", any("200,00 €" in z for z in zeilen), True)
+
+    # Die Vorschau-Erklaerung: ohne sie vergleicht man die Zahl mit der
+    # Banking-App und haelt die Abweichung fuer einen Rechenfehler.
+    fuss = " ".join(page.locator(".konto-fussnote").all_inner_texts())
+    pruefe("Vorschau wird erklaert", "Vorschau" in fuss, True)
+    pruefe("Umlage-Unterschied wird erklaert", "1.888,00" in norm(fuss), True)
 
     print("\n=== 10. Kuendigungs-Blick nach Jahreskosten ===")
     # Ticket 58*12 = 696 | Kfz 30*12 = 360 | Netflix 20*12 = 240
@@ -293,13 +347,25 @@ with sync_playwright() as p:
     zusammenfassung = page.evaluate("JSON.stringify(STATE.archive[0].summary)")
     pruefe("Archiv-Zusammenfassung ist gefuellt", "quoteNicht" in zusammenfassung, True)
     pruefe("Serie laeuft", page.locator(".serie-laeuft").count(), 1)
+    # Die Flamme zaehlt Monate, keine Anteile. Ein Prozentzeichen an dieser
+    # Stelle wuerde die Serie in dieselbe Sprache zurueckziehen, aus der sie
+    # gerade herausgeholt wurde.
+    serien_text = page.locator(".serie-laeuft").inner_text()
+    print("  Serie:", serien_text)
+    pruefe("Serie nennt Monate", "1 Monat" in serien_text, True)
+    pruefe("Serie kommt ohne Prozente aus", "%" in serien_text, False)
     pruefe("Archiv zeigt: unter der Marke", page.locator(".ziel-marke.gut").count(), 1)
 
     print("\n=== 17. Serie reisst, leerer Monat wird nicht bewertet ===")
     pruefe("neuer Monat urteilt noch nicht", page.locator(".verdikt.v-neutral").count(), 1)
     add(page, "income", "Gehalt", 2000, haken=True)
     add(page, "luxus", "Wein", 900)   # 900/2000 = 45% > 30%
-    pruefe("ueber der Marke gemeldet", page.locator(".ziel-karte.gerissen").count(), 1)
+    # Gemeldet wird das im Banner und in der Leiste. Die alte Ziel-Karte, die
+    # dasselbe ein drittes Mal sagte, gibt es nicht mehr.
+    chips = page.locator(".stand-chips").inner_text()
+    print("  Leiste:", chips.replace("\n", " "))
+    pruefe("ueber der Marke gemeldet", page.locator(".stand-chip.chip-warn").count(), 1)
+    pruefe("keine Ziel-Karte mehr", page.locator(".ziel-karte").count(), 0)
     with page.expect_download(timeout=15000):
         page.click("#btn-monat-abschliessen")
     page.wait_for_selector(".serie-weg")
@@ -338,7 +404,7 @@ with sync_playwright() as p:
     pruefe("stattdessen Vergleich mit der Miete", "Miete" in banner, True)
     # 863 rein, 400 Miete + 55 Ausnahmen raus = 408
     pruefe("Kontostand rechnet trotzdem",
-           page.locator(".konto-stand").inner_text(), "408,00 €")
+           norm(page.locator(".konto-zeile.ergebnis .konto-betrag").inner_text()), "408,00 €")
 
     print("\n=== 19. Gleiche Namen werden zusammengefasst ===")
     pruefe("zwei statt drei Eintraege", page.locator(".rang-zeile").count(), 2)
@@ -921,6 +987,348 @@ with sync_playwright() as p:
             if mass and banner.count(mass) > 1:
                 doppelt.append(f"Monat {nr}: {mass!r}")
         pruefe(f"bei {quote} kein doppelter Vergleich", doppelt, [])
+
+    print("\n=== 35. Pause: was ruht, zaehlt in KEINER Zahl mit ===")
+    neu_starten(page)
+    add(page, "income", "Gehalt", 2000, haken=True)
+    add(page, "fixkosten", "Miete", 800, rhythmus="monatlich")
+    add(page, "abos", "Gym", 40, rhythmus="monatlich", haken=False)
+    add(page, "abos", "Netflix", 20, rhythmus="monatlich", haken=False)
+
+    def posten_von(kat, label):
+        return page.locator(f'{karte(kat)} .posten:has(input[value="{label}"])')
+
+    gym = posten_von("abos", "Gym")
+    # Vorher: Ausnahmen 40 + 20 = 60 -> 3% | Kontostand 2000 - 800 - 60 = 1140
+    pruefe("vor der Pause: 3% Ausnahmen",
+           page.locator(".verdikt .prozent").inner_text().split("%")[0], "3")
+    pruefe("vor der Pause: Kontostand 1.140",
+           norm(page.locator(".konto-zeile.ergebnis .konto-betrag").inner_text()), "1.140,00 €")
+    pruefe("Gym steht im Kuendigungs-Blick",
+           any("Gym" in n for n in page.locator(".vertrag-name").all_inner_texts()), True)
+
+    gym.locator("[data-pause-an]").click()
+
+    # Nachher: nur noch Netflix zaehlt -> 20/2000 = 1% | 2000 - 800 - 20 = 1180
+    pruefe("Posten sichtbar als pausiert", gym.locator(".pause-schild").count(), 1)
+    pruefe("Zeile als pausiert markiert",
+           page.locator(f'{karte("abos")} .posten-pausiert').count(), 1)
+    pruefe("Pause laeuft bis zum laufenden Monat",
+           norm(gym.locator(".pause-schild").inner_text()), "⏸ pausiert bis Jul 26")
+    pruefe("nach der Pause: 1% Ausnahmen",
+           page.locator(".verdikt .prozent").inner_text().split("%")[0], "1")
+    pruefe("nach der Pause: Kontostand 1.180",
+           norm(page.locator(".konto-zeile.ergebnis .konto-betrag").inner_text()), "1.180,00 €")
+    pruefe("kein Zeitpreis an einem ruhenden Posten", gym.locator(".zeit-schild").count(), 0)
+    pruefe("Gym faellt aus dem Kuendigungs-Blick",
+           any("Gym" in n for n in page.locator(".vertrag-name").all_inner_texts()), False)
+    # Auch der Kartenkopf zaehlt nur noch, was laeuft: 20 statt 59,90.
+    pruefe("Kartenkopf zaehlt das ruhende Abo nicht mit",
+           norm(page.locator(f'{karte("abos")} .karte-summe').inner_text()), "20,00 €")
+    pruefe("Kontostand-Karte weist die Pause aus",
+           "40,00 €" in norm(page.locator(".konto-pause").inner_text()), True)
+    pruefe("Pause nennt den Posten beim Namen",
+           "Gym" in page.locator(".konto-pause").inner_text(), True)
+
+    # Pause verlaengern: bis September, dann ueberlebt sie einen Monatswechsel.
+    gym.locator("[data-pause-bis]").select_option("2026-09")
+    pruefe("Pause bis September", norm(gym.locator(".pause-schild").inner_text()),
+           "⏸ pausiert bis Sep 26")
+
+    with page.expect_download(timeout=15000):
+        page.click("#btn-monat-abschliessen")
+    page.wait_for_selector(".archiv-eintrag")
+    gym = posten_von("abos", "Gym")
+    pruefe("Pause wandert in den August mit", gym.locator(".pause-schild").count(), 1)
+
+    # … und endet dann von allein. Zwei Monatswechsel weiter ist Oktober.
+    with page.expect_download(timeout=15000):
+        page.click("#btn-monat-abschliessen")   # -> September, letzter Pausenmonat
+    page.wait_for_selector(".archiv-eintrag")
+    with page.expect_download(timeout=15000):
+        page.click("#btn-monat-abschliessen")   # -> Oktober, Pause abgelaufen
+    page.wait_for_selector(".archiv-eintrag")
+    gym = posten_von("abos", "Gym")
+    pruefe("abgelaufene Pause endet von allein", gym.locator(".pause-schild").count(), 0)
+    pruefe("Gym laeuft wieder mit", gym.locator("[data-pause-an]").count(), 1)
+    pruefe("Feld im Speicher geleert",
+           page.evaluate('STATE.currentMonth.abos.find(p => p.label === "Gym").pausiertBis'), "")
+
+    # Von Hand wieder aktivieren
+    gym.locator("[data-pause-an]").click()
+    gym = posten_von("abos", "Gym")
+    pruefe("wieder pausiert", gym.locator(".pause-schild").count(), 1)
+    gym.locator("[data-pause-aus]").click()
+    gym = posten_von("abos", "Gym")
+    pruefe("Knopf 'laeuft wieder' hebt die Pause auf", gym.locator(".pause-schild").count(), 0)
+
+    print("\n=== 36. Gehaltszyklus: startet per Knopf, nicht per Kalender ===")
+    neu_starten(page)
+    pruefe("ohne Start: Einladung statt geratener Zahlen",
+           page.locator(".zyklus-leer").count(), 1)
+    pruefe("Knopf steht auf der leeren Karte",
+           page.locator(".zyklus-leer #btn-gehalt-da").count(), 1)
+    # Achtung: .stand-label wird per CSS in Grossbuchstaben gesetzt, und
+    # inner_text() liefert den GERENDERTEN Text. Deshalb hier klein vergleichen.
+    pruefe("ohne Start zeigt die Leiste 'Monatsende'",
+           "monatsende" in page.locator(".stand-label").inner_text().lower(), True)
+
+    # Ein Druck, und der Zyklus laeuft ab heute.
+    page.click("#btn-gehalt-da")
+    heute = page.evaluate("alsTagesId(new Date())")
+    pruefe("Startdatum gespeichert", page.evaluate("STATE.einstellungen.zyklusStart"), heute)
+    pruefe("Zyklus-Karte erscheint", page.locator(".zyklus-karte .zyklus-spur").count(), 1)
+    pruefe("am Starttag ist Tag 1", page.evaluate("gehaltszyklus().tag"), 1)
+    pruefe("Leiste zeigt jetzt den Zyklus-Tag",
+           page.locator(".stand-chip").last.inner_text().startswith("Tag "), True)
+    pruefe("Knopf bleibt fuer das naechste Gehalt stehen",
+           page.locator(".zyklus-karte #btn-gehalt-da").count(), 1)
+
+    # Die Rechnung selbst, mit festem Startdatum und festem „heute" — sonst
+    # haengt der Test daran, wann er laeuft. Gestartet am 28. Juli 2026,
+    # heute ist der 3. August: Tag 7 von 31, angenommenes Ende am 28. August.
+    page.evaluate('STATE.einstellungen.zyklusStart = "2026-07-28"; speichern(); render();')
+    zy = page.evaluate("""(() => {
+      const z = gehaltszyklus(new Date(2026, 7, 3));
+      return { tag: z.tag, laenge: z.laenge, rest: z.restTage,
+               start: z.start.getDate(), ende: z.ende.getDate(),
+               ueber: z.ueberfaellig };
+    })()""")
+    print("  Zyklus am 3. August:", zy)
+    pruefe("Tag im Zyklus", zy["tag"], 7)
+    pruefe("Zykluslaenge", zy["laenge"], 31)
+    pruefe("Tage bis zum naechsten Gehalt", zy["rest"], 24)
+    pruefe("Zyklus startet am gedrueckten Tag", zy["start"], 28)
+    pruefe("Ende ist der gleiche Tag im Folgemonat", zy["ende"], 28)
+    pruefe("nicht ueberfaellig", zy["ueber"], False)
+
+    # Am Starttag selbst ist Tag 1 — nicht Tag 0 und nicht Tag 31.
+    pruefe("am Starttag beginnt der Zyklus",
+           page.evaluate("gehaltszyklus(new Date(2026, 6, 28)).tag"), 1)
+    # Ein Tag vor dem angenommenen Ende: der letzte Tag des Zyklus.
+    pruefe("Tag vor dem Ende ist der letzte",
+           page.evaluate("gehaltszyklus(new Date(2026, 7, 27)).restTage"), 0)
+
+    # Laeuft der Zyklus ueber, behauptet die App nichts mehr, sondern sagt es.
+    ueber = page.evaluate("""(() => {
+      const z = gehaltszyklus(new Date(2026, 8, 10));
+      return { ueber: z.ueberfaellig, anteil: z.anteil, rest: z.restTage };
+    })()""")
+    print("  Zyklus am 10. September:", ueber)
+    pruefe("ueberfaellig erkannt", ueber["ueber"], True)
+    pruefe("Balken bleibt bei 100%", ueber["anteil"], 1)
+    pruefe("keine Resttage mehr", ueber["rest"], 0)
+
+    # Ein kaputtes oder leeres Startdatum darf nicht rechnen, sondern muss
+    # zurueck auf die Einladung fallen.
+    page.evaluate('STATE.einstellungen.zyklusStart = "quatsch"; speichern(); render();')
+    pruefe("kaputtes Datum rechnet nicht", page.evaluate("gehaltszyklus() === null"), True)
+    pruefe("kaputtes Datum zeigt die Einladung", page.locator(".zyklus-leer").count(), 1)
+
+    # Der Tempo-Vergleich: Zeit gegen Ausnahmen-Budget.
+    page.evaluate('STATE.einstellungen.zyklusStart = alsTagesId(new Date()); speichern(); render();')
+    add(page, "income", "Gehalt", 2000, haken=True)
+    add(page, "luxus", "Sushi", 550)   # Budget sind 30% von 2000 = 600 -> 92% weg
+    tempo = page.locator(".zyklus-tempo").inner_text()
+    print("  Tempo:", tempo.replace("\n", " "))
+    pruefe("Tempo nennt das Ausnahmen-Budget", "92% vom Ausnahmen-Budget" in tempo, True)
+
+    print("\n=== 37. Kontostand rundet auf ganze Cent ===")
+    # Ohne Rundung schleppt der Monatswechsel Nachkommastellen weiter: Aus dem
+    # errechneten Kontostand wird das neue Startguthaben, und im Eingabefeld
+    # stand dann 1066,1399999999999.
+    pruefe("runde() macht aus Rechen-Rauschen einen Cent-Betrag",
+           page.evaluate("runde(1066.1399999999999)"), 1066.14)
+    neu_starten(page)
+    add(page, "income", "Gehalt", 1951.8, haken=True)
+    add(page, "income", "Flohmarkt", 126.5, haken=False)
+    add(page, "fixkosten", "Miete", 716, rhythmus="monatlich")
+    add(page, "abos", "Prime", 8.99, rhythmus="monatlich", haken=False)
+    add(page, "abos", "Kindle", 4.99, rhythmus="monatlich", haken=False)
+    setze(page, "#start-guthaben", 1066.14)
+    with page.expect_download(timeout=15000):
+        page.click("#btn-monat-abschliessen")
+    page.wait_for_selector(".archiv-eintrag")
+    uebernommen = page.evaluate("STATE.currentMonth.startBalance")
+    print("  uebernommenes Startguthaben:", uebernommen)
+    pruefe("hoechstens zwei Nachkommastellen",
+           round(uebernommen, 2) == uebernommen, True)
+    # 1066,14 + 1951,80 + 126,50 − 716 − 8,99 − 4,99 = 2414,46
+    pruefe("Startguthaben genau uebernommen", uebernommen, 2414.46)
+
+    print("\n=== 38. Die Kontostand-Kette: ein Fehler bleibt korrigierbar ===")
+    # Frueher schrieb jeder Monatsabschluss den Kontostand als feste Zahl in den
+    # naechsten Monat. Ein falscher Startwert war damit fuer immer in jedem
+    # Folgemonat drin. Jetzt wird die Kette bei jeder Anzeige neu gerechnet,
+    # und eine Korrektur in der Vergangenheit zieht bis heute durch.
+    neu_starten(page)
+
+    def monat_bauen(start_anker=None, mit_miete=False):
+        """Einen Monat mit 1000 Einnahmen fuellen.
+
+        Die Miete wird nur EINMAL eingetragen: Fixkosten sind wiederkehrend und
+        wandern beim Abschluss von allein in den naechsten Monat. Einnahmen tun
+        das nicht, die kommen jeden Monat neu dazu.
+        """
+        if start_anker is not None:
+            setze(page, "#start-guthaben", start_anker)
+        add(page, "income", "Gehalt", 1000, haken=True)
+        if mit_miete:
+            add(page, "fixkosten", "Miete", 400, rhythmus="monatlich")
+
+    def abschliessen():
+        with page.expect_download(timeout=15000):
+            page.click("#btn-monat-abschliessen")
+        page.wait_for_selector(".archiv-eintrag")
+
+    def kette():
+        return page.evaluate("kontostandKette()")
+
+    # --- Monat 1: der Anker. -300 im Minus, 1000 rein, 400 Miete raus.
+    m1 = page.evaluate("STATE.currentMonth.id")
+    monat_bauen(-300, mit_miete=True)
+    pruefe("erster Monat hat ein offenes Eingabefeld",
+           page.locator(".konto-block > #start-guthaben").count(), 1)
+    pruefe("Monat 1 startet beim Anker", kette()[m1]["start"], -300)
+    pruefe("Monat 1 endet bei 300", kette()[m1]["ende"], 300)   # -300 + 1000 - 400
+    pruefe("Monat 1 ist als Anker markiert", kette()[m1]["ausAnker"], True)
+
+    # --- Monat 2 erbt. Hier darf kein offenes Feld mehr stehen: Genau da hat
+    #     man frueher den Stand aus der Banking-App eingetippt (in dem das
+    #     Gehalt schon drin war) und es damit doppelt gezaehlt.
+    abschliessen()
+    m2 = page.evaluate("STATE.currentMonth.id")
+    pruefe("geerbter Monat zeigt den Wert als Text", page.locator(".konto-geerbt").count(), 1)
+    pruefe("geerbter Wert stimmt", norm(page.locator(".konto-geerbt").inner_text()), "300,00 €")
+    pruefe("kein offenes Eingabefeld mehr",
+           page.locator(".konto-block > #start-guthaben").count(), 0)
+    pruefe("Korrektur-Weg steht bereit", page.locator(".anker-setzen #start-guthaben").count(), 1)
+    herkunft = page.locator(".konto-block .feld-hinweis").first.inner_text()
+    print("  Herkunft:", herkunft.replace("\n", " "))
+    pruefe("Herkunft nennt den Vormonat", "Schlussstand" in herkunft, True)
+    pruefe("Herkunft bleibt ein kurzer Satz", len(herkunft) < 40, True)
+
+    monat_bauen()
+    pruefe("Monat 2 startet beim Schlussstand von Monat 1", kette()[m2]["start"], 300)
+    pruefe("Monat 2 endet bei 900", kette()[m2]["ende"], 900)
+    pruefe("Monat 2 ist KEIN Anker", kette()[m2]["ausAnker"], False)
+    pruefe("Monat 2 kennt seine Herkunft", kette()[m2]["vonMonat"], m1)
+
+    # --- Monat 3.
+    abschliessen()
+    m3 = page.evaluate("STATE.currentMonth.id")
+    monat_bauen()
+    pruefe("Monat 3 startet bei 900", kette()[m3]["start"], 900)
+    pruefe("Monat 3 endet bei 1500", kette()[m3]["ende"], 1500)
+
+    # --- DER KERN: Monat 1 im Archiv korrigieren. -300 war falsch, es waren -500.
+    #     Alles danach muss um genau 200 nach unten wandern, ohne dass man
+    #     Monat 2 oder 3 anfassen muesste.
+    page.evaluate("window.prompt = () => '-500'")
+    page.click(f'[data-korrigieren="{m1}"]')
+    k = kette()
+    pruefe("Monat 1 korrigiert", k[m1]["start"], -500)
+    pruefe("Korrektur erreicht Monat 1s Ende", k[m1]["ende"], 100)
+    pruefe("Korrektur erreicht Monat 2", k[m2]["start"], 100)
+    pruefe("Korrektur erreicht Monat 2s Ende", k[m2]["ende"], 700)
+    pruefe("Korrektur erreicht Monat 3", k[m3]["start"], 700)
+    pruefe("Korrektur erreicht bis heute durch", k[m3]["ende"], 1300)
+    pruefe("die Anzeige zieht mit",
+           norm(page.locator(".konto-geerbt").inner_text()), "700,00 €")
+
+    # --- Ein Anker MITTEN in der Zeit: ab Monat 2 zaehlt nur noch die neue Zahl.
+    page.evaluate("window.prompt = () => '1000'")
+    page.click(f'[data-korrigieren="{m2}"]')
+    k = kette()
+    pruefe("Anker in Monat 2 sticht die Kette", k[m2]["start"], 1000)
+    pruefe("Monat 1 bleibt davon unberuehrt", k[m1]["start"], -500)
+    pruefe("Monat 3 rechnet ab dem neuen Anker", k[m3]["start"], 1600)
+    pruefe("Anker im Archiv markiert", page.locator(".anker-marke").count() >= 1, True)
+
+    # --- Und wieder aufloesen: leere Eingabe nimmt den Anker zurueck.
+    page.evaluate("window.prompt = () => ''")
+    page.click(f'[data-korrigieren="{m2}"]')
+    k = kette()
+    pruefe("Anker aufgeloest, Monat 2 erbt wieder", k[m2]["start"], 100)
+    pruefe("Monat 3 wieder in der alten Kette", k[m3]["start"], 700)
+
+    # --- Der laufende Monat laesst sich genauso verankern und wieder loesen.
+    page.locator(".anker-setzen > summary").click()
+    setze(page, ".anker-setzen #start-guthaben", 2500)
+    pruefe("laufender Monat verankert", kette()[m3]["start"], 2500)
+    pruefe("jetzt steht dort ein offenes Feld",
+           page.locator(".konto-block > #start-guthaben").count(), 1)
+    page.click("#btn-anker-weg")
+    pruefe("Anker weggenommen, wieder geerbt", kette()[m3]["start"], 700)
+    pruefe("und wieder als Text statt Feld", page.locator(".konto-geerbt").count(), 1)
+
+    print("\n=== 39. Alte Staende steigen ohne Zahlensprung um ===")
+    # Ein Stand aus der Zeit vor der Kette hat noch keinen Anker. Er bekommt
+    # ihn beim Laden gesetzt — und die Zahl, die sie gestern gesehen hat,
+    # muss dieselbe bleiben.
+    alt = {
+        "version": 3,
+        "einstellungen": {"wochenstunden": 40},
+        "currentMonth": {
+            "id": "2026-08", "startBalance": 1200,
+            "income": [{"id": "b1", "label": "Gehalt", "amount": 2000}],
+            "fixkosten": [{"id": "b2", "label": "Miete", "amount": 800}],
+            "abos": [], "versicherungen": [], "lebensmittel": [],
+            "luxus": [], "konsum": [], "sparen": [],
+        },
+        "archive": [{
+            "id": "2026-07",
+            "summary": {"gehalt": 2000, "nicht": 0, "gespart": 0, "quoteNicht": 0,
+                        "kontostand": 1200},
+            "snapshot": {
+                "id": "2026-07", "startBalance": 0,
+                "income": [{"id": "c1", "label": "Gehalt", "amount": 2000}],
+                "fixkosten": [{"id": "c2", "label": "Miete", "amount": 800}],
+                "abos": [], "versicherungen": [], "lebensmittel": [],
+                "luxus": [], "konsum": [], "sparen": [],
+            },
+        }],
+        "onboardingGesehen": True,
+    }
+    page.evaluate("d => localStorage.setItem('girlmath.v1', JSON.stringify(d))", alt)
+    page.reload()
+    page.wait_for_selector(".verdikt")
+    k = kette()
+    # Juli: 0 + 2000 - 800 = 1200. Genau das stand vorher eingefroren im August.
+    pruefe("aeltester Monat wird zum Anker", k["2026-07"]["ausAnker"], True)
+    pruefe("Anker uebernimmt den alten Wert", k["2026-07"]["start"], 0)
+    pruefe("Kette rechnet den alten Schlussstand nach", k["2026-07"]["ende"], 1200)
+    pruefe("laufender Monat startet unveraendert", k["2026-08"]["start"], 1200)
+    pruefe("kein Zahlensprung beim Umstieg",
+           k["2026-08"]["start"], page.evaluate("STATE.currentMonth.startBalance"))
+    pruefe("und der laufende Monat braucht keinen eigenen Anker",
+           page.evaluate("STATE.currentMonth.anchorBalance"), None)
+
+    # Gegenprobe: ein Stand mit LUECKENHAFTEM Archiv. Hier kaeme die Kette auf
+    # eine andere Zahl — dann muss der bisherige Wert stehen bleiben.
+    luecke = {
+        "version": 3,
+        "einstellungen": {"wochenstunden": 40},
+        "currentMonth": {
+            "id": "2026-08", "startBalance": 1200,
+            "income": [{"id": "d1", "label": "Gehalt", "amount": 2000}],
+            "fixkosten": [], "abos": [], "versicherungen": [], "lebensmittel": [],
+            "luxus": [], "konsum": [], "sparen": [],
+        },
+        # Schnappschuss ohne jede Bewegung: die Kette wuerde hier auf 0 landen.
+        "archive": [{"id": "2026-07",
+                     "summary": {"gehalt": 2000, "nicht": 0, "gespart": 0,
+                                 "quoteNicht": 0, "kontostand": 1200},
+                     "snapshot": {"id": "2026-07"}}],
+        "onboardingGesehen": True,
+    }
+    page.evaluate("d => localStorage.setItem('girlmath.v1', JSON.stringify(d))", luecke)
+    page.reload()
+    page.wait_for_selector(".verdikt")
+    pruefe("bei luecken Archiv wird der laufende Monat verankert",
+           page.evaluate("STATE.currentMonth.anchorBalance"), 1200)
+    pruefe("die angezeigte Zahl bleibt exakt wie vorher",
+           kette()["2026-08"]["start"], 1200)
 
     browser.close()
 

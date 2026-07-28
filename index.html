@@ -69,30 +69,43 @@
   <meta name="apple-mobile-web-app-title" content="girl math" />
 
   <!--
-    Das ?v=15 hinter dem Dateinamen ist ein Versionsstempel.
+    Das ?v=17 hinter dem Dateinamen ist ein Versionsstempel.
 
     Warum: Browser legen Dateien für eine Weile beiseite, statt sie jedes Mal
     neu zu holen. Nach einem Update sähe man deshalb bis zu zehn Minuten lang
-    noch die alte Fassung. Für den Browser ist "styles.css?v=15" aber eine
-    andere Adresse als "styles.css?v=15" — also holt er sie sofort frisch.
+    noch die alte Fassung. Für den Browser ist "styles.css?v=17" aber eine
+    andere Adresse als "styles.css?v=16" — also holt er sie sofort frisch.
 
     ➜ WICHTIG: Bei jeder Änderung an styles.css oder app.js die Zahl an BEIDEN
       Stellen um eins hochzählen (unten beim <script> steht dieselbe). Vergisst
       man es, ist nichts kaputt, es dauert nur wieder bis zu zehn Minuten.
   -->
-  <link rel="stylesheet" href="styles.css?v=15" />
+  <link rel="stylesheet" href="styles.css?v=17" />
 </head>
 <body>
+  <!-- Die Leiste, die beim Scrollen oben kleben bleibt: Kontostand, Ausnahmen-
+       Prozente und der Tag im Gehaltszyklus. Sie steht bewusst AUSSERHALB von
+       .wrap, damit sie über die volle Breite geht.
+       Wird von app.js gefüllt (renderStand). -->
+  <div id="stand"></div>
+
   <div class="wrap">
 
     <!-- Kopfzeile: Titel + aktueller Monat + großer Konsumopfer-Status.
          Wird von app.js gefüllt (renderKopf). -->
     <header id="kopf"></header>
 
-    <!-- Deine Abmachung für diesen Monat: max. X % Ausnahmen, plus die Serie
-         der Monate, in denen du sie gehalten hast.
-         Wird von app.js gefüllt (renderZiel). -->
-    <section id="ziel"></section>
+    <!-- Die Serie: wie viele Monate in Folge du im Rahmen geblieben bist.
+         Bleibt leer, solange noch kein Monat abgeschlossen ist.
+         Wird von app.js gefüllt (renderSerie). -->
+    <section id="serie"></section>
+
+    <!-- Der Gehaltszyklus: Tag X von Y, Tage bis zum nächsten Gehalt und der
+         Tempo-Vergleich zwischen verstrichener Zeit und ausgegebenem Geld.
+         Der Zyklus läuft von Gehalt zu Gehalt, nicht von Monatsanfang bis
+         Monatsende, und startet per Knopf.
+         Wird von app.js gefüllt (renderZyklus). -->
+    <section id="zyklus"></section>
 
     <!-- Alle Eingabe-Kategorien (Einnahmen, Fixkosten, Abos, Versicherungen,
          Einkauf, Ausnahmen, Sparen).
@@ -194,6 +207,6 @@
 
   <!-- Die Logik ganz am Ende laden, damit die Bereiche oben schon existieren. -->
   <!-- Die Zahl hier muss dieselbe sein wie oben beim Stylesheet. -->
-  <script src="app.js?v=15"></script>
+  <script src="app.js?v=17"></script>
 </body>
 </html>

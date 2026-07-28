@@ -79,6 +79,88 @@ body.modal-offen { overflow: hidden; }
 }
 
 /* ============================================================
+   Die Stand-Leiste — klebt beim Scrollen oben fest
+
+   „sticky" heißt: Sie scrollt erst normal mit und bleibt dann am
+   oberen Rand hängen. Damit ist der Kontostand IMMER im Bild, egal
+   wie weit unten man gerade ist. Genau das war vorher das Problem:
+   Oben stand ein grünes „8% — Spar-Königin", und dass das Konto im
+   Minus war, sah man erst nach dreimal Scrollen.
+
+   Das Milchglas (backdrop-filter) lässt den Verlauf des Hintergrunds
+   durchscheinen, statt einen harten Balken über die Seite zu legen.
+   Browser ohne diese Fähigkeit zeigen einfach die Farbe darunter —
+   nichts geht kaputt.
+   ============================================================ */
+#stand {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+}
+.stand-leiste {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  max-width: 780px;
+  margin: 0 auto;
+  padding: 9px 18px 10px;
+  background: rgba(253, 250, 245, 0.92);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--linie);
+}
+.stand-geld {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+.stand-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--braun-weich);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+.stand-zahl {
+  font-size: 21px;
+  font-weight: 900;
+  letter-spacing: -0.5px;
+  white-space: nowrap;
+}
+/* Im Minus wird die ganze Leiste rot — nicht nur die Zahl. Eine rote
+   Ziffer übersieht man, eine rote Leiste nicht. */
+.stand-leiste.im-minus {
+  background: rgba(226, 65, 95, 0.12);
+  border-bottom-color: rgba(226, 65, 95, 0.35);
+}
+.stand-leiste.im-minus .stand-zahl,
+.stand-leiste.im-minus .stand-label { color: var(--rot); }
+
+.stand-chips {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.stand-chip {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--braun-weich);
+  background: var(--creme);
+  border-radius: 999px;
+  padding: 3px 10px;
+  white-space: nowrap;
+}
+/* Über der 30%-Marke wird der Prozent-Chip pink statt beige */
+.stand-chip.chip-warn {
+  background: var(--pink-weich);
+  color: var(--pink);
+}
+
+/* ============================================================
    Kopf & Verdikt-Banner
    ============================================================ */
 #kopf { margin-bottom: 8px; }
@@ -184,6 +266,14 @@ body.modal-offen { overflow: hidden; }
   margin: 10px 0 0;
   line-height: 1.4;
 }
+
+/* Hier standen mal ein roter Rahmen ums Banner und ein Einwand-Kasten
+   mit dem Kontostand darin. Beides ist raus: Zusammen mit Prozentzahl,
+   Spruch und Arbeitszeit waren das vier Blöcke übereinander, und damit
+   war das Banner nur noch Lärm.
+
+   Der Kontostand steht jetzt ausschließlich in der Leiste ganz oben.
+   Die ist beim Scrollen immer sichtbar, also reicht sie völlig. */
 
 /* Verdikt-Stufen: von entspannt (grün) bis Katastrophe (dunkle Beere).
    v0 = Spar-Königin … v6 = Insolvenz-Vibes. Kein Schwarz, auch nicht ganz unten. */
@@ -372,6 +462,47 @@ body.modal-offen { overflow: hidden; }
   border-radius: 999px;
   padding: 3px 10px;
 }
+
+/* ---- Pause: Knopf, Schild und der ruhende Posten ----
+
+   Ein pausierter Posten muss auf einen Blick anders aussehen als ein
+   laufender, sonst rätselt man später, warum die Summe nicht aufgeht.
+   Deshalb beides: Das Schild sagt es in Worten, die blasse Zeile mit
+   dem durchgestrichenen Betrag sagt es ohne Worte. */
+.mini-knopf {
+  border: 1px solid var(--linie);
+  border-radius: 999px;
+  background: var(--creme);
+  color: var(--braun-weich);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 4px 11px;
+  cursor: pointer;
+}
+.mini-knopf:hover { border-color: var(--pink); color: var(--pink); }
+.mini-knopf:focus-visible {
+  outline: none;
+  border-color: var(--pink);
+  box-shadow: 0 0 0 3px rgba(255, 45, 120, 0.15);
+}
+
+/* Lila statt Pink oder Rot: Eine Pause ist keine Warnung und kein Fehler,
+   sondern ein dritter Zustand. Sie braucht eine eigene Farbe. */
+.pause-schild {
+  font-size: 12px;
+  font-weight: 700;
+  color: #7A5FA8;
+  background: #EFE7F8;
+  border-radius: 999px;
+  padding: 3px 10px;
+  white-space: nowrap;
+}
+
+/* Der ruhende Posten: blass, Betrag durchgestrichen. Die Bedienelemente
+   darunter bleiben voll sichtbar — man muss die Pause ja beenden können. */
+.posten-pausiert .posten-zeile { opacity: 0.5; }
+.posten-pausiert .posten-zeile input[type="number"] { text-decoration: line-through; }
 
 /* Löschen-Knopf (das kleine ✕) */
 .del {
@@ -617,6 +748,17 @@ body.modal-offen { overflow: hidden; }
 .zahlenzeile:first-of-type { border-top: none; }
 .zahlenzeile strong { font-weight: 800; }
 .zahlenzeile.dick { font-size: 16px; }
+
+/* Der Satz unter „Von diesem Monat noch frei". Er beantwortet die eine Frage,
+   die diese Zahl neben dem Kontostand darüber aufwirft: warum sie eine andere
+   ist. Klein und ruhig, es ist eine Fußnote und keine Warnung. */
+.zahlen-fussnote {
+  margin: 8px 0 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--braun-weich);
+}
+
 .wert-positiv { color: var(--gruen); font-weight: 800; }
 .wert-nicht   { color: var(--rot);   font-weight: 800; }
 
@@ -650,6 +792,9 @@ body.modal-offen { overflow: hidden; }
 .fuell-notwendig { background: var(--mauve); }
 .fuell-nicht     { background: var(--pink); }
 .fuell-sparen    { background: var(--gruen); }
+/* Der Zeit-Balken im Gehaltszyklus. Sandfarben, weil verstrichene Zeit
+   weder gut noch schlecht ist — sie ist einfach vergangen. */
+.fuell-zeit      { background: var(--sand); }
 /* Ziel-Markierung als senkrechter Strich */
 .ziel-strich {
   position: absolute;
@@ -689,6 +834,42 @@ body.modal-offen { overflow: hidden; }
 .trend { font-size: 13px; font-weight: 700; margin: 6px 2px 0; color: var(--braun-weich); }
 .trend-besser { color: var(--gruen); }
 .trend-schlechter { color: var(--rot); }
+
+/* Start → Ende eines Archiv-Monats. Steht bewusst da: Erst wenn man beide
+   Zahlen sieht, wird sichtbar, dass eine Korrektur im Vormonat hier ankommt. */
+.archiv-konto {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--braun);
+  margin-top: 4px;
+}
+/* Markiert einen Startwert, den sie selbst gesetzt hat — im Gegensatz zu
+   einem, den die Kette gerechnet hat. */
+.anker-marke {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--pink);
+  background: var(--pink-weich);
+  border-radius: 999px;
+  padding: 1px 7px;
+  vertical-align: 1px;
+}
+.archiv-korrigieren {
+  margin-top: 8px;
+  border: 1px solid var(--linie);
+  background: transparent;
+  color: var(--braun-weich);
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 800;
+  padding: 5px 11px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+.archiv-korrigieren:hover { background: var(--pink-weich); color: var(--pink); border-color: var(--pink); }
 
 /* ============================================================
    Kontostand-Bereich
@@ -734,8 +915,107 @@ body.modal-offen { overflow: hidden; }
   line-height: 1.4;
 }
 
+/* Ein Startwert, der NICHT eingetippt wurde, sondern aus dem Vormonat kommt.
+
+   Er sieht bewusst anders aus als ein Eingabefeld: Wo nichts zu tippen ist,
+   soll auch kein Feld stehen. Genau dieses Feld war die Stelle, an der man
+   den Kontostand aus der Banking-App eintrug und damit das Gehalt doppelt
+   zählte. Die gestrichelte Linie sagt: hier steht ein Ergebnis, kein Eingang. */
+.konto-geerbt {
+  font-size: 20px;
+  font-weight: 900;
+  color: var(--braun);
+  padding: 8px 0 6px;
+  border-bottom: 2px dashed var(--linie);
+  display: inline-block;
+  min-width: 120px;
+}
+
+.anker-setzen { margin-top: 10px; max-width: 260px; }
+.anker-setzen > summary {
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--pink);
+  list-style: none;
+}
+.anker-setzen > summary::-webkit-details-marker { display: none; }
+.anker-setzen > summary::before { content: "↻ "; }
+.anker-text {
+  font-size: 11px;
+  color: var(--braun-weich);
+  line-height: 1.45;
+  margin: 8px 0;
+}
+.anker-weg { margin-top: 10px; display: block; }
+
 .konto-stand { font-size: 30px; font-weight: 900; letter-spacing: -0.5px; }
 .konto-stand.negativ { color: var(--rot); }
+
+/* ---- Die Aufschlüsselung: die Rechnung Zeile für Zeile ----
+
+   Sie ersetzt die einzelne Zahl, die vorher hier stand. Eine nackte Summe
+   kann man nur glauben oder nicht glauben; eine Rechnung kann man prüfen.
+   Wenn der Kontostand komisch aussieht, sieht man hier sofort, WELCHE Zeile
+   nicht stimmt, statt das Ergebnis anzustarren und zu raten.
+
+   Die drei Spalten sind fest: Zeichen (+/−/=), Text, Betrag. Dadurch stehen
+   alle Beträge exakt untereinander und lassen sich mit dem Auge addieren. */
+.konto-rechnung {
+  flex-basis: 100%;
+  margin-top: 4px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--linie);
+}
+.konto-zeile {
+  display: grid;
+  grid-template-columns: 18px 1fr auto;
+  gap: 8px;
+  align-items: baseline;
+  padding: 5px 0;
+  font-size: 14px;
+}
+.konto-zeichen {
+  font-weight: 900;
+  color: var(--braun-weich);
+  text-align: center;
+}
+.konto-text  { color: var(--braun-weich); font-weight: 600; }
+.konto-betrag {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums; /* gleich breite Ziffern = saubere Spalte */
+  white-space: nowrap;
+}
+.konto-zeile.positiv .konto-betrag { color: var(--gruen); }
+.konto-zeile.nicht   .konto-betrag { color: var(--pink); }
+
+/* Die Ergebniszeile: abgesetzt, größer, und im Minus rot. */
+.konto-zeile.ergebnis {
+  margin-top: 6px;
+  padding-top: 11px;
+  border-top: 2px solid var(--linie);
+  font-size: 16px;
+}
+.konto-zeile.ergebnis .konto-text {
+  color: var(--braun);
+  font-weight: 800;
+}
+.konto-zeile.ergebnis .konto-betrag { font-size: 21px; font-weight: 900; }
+.konto-zeile.ergebnis.negativ .konto-betrag,
+.konto-zeile.ergebnis.negativ .konto-text { color: var(--rot); }
+
+/* Was diesen Monat pausiert ist und deshalb in keiner Zeile oben steht */
+.konto-pause {
+  flex-basis: 100%;
+  margin: 10px 0 0;
+  padding: 10px 13px;
+  border-radius: var(--radius-klein);
+  background: #EFE7F8;
+  color: #6B4E96;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.45;
+}
 
 /* Die Erklärung, warum Kontostand und Übersicht auseinandergehen dürfen */
 .konto-fussnote {
@@ -748,28 +1028,86 @@ body.modal-offen { overflow: hidden; }
 }
 
 /* ============================================================
-   Die Abmachung: dein eigenes Monatsziel + die Serie
+   Der Gehaltszyklus
+
+   Die Karte beantwortet „wo im Monat bin ich eigentlich?" — gemessen
+   an dem Tag, an dem dein Gehalt kam, nicht am Kalender. Ruhige Farben
+   mit Absicht: Sie ist ein Kompass, kein Urteil. Geurteilt wird oben
+   im Banner.
    ============================================================ */
-.ziel-karte { border-left: 6px solid var(--braun-weich); }
-.ziel-karte.ok       { border-left-color: var(--gruen); }
-.ziel-karte.gerissen { border-left-color: var(--rot); }
-
-.ziel-kopf {
+.zyklus-karte { margin-bottom: 14px; }
+.zyklus-kopf {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
+  align-items: baseline;
   justify-content: space-between;
-  gap: 10px;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  margin-bottom: 10px;
 }
-.ziel-titel { font-size: 15px; font-weight: 900; margin: 0; }
+.zyklus-spanne {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--braun-weich);
+  white-space: nowrap;
+}
+.zyklus-spur { height: 14px; }
 
-.ziel-stand { font-size: 14px; margin: 10px 0 0; }
-.ziel-stand.gut      { color: var(--gruen); }
-.ziel-stand.schlecht { color: var(--rot); }
+.zyklus-rest {
+  font-size: 14px;
+  color: var(--braun-weich);
+  font-weight: 600;
+  margin: 10px 0 0;
+}
+/* Der überfällige Zyklus: kein Alarm, aber sichtbar genug, dass der
+   Knopf darunter gefunden wird. */
+.zyklus-rest.warn { color: var(--rot); font-weight: 700; }
+/* Der Tempo-Satz: verstrichene Zeit gegen ausgegebenes Ausnahmen-Budget.
+   Das ist die eigentliche Aussage der Karte, deshalb kräftiger. */
+.zyklus-tempo {
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.45;
+  margin: 8px 0 0;
+}
+.zyklus-tempo.gut  { color: var(--gruen); }
+.zyklus-tempo.warn { color: var(--rot); }
 
-/* Der Serien-Streifen — der Grund, morgen weiterzumachen */
+.zyklus-protag {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--braun-weich);
+  margin: 8px 0 0;
+}
+.zyklus-protag.warn { color: var(--rot); font-weight: 700; }
+
+/* Die Erinnerung, den Monat abzuschließen — nur sichtbar, wenn die App
+   es sicher weiß (siehe renderZyklus). */
+.zyklus-anstoss {
+  margin: 12px 0 0;
+  padding: 10px 13px;
+  border-radius: var(--radius-klein);
+  background: var(--gold-weich);
+  color: #8A6414;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.45;
+}
+
+/* „Gehalt ist da" — auf voller Breite, weil es die einzige Handlung auf
+   dieser Karte ist. Einmal im Monat gedrückt, und die App weiß wieder,
+   in welchem Takt sie rechnet. */
+.zyklus-knopf {
+  display: block;
+  width: 100%;
+  margin-top: 14px;
+}
+
+/* Der Serien-Streifen — der Grund, morgen weiterzumachen.
+
+   Er steht allein zwischen Kopfzeile und Zyklus-Karte, ohne Karte
+   drumherum. Deshalb trägt er den Abstand nach unten selbst. */
 .serie {
-  margin-top: 12px;
+  margin: 0 0 14px;
   padding: 9px 12px;
   border-radius: var(--radius-klein);
   font-size: 13px;
@@ -1289,8 +1627,11 @@ body.modal-offen { overflow: hidden; }
 #bericht { display: none; }
 
 @media print {
-  /* Die App selbst und alles Schwebende bleiben draußen */
-  .wrap, #modal, #toast { display: none !important; }
+  /* Die App selbst und alles Schwebende bleiben draußen.
+     #stand steht außerhalb von .wrap (damit die Leiste über die volle
+     Breite kleben kann) und muss deshalb einzeln genannt werden — sonst
+     klebt sie mit auf dem PDF. */
+  .wrap, #stand, #modal, #toast { display: none !important; }
   #bericht { display: block; }
 
   /* Weißer Grund, schwarze Schrift spart Tinte und liest sich besser */
@@ -1751,4 +2092,13 @@ body.modal-offen { overflow: hidden; }
   .konto-block input { width: 130px; }
   .affirmation-satz { font-size: 19px; }
   .affirmation-karte { padding: 24px 16px 16px; }
+
+  /* Die Stand-Leiste auf dem Handy: enger, und die Beschriftung wandert
+     über die Zahl statt daneben. Nebeneinander würde bei „bleibt bis zum
+     nächsten Gehalt" die Zahl aus dem Bild schieben. */
+  .stand-leiste { padding: 7px 14px 8px; gap: 4px 10px; }
+  .stand-geld { flex-direction: column; gap: 0; }
+  .stand-label { font-size: 10px; }
+  .stand-zahl { font-size: 19px; }
+  .stand-chip { font-size: 11px; padding: 2px 8px; }
 }
