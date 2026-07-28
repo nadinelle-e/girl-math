@@ -810,68 +810,129 @@ body.modal-offen { overflow: hidden; }
    Archiv
    ============================================================ */
 .archiv-titel { font-size: 19px; font-weight: 900; margin: 26px 0 10px; }
+
+/* Ein Monat im Archiv: nur sein Name, und rechts das ✕.
+
+   Hier standen einmal fünf Zahlen, ein Trend und zwei Knöpfe pro Monat. Nach
+   einem halben Jahr war das eine Textwand, durch die niemand mehr las. Alles,
+   was da stand, steht im Bericht — und den holt man sich mit einem Tipp. */
 .archiv-eintrag {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
   background: var(--karte);
   border: 1px solid var(--linie-zart);
   border-left: 6px solid var(--pink);
   border-radius: var(--radius-klein);
-  padding: 13px 15px;
   margin-bottom: 8px;
   box-shadow: var(--schatten);
+  overflow: hidden;
 }
-.archiv-monat { font-weight: 800; }
-.archiv-detail { color: var(--braun-weich); font-size: 13px; }
-.archiv-badge {
-  font-weight: 900;
-  font-size: 15px;
-  padding: 5px 12px;
-  border-radius: 999px;
-  color: #fff;
-  white-space: nowrap;
+.archiv-kopf {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
 }
-.trend { font-size: 13px; font-weight: 700; margin: 6px 2px 0; color: var(--braun-weich); }
-.trend-besser { color: var(--gruen); }
-.trend-schlechter { color: var(--rot); }
-
-/* Start → Ende eines Archiv-Monats. Steht bewusst da: Erst wenn man beide
-   Zahlen sieht, wird sichtbar, dass eine Korrektur im Vormonat hier ankommt. */
-.archiv-konto {
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--braun);
-  margin-top: 4px;
-}
-/* Markiert einen Startwert, den sie selbst gesetzt hat — im Gegensatz zu
-   einem, den die Kette gerechnet hat. */
-.anker-marke {
-  display: inline-block;
-  font-size: 10px;
-  font-weight: 900;
-  text-transform: uppercase;
-  letter-spacing: 0.4px;
-  color: var(--pink);
-  background: var(--pink-weich);
-  border-radius: 999px;
-  padding: 1px 7px;
-  vertical-align: 1px;
-}
-.archiv-korrigieren {
-  margin-top: 8px;
-  border: 1px solid var(--linie);
+/* Der Monatsname IST der Knopf — die ganze Zeile, nicht nur das Wort.
+   Auf dem Handy trifft man so verlässlich, was man treffen will. */
+.archiv-monat {
+  flex: 1;
+  text-align: left;
+  border: none;
   background: transparent;
-  color: var(--braun-weich);
   font-family: inherit;
-  font-size: 11px;
+  font-size: 15px;
   font-weight: 800;
-  padding: 5px 11px;
-  border-radius: 999px;
+  color: var(--braun);
+  padding: 15px;
   cursor: pointer;
 }
-.archiv-korrigieren:hover { background: var(--pink-weich); color: var(--pink); border-color: var(--pink); }
+.archiv-weg {
+  border: none;
+  background: transparent;
+  color: var(--braun-weich);
+  font-size: 15px;
+  line-height: 1;
+  padding: 15px;
+  cursor: pointer;
+  flex: none;
+}
+.archiv-weg:hover { color: var(--rot); }
+
+/* Die beiden Knöpfe stehen IMMER im Dokument und werden nur ein- und
+   ausgeblendet. Sie erst beim Antippen zu erzeugen, würde bei jedem
+   Neuzeichnen die halbe Karte austauschen — und das kostet den Fokus,
+   wenn man gerade nebenan tippt. */
+.archiv-aktionen {
+  display: none;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 0 15px 15px;
+}
+.archiv-eintrag.archiv-offen .archiv-aktionen { display: flex; }
+
+/* Der Monat, der gerade zum Korrigieren offen ist. */
+.archiv-eintrag.archiv-in-arbeit {
+  border-left-color: var(--braun);
+  background: var(--pink-weich);
+}
+
+/* „2 Monate ausgeblendet · wieder zeigen" — die Rückholzeile.
+   Sie ist der Grund, warum das ✕ ohne Rückfrage auskommt. */
+.archiv-zeigen {
+  display: block;
+  width: 100%;
+  margin-top: 4px;
+  border: 1px dashed var(--linie);
+  background: transparent;
+  border-radius: var(--radius-klein);
+  color: var(--braun-weich);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  padding: 10px;
+  cursor: pointer;
+}
+.archiv-zeigen:hover { border-color: var(--pink); color: var(--pink); }
+
+/* ============================================================
+   Der Balken beim Bearbeiten eines alten Monats
+
+   Er klebt oben und ist absichtlich laut: Alles darunter zeigt und speichert
+   jetzt den Juli. Wer das übersieht, trägt seinen August in den falschen
+   Monat ein — und merkt es erst Wochen später.
+   ============================================================ */
+.bearbeitung-balken {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  background: var(--braun);
+  color: var(--papier);
+  padding: 10px 16px;
+  font-size: 14px;
+  font-weight: 700;
+}
+.bearbeitung-balken strong { font-weight: 900; }
+/* Heller Knopf auf braunem Grund: Ein pinker oder brauner ginge hier unter,
+   und „fertig" muss der Ausweg sein, den man sofort findet. */
+.bearbeitung-balken .btn {
+  flex: none;
+  background: var(--papier);
+  color: var(--braun);
+  border-color: var(--papier);
+  padding: 7px 18px;
+}
+.bearbeitung-balken .btn:hover { background: #fff; }
+
+/* Während ein alter Monat offen ist, hat „Monat abschließen" nichts zu
+   suchen — und ein zweiter Monat lässt sich auch nicht danebenlegen. */
+body.bearbeitung-offen .werkzeuge,
+body.bearbeitung-offen .werkzeuge-hinweis,
+body.bearbeitung-offen .archiv-aktionen,
+body.bearbeitung-offen .archiv-weg { display: none; }
 
 /* ============================================================
    Kontostand-Bereich
@@ -917,39 +978,36 @@ body.modal-offen { overflow: hidden; }
   line-height: 1.4;
 }
 
-/* Ein Startwert, der NICHT eingetippt wurde, sondern aus dem Vormonat kommt.
+/* Das Häkchen „Dein Gehalt ist da schon drauf".
 
-   Er sieht bewusst anders aus als ein Eingabefeld: Wo nichts zu tippen ist,
-   soll auch kein Feld stehen. Genau dieses Feld war die Stelle, an der man
-   den Kontostand aus der Banking-App eintrug und damit das Gehalt doppelt
-   zählte. Die gestrichelte Linie sagt: hier steht ein Ergebnis, kein Eingang. */
-.konto-geerbt {
-  font-size: 20px;
-  font-weight: 900;
+   Steht direkt unter dem Feld und nicht in einer eigenen Zeile weiter unten:
+   Es gehört zu der Zahl, die man gerade tippt, und wer es dort nicht sieht,
+   sieht es nie. Der ganze Bereich ist anklickbar (deshalb <label>), damit man
+   auf dem Handy nicht das winzige Kästchen treffen muss. */
+.konto-gehalt {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  font-size: 13px;
+  font-weight: 700;
   color: var(--braun);
-  padding: 8px 0 6px;
-  border-bottom: 2px dashed var(--linie);
-  display: inline-block;
-  min-width: 120px;
-}
-
-.anker-setzen { margin-top: 10px; max-width: 260px; }
-.anker-setzen > summary {
   cursor: pointer;
-  font-size: 12px;
-  font-weight: 800;
-  color: var(--pink);
-  list-style: none;
 }
-.anker-setzen > summary::-webkit-details-marker { display: none; }
-.anker-setzen > summary::before { content: "↻ "; }
-.anker-text {
-  font-size: 11px;
-  color: var(--braun-weich);
-  line-height: 1.45;
-  margin: 8px 0;
+/* Die Regel für die Eingabefelder darüber setzt Rahmen, Polster und 150px
+   Breite — an einem Kästchen ergibt das einen Klotz mit Luft drumherum.
+   Deshalb hier alles zurück auf ein schlichtes Häkchen. */
+.konto-gehalt input {
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: none;
+  accent-color: var(--pink);
+  flex: none;
+  margin: 0;
 }
-.anker-weg { margin-top: 10px; display: block; }
 
 .konto-stand { font-size: 30px; font-weight: 900; letter-spacing: -0.5px; }
 .konto-stand.negativ { color: var(--rot); }
@@ -1006,18 +1064,6 @@ body.modal-offen { overflow: hidden; }
 .konto-zeile.ergebnis.negativ .konto-betrag,
 .konto-zeile.ergebnis.negativ .konto-text { color: var(--rot); }
 
-/* Was diesen Monat pausiert ist und deshalb in keiner Zeile oben steht */
-.konto-pause {
-  flex-basis: 100%;
-  margin: 10px 0 0;
-  padding: 10px 13px;
-  border-radius: var(--radius-klein);
-  background: #EFE7F8;
-  color: #6B4E96;
-  font-size: 13px;
-  font-weight: 600;
-  line-height: 1.45;
-}
 
 /* Die Erklärung, warum Kontostand und Übersicht auseinandergehen dürfen */
 .konto-fussnote {
@@ -1119,11 +1165,6 @@ body.modal-offen { overflow: hidden; }
 }
 .serie-laeuft { background: #E8F6EE; color: #2F7F5B; }
 .serie-weg    { background: var(--creme); }
-
-/* Die Ziel-Marke im Archiv */
-.ziel-marke { font-size: 12px; font-weight: 800; margin: 5px 2px 0; }
-.ziel-marke.gut      { color: var(--gruen); }
-.ziel-marke.schlecht { color: var(--rot); }
 
 /* ============================================================
    Lebenszeit: Wochenstunden-Feld und Arbeitszeit-Schilder
@@ -1585,7 +1626,7 @@ body.modal-offen { overflow: hidden; }
      #stand steht außerhalb von .wrap (damit die Leiste über die volle
      Breite kleben kann) und muss deshalb einzeln genannt werden — sonst
      klebt sie mit auf dem PDF. */
-  .wrap, #stand, #modal, #toast { display: none !important; }
+  .wrap, #stand, #bearbeitung, #modal, #toast { display: none !important; }
   #bericht { display: block; }
 
   /* Weißer Grund, schwarze Schrift spart Tinte und liest sich besser */
@@ -2043,7 +2084,9 @@ body.modal-offen { overflow: hidden; }
   .posten-zeile, .form-zeile { grid-template-columns: 1fr 84px auto; }
   .donut-bereich { gap: 4px 16px; }
   .legende { min-width: 0; width: 100%; }
-  .konto-block input { width: 130px; }
+  /* Nur die Betragsfelder werden schmaler — das Gehalt-Häkchen daneben ist
+     kein Eingabefeld und bleibt ein Kästchen. */
+  .konto-block input:not([type="checkbox"]) { width: 130px; }
   .affirmation-satz { font-size: 19px; }
   .affirmation-karte { padding: 24px 16px 16px; }
 

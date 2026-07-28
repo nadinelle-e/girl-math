@@ -843,19 +843,29 @@ function istPausiert(posten, monatId) {
 function neuerMonat(id, startguthaben, vorlage) {
   const monat = {
     id: id,
-    // Gerundet, damit sich die Nachkommastellen der Rechnung nicht von Monat
-    // zu Monat weiterschleppen — siehe runde().
-    startBalance: runde(startguthaben),
-    /* Der ANKER: „Hier weiß ich, was wirklich auf dem Konto lag."
+    /* Was zu Beginn des Monats auf dem Konto lag.
 
-       Steht hier eine Zahl, fängt die Kontostand-Kette in diesem Monat neu
-       an und rechnet ab hier vorwärts. Steht hier null, erbt der Monat den
-       Schlussstand seines Vormonats — das ist der Normalfall.
+       `null` heißt: noch nicht eingetragen. Das ist etwas anderes als 0
+       („das Konto stand auf genau null"), und deshalb steht hier auch keine
+       0 als Notlösung. Ein frischer Monat startet leer und wartet auf deine
+       Zahl — geerbt wird nichts mehr, jeder Monat steht für sich.
 
-       Der allererste Monat der App ist immer ein Anker: Vor ihm gibt es
-       nichts, aus dem er erben könnte. Jeder Folgemonat startet ohne, denn
-       seine Zahl ist ja gerechnet und nicht gewusst. */
-    anchorBalance: vorlage ? null : runde(startguthaben),
+       Gerundet gelesen, damit sich Nachkommastellen nicht ansammeln. */
+    startBalance: (typeof startguthaben === "number" && Number.isFinite(startguthaben))
+      ? runde(startguthaben)
+      : null,
+    /* Steckt in der Zahl oben schon dein Gehalt?
+
+       Wer nachsieht, was auf dem Konto liegt, sieht dort mitten im Monat
+       auch das Gehalt — und dann zählt die Rechnung es doppelt: einmal aus
+       dem Kontostand, einmal aus deinen Einnahmen. Steht hier true, ziehen
+       wir die eingetragenen Einnahmen wieder ab.
+
+       Warum als Häkchen und nicht als fertig verrechnete Zahl: So bleibt
+       deine eigene Eingabe stehen, wie du sie gemacht hast. Trägst du dein
+       Gehalt später nach oder änderst es, zieht der Startwert von selbst
+       mit, statt einmal falsch festzustehen. */
+    startMitGehalt: false,
     /* Was dir zugeflossen ist, ohne dass du etwas dafür getan hast.
 
        Startet in JEDEM Monat leer, auch wenn die Vorlage voll war: Ein
@@ -889,14 +899,14 @@ function neuerMonat(id, startguthaben, vorlage) {
    Zettel wird auf das neue Formular übertragen, kein Feld bleibt leer.
    ------------------------------------------------------------ */
 
-/* Merker für den einen Moment beim Update von „eingefrorene Zahlen" auf
-   „gerechnete Kette". Er lebt nur bis zum ersten render() und wird bewusst
-   nicht mitgespeichert: Liefe die Absicherung bei jedem Laden erneut, würde
-   sie jede Korrektur sofort wieder festnageln.
+/* Merker für den einen Moment beim Umstieg von der Kontostand-Kette auf
+   eigenständige Monate. Er lebt nur bis zum ersten render() und wird bewusst
+   nicht mitgespeichert: Liefe der Umstieg bei jedem Laden erneut, würde er
+   jede spätere Korrektur sofort wieder überschreiben.
 
    Steht hier oben und nicht bei laden(): `let` gilt erst ab seiner Zeile,
    und migriere() greift schon in der nächsten Zeile darauf zu. */
-let ankerPruefenNoetig = false;
+let umstiegNoetig = false;
 
 let STATE = laden();
 
@@ -971,12 +981,13 @@ function saubereAffirmationen(liste) {
 
 function leererStand() {
   return {
-    version: 3,
+    version: 4,
     einstellungen: standardEinstellungen(),
-    currentMonth: neuerMonat(monatsId(new Date()), 0, null),
+    currentMonth: neuerMonat(monatsId(new Date()), null, null),
     archive: [],
     onboardingGesehen: false,
     letzterAbschluss: "",
+    bearbeitung: null,
   };
 }
 
@@ -1002,48 +1013,57 @@ function migriere(daten) {
       id: id,
       summary: (eintrag && eintrag.summary) || {},
       snapshot: normalisiereMonat(eintrag && eintrag.snapshot, id),
+      /* Aus dem Archiv genommen — aber nur von der Liste.
+
+         Der Eintrag bleibt mit allen Zahlen erhalten und zählt für Notgroschen,
+         Sparziel, Serie und Wohlstand unverändert weiter. Ausgeblendet ist er
+         nur auf dem Papier. Deshalb steht hier ein Merker und kein `delete`:
+         Ein Monat, den du gelebt hast, verschwindet nicht dadurch, dass du ihn
+         nicht mehr sehen willst. */
+      versteckt: eintrag && eintrag.versteckt === true,
     };
   });
 
   const aktuellerMonat = normalisiereMonat(daten.currentMonth, heute);
 
-  /* Der Kontostand war früher eine Kette aus eingefrorenen Zahlen: Jeder
-     Monat schrieb seinen Schlussstand fest in den nächsten. Jetzt wird die
-     Kette gerechnet, und dafür braucht sie genau einen Startpunkt.
+  /* Wurde die App mitten im Bearbeiten eines Archiv-Monats geschlossen?
 
-     Ein Stand aus der Zeit davor hat noch keinen. Also setzen wir ihn hier
-     einmalig: Der ÄLTESTE bekannte Monat wird zum Anker, mit dem Wert, der
-     ohnehin schon in ihm stand. Von dort rechnet die Kette vorwärts und kommt
-     bei denselben Zahlen heraus wie vorher — denn genau diese Rechnung stand
-     ja hinter den eingefrorenen Werten.
+     Dann steht in `currentMonth` der alte Monat und der eigentlich laufende
+     liegt zur Seite gelegt in `bearbeitung.zurueck`. Beide kommen genau so
+     zurück, damit ein Neuladen die Arbeit nicht zerreißt.
 
-     Archiv ist neueste-zuerst sortiert, der älteste steht also ganz hinten.
-     Gibt es kein Archiv, ist der laufende Monat selbst der Anfang.
-
-     Die Prüfung „hat schon irgendwer einen Anker?" verhindert, dass dieser
-     Notnagel bei jedem Laden erneut zuschlägt und einen später gesetzten
-     Anker überschreibt. */
-  const alleMonate = archive.map(e => e.snapshot).concat([aktuellerMonat]);
-  const hatAnker = alleMonate.some(m => m.anchorBalance !== null);
-  if (!hatAnker && alleMonate.length > 0) {
-    const aeltester = archive.length > 0 ? archive[archive.length - 1].snapshot : aktuellerMonat;
-    aeltester.anchorBalance = runde(aeltester.startBalance);
-    /* „Kommt dieselbe Zahl heraus" gilt nur, wenn jeder Archiv-Monat seinen
-       vollständigen Schnappschuss hat. Sehr alte Stände haben da Lücken, und
-       dann rechnet die Kette an einer leeren Stelle vorbei und landet woanders.
-
-       Deshalb wird nach dem Laden einmal nachgerechnet und im Zweifel auch der
-       laufende Monat verankert — siehe ankerAbsichern(). Ein Update darf die
-       Zahl, die sie gestern gesehen hat, nicht verschieben. */
-    ankerPruefenNoetig = true;
+     Findet sich der bearbeitete Monat nicht mehr im Archiv, wird der Umbau
+     rückgängig gemacht: Der laufende Monat kommt zurück auf seinen Platz.
+     Lieber ein sauberer Zustand als eine App, die in der Bearbeitung eines
+     Monats feststeckt, den es nicht gibt. */
+  const roheBearb = (daten.bearbeitung && typeof daten.bearbeitung === "object")
+    ? daten.bearbeitung : null;
+  let laufender = aktuellerMonat;
+  let bearbeitung = null;
+  if (roheBearb && roheBearb.zurueck) {
+    const zurueck = normalisiereMonat(roheBearb.zurueck, heute);
+    if (archive.some(e => e.id === roheBearb.id)) {
+      bearbeitung = { id: roheBearb.id, zurueck: zurueck };
+    } else {
+      laufender = zurueck;
+    }
   }
 
   const roheEinst = (daten.einstellungen && typeof daten.einstellungen === "object")
     ? daten.einstellungen : {};
   const stunden = Number(roheEinst.wochenstunden);
 
+  /* Alles vor Fassung 4 rechnete den Kontostand als KETTE: Jeder Monat erbte
+     den Schlussstand seines Vormonats, und eine Korrektur ganz hinten zog
+     durch bis heute. Jetzt steht jeder Monat für sich.
+
+     Damit dabei keine Zahl springt, wird die alte Kette nach dem Laden noch
+     genau einmal gerechnet und ihr Ergebnis in jeden Monat geschrieben —
+     siehe startwerteFestschreiben(). Danach ist sie Geschichte. */
+  if (!(Number(daten.version) >= 4)) umstiegNoetig = true;
+
   return {
-    version: 3,
+    version: 4,
     einstellungen: {
       wochenstunden: (stunden > 0 && stunden <= 80) ? stunden : 40,
       notgroschenStart: Math.max(0, Number(roheEinst.notgroschenStart) || 0),
@@ -1072,8 +1092,11 @@ function migriere(daten) {
          aus einer alten Einstellung zurückrechnet. */
       zyklusStart: saubererZyklusStart(roheEinst.zyklusStart),
     },
-    currentMonth: aktuellerMonat,
+    currentMonth: laufender,
     archive: archive,
+    // Welcher Archiv-Monat gerade in Bearbeitung ist, und wo der laufende
+    // Monat solange liegt. null heißt: alles am gewohnten Platz.
+    bearbeitung: bearbeitung,
     onboardingGesehen: daten.onboardingGesehen === true,
     /* Wann zuletzt ein Monat abgeschlossen wurde, als "JJJJ-MM-TT".
        Daraus weiß die App, ob seit deinem letzten Gehalt schon abgeschlossen
@@ -1087,27 +1110,42 @@ function migriere(daten) {
 // alle Posten mit ID, Rhythmus und Fälligkeit versehen.
 function normalisiereMonat(monat, ersatzId) {
   const roh = (monat && typeof monat === "object") ? monat : {};
+
+  /* Nur eine echte Zahl zählt als Startwert. Fehlend oder Unsinn heißt
+     „noch nicht eingetragen" (null) — und das ist etwas anderes als 0.
+     Deshalb hier die ausdrückliche Prüfung statt des sonst üblichen `|| 0`:
+     Die 0 ist ein gültiger Kontostand („stand auf genau null") und darf
+     nicht aus Versehen entstehen.
+
+     Gerundet gelesen: Ältere Stände haben durch den Monatswechsel
+     Nachkommastellen wie 1066,1399999999 angesammelt. Beim ersten Laden
+     nach diesem Update ist das ein für alle Mal weg. */
+  const alsZahl = (wert) => (typeof wert === "number" && Number.isFinite(wert))
+    ? runde(wert) : null;
+  /* Stände aus der Zeit der Kontostand-Kette kennen zwei Felder: den
+     gerechneten `startBalance` und den selbst gesetzten `anchorBalance`.
+     Der Anker war die Zahl, die sie WUSSTE — er sticht und wird zum
+     Startwert. Die Kette selbst gibt es nicht mehr. */
+  const rohAnker = alsZahl(roh.anchorBalance);
+  const rohStart = alsZahl(roh.startBalance);
+
   // Ein `ziel` aus alten Ständen wird hier stillschweigend fallengelassen —
   // das selbstgesetzte Ziel gibt es nicht mehr, gemessen wird an der Regel.
   const sauber = {
     id: typeof roh.id === "string" ? roh.id : ersatzId,
-    /* Gerundet gelesen: Ältere Stände haben durch den Monatswechsel
-       Nachkommastellen wie 1066,1399999999 angesammelt. Beim ersten Laden
-       nach diesem Update ist das ein für alle Mal weg. */
-    startBalance: runde(roh.startBalance),
-    /* Der Anker — siehe neuerMonat(). Nur eine echte Zahl zählt: null,
-       fehlend oder Unsinn heißt gleichermaßen „kein Anker, erbe vom
-       Vormonat". Deshalb hier die ausdrückliche Prüfung auf eine Zahl statt
-       des sonst üblichen `|| 0` — die 0 ist ein gültiger Anker
-       („Konto stand auf genau null") und darf nicht aus Versehen entstehen. */
-    anchorBalance: typeof roh.anchorBalance === "number" && Number.isFinite(roh.anchorBalance)
-      ? runde(roh.anchorBalance)
-      : null,
+    startBalance: rohAnker !== null ? rohAnker : rohStart,
+    // Steckt in der Zahl oben schon das Gehalt? Siehe neuerMonat().
+    startMitGehalt: roh.startMitGehalt === true,
     /* Stände von vor dieser Karte kennen das Feld nicht. Dann steht hier
        eben eine leere Liste — der Monat ist deshalb nicht kaputt, er hat
        nur noch nichts gezählt. */
     zufluesse: (Array.isArray(roh.zufluesse) ? roh.zufluesse : []).map(saubererZufluss),
   };
+  /* Merker für den einmaligen Umstieg von der Kette auf eigenständige Monate,
+     siehe startwerteFestschreiben(). Er steht nur an Monaten, die früher
+     einen Anker trugen, und wird beim Umstieg gleich wieder entfernt. */
+  if (rohAnker !== null) sauber.ankerAusAltemStand = true;
+
   KATEGORIEN.forEach(kat => {
     const liste = Array.isArray(roh[kat.key]) ? roh[kat.key] : [];
     sauber[kat.key] = liste.map(p => normalisierePosten(p, kat, sauber.id));
@@ -1177,136 +1215,99 @@ function speichern() {
              darf in den Kontostand, denn deine Bank legt nichts um.
    ------------------------------------------------------------ */
 /* ------------------------------------------------------------
-   10a. DIE KONTOSTAND-KETTE
+   10a. JEDER MONAT FÜR SICH
 
-   Warum es sie gibt: Früher schrieb jeder Monatsabschluss den errechneten
-   Kontostand als feste Zahl in den nächsten Monat. Der Juli hatte sich das
-   Ergebnis vom Juni abgeschrieben und fragte nie wieder nach. Ein Zahlendreher
-   im Juni war damit für alle Zeit in jedem Folgemonat drin — es gab keine
-   Stelle, an der man ihn hätte herausnehmen können.
+   Hier stand einmal eine KETTE: Jeder Monat erbte den Schlussstand seines
+   Vormonats, und eine Korrektur ganz hinten zog durch bis heute. Das war
+   praktisch und trotzdem falsch herum gedacht — es machte jeden Monat von
+   allen davor abhaengig, und man konnte keinen einzelnen mehr anfassen,
+   ohne alle anderen mitzubewegen.
 
-   Jetzt wird nichts mehr abgeschrieben, sondern gerechnet. Und zwar bei jeder
-   Anzeige neu, von vorne:
+   Jetzt gilt: Jeder Monat hat genau eine eigene Zahl, `startBalance` — was
+   zu seinem Beginn auf dem Konto lag. Du trägst sie ein, sie gilt für
+   diesen einen Monat, und kein anderer Monat merkt etwas davon.
 
-     Anfang Juli = Ende Juni = Anfang Juni + Junis Bewegungen = …
-
-   … zurück bis zum letzten ANKER. Ein Anker ist ein Monat, in dem du gesagt
-   hast „hier weiß ich, was wirklich auf dem Konto lag". Ab dort läuft die
-   Rechnung vorwärts. Korrigierst du irgendwo etwas, heilt alles danach von
-   selbst mit — genau das war vorher unmöglich.
-
-   Metapher: Vorher war es eine Reihe von Zetteln, auf denen jeder nur das
-   Ergebnis des vorigen abgeschrieben hatte. Jetzt ist es eine Rechnung, die
-   man von oben nachlesen kann — und die Zettel liegen alle noch da.
-
-   Möglich ist das, weil beim Abschluss ohnehin eine vollständige Kopie jedes
-   Monats ins Archiv wandert (`snapshot`). Die Daten waren immer da, sie
-   wurden nur nie wieder angesehen.
-
-   Zurück kommt eine Tabelle: Monats-ID → { start, ende, ausAnker, vonMonat }.
+   Das Einzige, was dabei zu klären war: Wer mitten im Monat nachsieht,
+   sieht dort auch schon sein Gehalt. Dafür gibt es das Häkchen
+   `startMitGehalt` — siehe neuerMonat() und rechne().
    ------------------------------------------------------------ */
-function kontostandKette() {
+
+/* Der einmalige Umstieg von der Kette auf eigenständige Monate.
+
+   Läuft genau einmal, direkt nach dem ersten Laden eines älteren Standes.
+   Die alte Kette wird ein letztes Mal chronologisch durchgerechnet, und ihr
+   Ergebnis wird in jeden Monat als eigener Startwert geschrieben.
+
+   Warum das nötig ist: Ein Monat, der früher geerbt hat, trägt in seinem
+   gespeicherten `startBalance` womöglich eine veraltete Zahl — die Kette
+   hat sie ja bei jeder Anzeige neu gerechnet, statt sie festzuhalten.
+   Würden wir die einfach stehen lassen, sähe sie nach dem Update einen
+   anderen Kontostand als gestern.
+
+   Der Grundsatz dahinter: Ein Update darf Zahlen besser machen, aber
+   niemals heimlich verschieben. */
+function startwerteFestschreiben() {
+  if (!umstiegNoetig) return;
+  umstiegNoetig = false;
+
   // Archiv ist neueste-zuerst gespeichert. Gerechnet wird chronologisch,
   // also älteste zuerst — deshalb einmal umdrehen.
-  const monate = (STATE.archive || []).map(e => e.snapshot).reverse();
-  monate.push(STATE.currentMonth);
+  const eintraege = (STATE.archive || []).slice().reverse();
+  const monate = eintraege.map(e => e.snapshot).concat([STATE.currentMonth]);
 
-  const kette = {};
-  let vorherEnde = null;   // Schlussstand des Vormonats
-  let vorherId = null;
-
-  monate.forEach(monat => {
-    if (!monat || !monat.id) return;
-
-    /* Drei Quellen für den Startwert, in dieser Rangfolge:
-       1. Ein gesetzter Anker — er sticht immer, denn er ist gewusst statt gerechnet.
-       2. Der Schlussstand des Vormonats — der Normalfall.
-       3. Das alte `startBalance`-Feld — nur beim allerersten Monat, falls
-          die Migration keinen Anker setzen konnte. Reine Rückfalllinie. */
-    const ausAnker = monat.anchorBalance !== null && monat.anchorBalance !== undefined;
-    let start;
-    if (ausAnker)              start = runde(monat.anchorBalance);
-    else if (vorherEnde !== null) start = vorherEnde;
-    else                       start = runde(monat.startBalance);
-
-    /* Hier steckt der eigentliche Trick: rechne() bekommt den Startwert von
-       außen gereicht und liest ihn NICHT aus dem Monat. Sonst müsste diese
-       Funktion die gespeicherten Daten anfassen, um zu rechnen — und wer
-       zum Rechnen schreibt, hat irgendwann zwei Wahrheiten. */
-    const ende = rechne(monat, start).kontostand;
-
-    kette[monat.id] = {
-      start: start,
-      ende: ende,
-      ausAnker: ausAnker,
-      // Aus welchem Monat der Startwert stammt — für den Satz „übernommen aus Juni".
-      vonMonat: ausAnker ? null : vorherId,
-    };
-
-    vorherEnde = ende;
-    vorherId = monat.id;
+  /* Wer trug früher einen Anker? Der Merker wird gleich hier eingesammelt und
+     überall entfernt — er hat nur diesen einen Moment lang eine Aufgabe. */
+  const hatteAnker = new Map();
+  monate.forEach(m => {
+    if (!m) return;
+    hatteAnker.set(m, m.ankerAusAltemStand === true);
+    delete m.ankerAusAltemStand;
   });
 
-  return kette;
-}
+  /* Taugt das Archiv überhaupt zum Nachrechnen?
 
-/* Der Startwert für einen einzelnen Monat, ohne dass der Aufrufer die ganze
-   Kette auseinandernehmen muss. Kennt die Kette den Monat nicht (dann ist er
-   weder im Archiv noch der laufende), fällt sie auf sein altes Feld zurück. */
-/* Die Sicherung für den Umstieg von den eingefrorenen Zahlen auf die Kette.
+     Sehr alte Schnappschüsse haben Lücken: Die Zusammenfassung nennt ein
+     Gehalt, im Schnappschuss selbst steht keins. Die Kette liefe dort an einer
+     leeren Stelle vorbei und käme am Ende woanders heraus als die Zahl, die
+     gestern auf dem Schirm stand.
 
-   Läuft genau einmal, direkt nach dem ersten Laden eines alten Standes. Sie
-   rechnet die Kette einmal probeweise durch und vergleicht ihr Ergebnis für
-   den laufenden Monat mit der Zahl, die dort eingefroren stand.
+     Deshalb wird erst geprüft und dann gerechnet. Bei Lücken bleibt jeder
+     gespeicherte Wert stehen — er ist dann die einzige verlässliche Quelle. */
+  const vollstaendig = eintraege.every(e => {
+    const gemeldet = Number((e.summary || {}).gehalt) || 0;
+    return Math.abs(rechne(e.snapshot).gehalt - gemeldet) < 0.005;
+  });
 
-   Stimmen beide überein, war das Archiv vollständig und die Kette darf
-   allein weiterrechnen. Weichen sie ab — weil ein alter Schnappschuss Lücken
-   hat —, bekommt der laufende Monat seinen bisherigen Wert als Anker. Dann
-   sieht sie nach dem Update exakt dieselbe Zahl wie davor, und die Kette
-   greift ab dem nächsten Monatsabschluss.
+  if (vollstaendig) {
+    let vorherEnde = null;   // Schlussstand des Vormonats
+    monate.forEach(monat => {
+      if (!monat || !monat.id) return;
 
-   Der Grundsatz dahinter: Ein Update darf Zahlen besser machen, aber niemals
-   heimlich verschieben. */
-function ankerAbsichern() {
-  if (!ankerPruefenNoetig) return;
-  ankerPruefenNoetig = false;
+      /* Wo früher ein Anker stand, steht die Zahl schon richtig: Sie war
+         gewusst, nicht gerechnet, und normalisiereMonat() hat sie zum
+         Startwert gemacht. Alle anderen erbten — genau das frieren wir
+         jetzt ein. */
+      if (!hatteAnker.get(monat) && vorherEnde !== null) monat.startBalance = vorherEnde;
 
-  const monat = STATE.currentMonth;
-  const vorher = runde(monat.startBalance);
-  const gerechnet = kontostandKette()[monat.id];
-
-  if (gerechnet && Math.abs(gerechnet.start - vorher) > 0.005) {
+      vorherEnde = rechne(monat).kontostand;
+    });
+  } else {
     console.info(
-      `girl math: Der gerechnete Startwert (${gerechnet.start}) weicht vom bisher ` +
-      `gespeicherten (${vorher}) ab — vermutlich fehlen einem Archiv-Monat Daten. ` +
-      `Der bisherige Wert bleibt stehen und ist jetzt als Startwert gesetzt.`
+      "girl math: Einem archivierten Monat fehlen Daten. Jeder Monat behält " +
+      "deshalb den Startwert, der bisher in ihm stand — so bleibt jede Zahl, " +
+      "wie du sie zuletzt gesehen hast."
     );
-    monat.anchorBalance = vorher;
-    speichern();
   }
+
+  speichern();
 }
 
-function startwertFuer(monatId, kette) {
-  const glied = kette && kette[monatId];
-  if (glied) return glied.start;
-  const monat = monatId === STATE.currentMonth.id
-    ? STATE.currentMonth
-    : (STATE.archive || []).find(e => e.id === monatId);
-  return runde(monat ? (monat.snapshot || monat).startBalance : 0);
-}
-
-/* Die Zahlen des laufenden Monats — immer mit dem Startwert aus der Kette.
-   Alle Stellen, die früher `rechne(STATE.currentMonth)` gerufen haben, gehen
-   jetzt hier durch, damit keine davon einen veralteten Startwert erwischt. */
+// Die Zahlen des Monats, an dem gerade gearbeitet wird.
 function rechneAktuell() {
-  const kette = kontostandKette();
-  return rechne(STATE.currentMonth, startwertFuer(STATE.currentMonth.id, kette));
+  return rechne(STATE.currentMonth);
 }
 
-/* `startUeberschreibung` ist der Startwert aus der Kontostand-Kette. Fehlt er,
-   greift das im Monat gespeicherte `startBalance` — so bleiben ältere Aufrufe
-   und die Tests gültig, die einen Monat für sich allein durchrechnen. */
-function rechne(monat, startUeberschreibung) {
+function rechne(monat) {
   const monatNr = monatsNummer(monat.id);
 
   const z = {
@@ -1430,9 +1431,21 @@ function rechne(monat, startUeberschreibung) {
   z.ausgegebenUmlage = z.notwendigUmlage + z.nichtUmlage;
   z.ausgegebenReal   = z.notwendigReal + z.nichtReal;
   z.uebrig           = z.gehalt - z.ausgegebenUmlage - z.gespart;
-  z.startBalance     = runde(startUeberschreibung !== undefined && startUeberschreibung !== null
-                              ? startUeberschreibung
-                              : monat.startBalance);
+  /* Der Kontostand zu Beginn dieses Monats.
+
+     `startFehlt` heißt: noch nichts eingetragen. Gerechnet wird dann ab null,
+     und die Karte sagt offen dazu, dass die Zahl noch fehlt — eine stille 0
+     sähe aus wie ein leergeräumtes Konto.
+
+     `startMitGehalt` löst das Problem, dass ein Blick aufs Konto mitten im
+     Monat das Gehalt schon enthält: Dann zählte die Rechnung es doppelt,
+     einmal aus dem Kontostand und einmal aus den Einnahmen. Also ziehen wir
+     genau die Einnahmen wieder ab, die weiter oben zusammengezählt wurden. */
+  const eingetragen = monat.startBalance;
+  z.startFehlt       = !(typeof eingetragen === "number" && Number.isFinite(eingetragen));
+  z.startEingetragen = z.startFehlt ? 0 : runde(eingetragen);
+  z.startMitGehalt   = monat.startMitGehalt === true;
+  z.startBalance     = runde(z.startMitGehalt ? z.startEingetragen - z.gehalt : z.startEingetragen);
   /* Der Kontostand ist eine VORSCHAU aufs Monatsende, keine Momentaufnahme:
      Hier ist schon alles abgezogen, was diesen Monat noch abgebucht wird.
      Deine Banking-App zeigt heute deshalb eine andere Zahl — und genau das
@@ -1648,17 +1661,28 @@ function gespartAusArchiv(eintrag, fuersZiel) {
    Reise ist kein Puffer: Wenn die Waschmaschine kaputtgeht, ist entweder
    die Reise weg oder du im Dispo. Beides zusammen in einen Balken zu
    werfen würde dir eine Sicherheit vorrechnen, die es nicht gibt. */
-function notgroschen(z) {
+/* `bisMonat` zieht eine Zeitgrenze: Gezählt wird nur, was bis einschließlich
+   diesem Monat zurückgelegt wurde. Gebraucht wird das vom Bericht eines
+   abgeschlossenen Monats — auf dem Juli-Blatt stünde sonst der Stand von
+   heute, also eine Zahl aus der Zukunft. Der Vergleich funktioniert auf den
+   Monats-IDs direkt, weil "2026-07" < "2026-11" auch als Text stimmt. */
+function notgroschen(z, bisMonat) {
   const dreiMonate  = z.notwendigUmlage * 3;
   const sechsMonate = z.notwendigUmlage * 6;
 
-  const alt = STATE.archive.reduce((s, m) => s + gespartAusArchiv(m, false), 0);
+  const archiv = bisMonat
+    ? STATE.archive.filter(m => String(m.id) <= bisMonat)
+    : STATE.archive;
+  const alt = archiv.reduce((s, m) => s + gespartAusArchiv(m, false), 0);
   // Was schon vor der App auf der hohen Kante lag, zählt selbstverständlich mit.
   const vorhanden = Number(STATE.einstellungen.notgroschenStart) || 0;
-  // Ohne Ziel gibt es keine Aufteilung: dann ist alles Gesparte Puffer.
-  const jetzt = sparzielAktiv()
-    ? sparenIn(STATE.currentMonth, false)
-    : summe(STATE.currentMonth.sparen);
+  /* Der laufende Monat zählt nur mit, wenn nach dem Stand von HEUTE gefragt
+     ist. Bei einem Blatt über einen alten Monat steckt der selbst schon im
+     Archiv — ihn nochmal dazuzurechnen wäre doppelt.
+     Ohne Ziel gibt es keine Aufteilung: dann ist alles Gesparte Puffer. */
+  const jetzt = bisMonat
+    ? 0
+    : (sparzielAktiv() ? sparenIn(STATE.currentMonth, false) : summe(STATE.currentMonth.sparen));
   const bisher = vorhanden + alt + jetzt;
 
   /* Der Notgroschen läuft in zwei Stufen. Sobald drei Monate stehen, rückt
@@ -1878,7 +1902,9 @@ function zufluss(monat) {
 
    Zurück kommt eine Liste, neuestes Jahr zuerst. Jahre ohne einen einzigen
    Moment fallen raus: eine Zeile „2024 · 0 €" ist keine Auswertung. */
-function zuflussJahre() {
+/* `bisMonat` zieht dieselbe Zeitgrenze wie beim Notgroschen: Auf dem Bericht
+   eines abgeschlossenen Monats zählt nur, was bis dahin passiert ist. */
+function zuflussJahre(bisMonat) {
   const jahre = new Map();
 
   const dazu = (monatsId, summe, anzahl) => {
@@ -1890,10 +1916,15 @@ function zuflussJahre() {
     jahre.set(jahr, bisher);
   };
 
-  const jetzt = zufluss(STATE.currentMonth);
-  dazu(STATE.currentMonth.id, jetzt.summe, jetzt.anzahl);
+  // Der laufende Monat gehört nur ins Bild, wenn nach dem Stand von heute
+  // gefragt ist — sonst steckt der Berichtsmonat ohnehin schon im Archiv.
+  if (!bisMonat) {
+    const jetzt = zufluss(STATE.currentMonth);
+    dazu(STATE.currentMonth.id, jetzt.summe, jetzt.anzahl);
+  }
 
   (STATE.archive || []).forEach(eintrag => {
+    if (bisMonat && String(eintrag && eintrag.id) > bisMonat) return;
     const s = (eintrag && eintrag.summary) || {};
     dazu(eintrag && eintrag.id, Number(s.zuflussSumme) || 0, Number(s.zuflussAnzahl) || 0);
   });
@@ -1916,8 +1947,12 @@ let affirmationenOffen = false;
    jedem getippten Buchstaben zu, denn jede Änderung zeichnet die Karte neu. */
 let sparzielAendernOffen = false;
 
-// … und für „Stimmt das nicht?" in der Kontostand-Karte.
-let ankerAendernOffen = false;
+/* Welcher Archiv-Monat zeigt gerade seine beiden Knöpfe (PDF, bearbeiten)?
+
+   Dieselbe Überlegung wie bei den Posten: Zwei Knöpfe an jedem Monat wären
+   eine Wand, durch die niemand liest. Sichtbar sind sie an genau dem Monat,
+   den du angetippt hast. "" heißt: keiner. */
+let offenerArchivMonat = "";
 
 /* Welcher Posten zeigt gerade seine Bedienelemente?
 
@@ -1963,15 +1998,13 @@ function aktuelleAffirmation() {
    Änderung erneut ausgeführt.
    ============================================================ */
 function render() {
-  /* Die Kette einmal für die ganze Anzeige rechnen und durchreichen, statt sie
-     in jeder Karte neu aufzurollen. Sie ist die gemeinsame Wahrheit über alle
-     Kontostände — der laufende Monat und das Archiv müssen dieselbe sehen. */
-  const kette = kontostandKette();
-  const z = rechne(STATE.currentMonth, startwertFuer(STATE.currentMonth.id, kette)); // "z" = Zahlen
-  /* Und derselbe Gedanke für den Gehaltszyklus: Drei Karten brauchen ihn, und
-     drei eigene Rechnungen wären drei Gelegenheiten, dass sie auseinanderlaufen.
+  const z = rechneAktuell(); // "z" = Zahlen
+  /* Der Gehaltszyklus wird einmal für die ganze Anzeige gerechnet und
+     durchgereicht: Drei Karten brauchen ihn, und drei eigene Rechnungen wären
+     drei Gelegenheiten, dass sie auseinanderlaufen.
      `zy` ist null, solange kein Zyklus gestartet wurde. */
   const zy = gehaltszyklus();
+  renderBearbeitung();
   renderStand(z, zy);
   renderKopf(z);
   renderSerie();
@@ -1979,7 +2012,7 @@ function render() {
   renderKategorien(z);
   renderFaellig(z);
   renderVertraege(z);
-  renderKonto(z, kette, zy);
+  renderKonto(z, zy);
   renderUebersicht(z);
   renderNotgroschen(z);
   renderSparziel(z);
@@ -1987,7 +2020,7 @@ function render() {
   // Rechnung, und das soll man schon hier sehen.
   renderZufluss();
   renderAffirmation();
-  renderArchiv(kette);
+  renderArchiv();
   renderModal();
 }
 
@@ -2648,61 +2681,48 @@ function renderVertraege(z) {
    Beides löst die Aufschlüsselung: Sie zeigt die Rechnung Zeile für Zeile.
    Stimmt eine Zahl nicht, sieht man sofort, WELCHE — statt das Ergebnis
    anzustarren. --- */
-/* Der obere Block der Kontostand-Karte: Wo kommt der Startwert dieses Monats her?
+/* Der obere Block der Kontostand-Karte: die eine Zahl, die du selbst weißt.
 
-   Zwei Zustände, und der Unterschied ist der ganze Punkt der Kette:
+   Gefragt wird bewusst nach dem Stand von JETZT und nicht nach dem "zu Beginn
+   des Monats" — den müsste man sich zurückrechnen, und niemand tut das.
+   Man sieht in der Banking-App nach und tippt ab, was dort steht.
 
-   ANKER   — du hast diese Zahl gewusst und eingetragen. Nur hier gibt es ein
-             offenes Eingabefeld, denn nur hier ist Tippen überhaupt sinnvoll.
+   Genau daraus entsteht aber die eine Falle: Mitten im Monat ist das Gehalt
+   dort schon drauf, und die Rechnung darunter zählt es gleich nochmal aus
+   den Einnahmen. Deshalb steht das Häkchen direkt am Feld, mit dem Satz, der
+   die Umrechnung offenlegt. Ein Klick, und die Zahl stimmt. --- */
+function startBlockHtml(z) {
+  const wert = z.startFehlt ? "" : z.startEingetragen;
 
-   GEERBT  — die Zahl ist der Schlussstand des Vormonats, also gerechnet.
-             Ein Eingabefeld wäre hier eine Einladung zum Fehler: Man tippt,
-             was die Bank heute sagt, und zählt damit das Gehalt doppelt.
-             Deshalb steht der Wert als Text da — mit dem Weg, wie er entstand,
-             und einem Ausweg für den Fall, dass er nicht stimmt. --- */
-function startBlockHtml(z, glied) {
-  const istErsterMonat = !STATE.archive || STATE.archive.length === 0;
-
-  /* Der allererste Monat bekommt immer das Eingabefeld, auch ohne gesetzten
-     Anker: Er IST der Anfang der Rechnung. Ihm „aus dem Vormonat" hinzu-
-     schreiben wäre schlicht gelogen, es gibt keinen. */
-  if (glied.ausAnker || istErsterMonat) {
-    /* Ein Anker mitten in der Zeit lässt sich wieder auflösen. Beim allerersten
-       Monat wäre das sinnlos: Vor ihm gibt es nichts, aus dem er erben könnte. */
-    const zurueck = istErsterMonat ? "" : `
-      <button type="button" id="btn-anker-weg" class="btn btn-leise anker-weg">
-        Wieder aus dem Vormonat
-      </button>`;
-
-    return `
-      <div class="konto-block">
-        <div class="beschriftung">Kontostand zu Beginn dieses Monats</div>
-        <input id="start-guthaben" type="number" step="0.01" inputmode="decimal"
-               value="${glied.start}" />
-        <div class="feld-hinweis">Bevor die Einnahmen dieses Monats kamen.</div>
-        ${zurueck}
-      </div>`;
+  /* Was das Häkchen aus deiner Zahl macht, steht darunter im Klartext.
+     Ohne Gehalt gibt es nichts abzuziehen — dann verspricht der Satz auch
+     nichts, sondern sagt, worauf er wartet. */
+  let hinweis;
+  if (z.startFehlt) {
+    hinweis = "Solange hier nichts steht, rechnen wir ab null.";
+  } else if (z.startMitGehalt && z.gehalt > 0) {
+    hinweis = `Dann rechnen wir mit ${euro(z.startBalance)} vor dem Gehalt.`;
+  } else if (z.startMitGehalt) {
+    hinweis = "Sobald deine Einnahmen eingetragen sind, ziehen wir sie hier ab.";
+  } else {
+    // Eine Zahl, die für sich spricht, braucht keinen Satz darunter.
+    hinweis = "";
   }
 
   return `
     <div class="konto-block">
-      <div class="beschriftung">Kontostand zu Beginn dieses Monats</div>
-      <div class="konto-geerbt">${euro(glied.start)}</div>
-      <div class="feld-hinweis">${glied.vonMonat
-        ? `Schlussstand vom ${monatLesbar(glied.vonMonat)}.`
-        : `Aus dem Vormonat.`}</div>
-      <details class="anker-setzen" ${ankerAendernOffen ? "open" : ""}>
-        <summary>Stimmt das nicht?</summary>
-        <p class="anker-text">Was wirklich auf dem Konto lag, bevor die Einnahmen kamen:</p>
-        <input id="start-guthaben" type="number" step="0.01" inputmode="decimal"
-               placeholder="${glied.start}" />
-      </details>
+      <div class="beschriftung">Was liegt gerade auf dem Konto?</div>
+      <input id="start-guthaben" type="number" step="0.01" inputmode="decimal"
+             value="${wert}" placeholder="z.B. 1200" />
+      <label class="konto-gehalt">
+        <input type="checkbox" id="start-mit-gehalt" ${z.startMitGehalt ? "checked" : ""} />
+        <span>Dein Gehalt ist da schon drauf</span>
+      </label>
+      ${hinweis ? `<div class="feld-hinweis">${hinweis}</div>` : ""}
     </div>`;
 }
 
-function renderKonto(z, kette, zy) {
-  const glied = (kette && kette[STATE.currentMonth.id]) || { start: z.startBalance, ausAnker: true, vonMonat: null };
-
+function renderKonto(z, zy) {
   // Eine Zeile der Aufschlüsselung. `zeichen` ist „+", „−" oder leer.
   const zeile = (zeichen, text, betrag, klasse) => `
     <div class="konto-zeile ${klasse || ""}">
@@ -2711,12 +2731,6 @@ function renderKonto(z, kette, zy) {
       <span class="konto-betrag">${euro(betrag)}</span>
     </div>`;
 
-  // Was diesen Monat pausiert und deshalb in keiner Zeile oben auftaucht.
-  const pauseZeile = z.pausiertSumme > 0
-    ? `<p class="konto-pause">⏸ Pausiert: ${z.pausiert.map(p => escapeAttr(p.label)).join(", ")}.
-         <strong>${euro(z.pausiertSumme)}</strong> bleiben diesen Monat bei dir.</p>`
-    : "";
-
   const endeLabel = zy
     ? `Bleibt bis zum nächsten Gehalt am ${datumLesbar(zy.ende)}`
     : "Bleibt am Monatsende";
@@ -2724,10 +2738,10 @@ function renderKonto(z, kette, zy) {
   document.getElementById("konto").innerHTML = `
     <h2 class="nr-titel">Kontostand</h2>
     <div class="karte konto-karte">
-      ${startBlockHtml(z, glied)}
+      ${startBlockHtml(z)}
 
       <div class="konto-rechnung">
-        ${zeile("", "Kontostand zu Beginn", z.startBalance)}
+        ${zeile("", z.startFehlt ? "Kontostand zu Beginn (fehlt noch)" : "Kontostand zu Beginn", z.startBalance)}
         ${zeile("+", "Einnahmen", z.gehalt, "positiv")}
         ${zeile("−", "Notwendige Ausgaben", z.notwendigReal)}
         ${zeile("−", "Ausnahmen", z.nichtReal, "nicht")}
@@ -2741,7 +2755,6 @@ function renderKonto(z, kette, zy) {
 
       <p class="konto-fussnote"><strong>Vorschau</strong> aufs Monatsende: Hier ist schon abgezogen,
         was erst noch abgebucht wird. Deine Bank zeigt heute eine andere Zahl.</p>
-      ${pauseZeile}
     </div>
   `;
 }
@@ -3276,11 +3289,20 @@ function renderAffirmation() {
   `;
 }
 
-/* --- 11j. Archiv der abgeschlossenen Monate --- */
-function renderArchiv(kette) {
-  const ziel = document.getElementById("archiv");
+/* --- 11j. Archiv der abgeschlossenen Monate ---
 
-  if (!STATE.archive || STATE.archive.length === 0) {
+   Hier stand einmal jeder Monat mit seinen fünf Zahlen, dem Trend zum Vormonat
+   und zwei Knöpfen. Das war eine Wand aus Text, die niemand liest, und es
+   sagte dasselbe dreimal — die Zahlen stehen ohnehin alle im Bericht.
+
+   Jetzt steht da der Monatsname. Ein Tipp darauf, und du hast die Wahl: den
+   Bericht als PDF sichern oder den Monat nochmal aufmachen und korrigieren.
+   Das ✕ nimmt ihn von der Liste, ohne eine einzige Zahl anzufassen. --- */
+function renderArchiv() {
+  const ziel = document.getElementById("archiv");
+  const alle = STATE.archive || [];
+
+  if (alle.length === 0) {
     ziel.innerHTML = `
       <h2 class="archiv-titel">Archiv</h2>
       <p class="leer-hinweis">Noch kein Monat abgeschlossen. Am Monatsende auf „Monat abschließen" tippen.</p>
@@ -3288,65 +3310,70 @@ function renderArchiv(kette) {
     return;
   }
 
-  const eintraege = STATE.archive.map((m, i) => {
-    const s = m.summary || {};
-    const quote = Number(s.quoteNicht) || 0;
-    const v = verdiktFuer(quote);
+  const sichtbar = alle.filter(m => !m.versteckt);
+  const versteckt = alle.length - sichtbar.length;
 
-    // Trend im Vergleich zum davor abgeschlossenen Monat (der steht im Array dahinter).
-    let trend = "";
-    const vorher = STATE.archive[i + 1];
-    if (vorher && vorher.summary) {
-      const diff = Math.round(quote - (Number(vorher.summary.quoteNicht) || 0));
-      if (diff < 0)      trend = `<div class="trend trend-besser">▼ ${Math.abs(diff)}%-Punkte besser als davor</div>`;
-      else if (diff > 0) trend = `<div class="trend trend-schlechter">▲ ${diff}%-Punkte schlechter als davor</div>`;
-      else               trend = `<div class="trend">gleich geblieben</div>`;
-    }
-
-    /* Ist sie in dem Monat unter der 30%-Marke geblieben?
-       Bei null (keine Einnahmen eingetragen) sagen wir das offen, statt zu urteilen.
-       Alte Einträge kennen nur `zielErreicht` — die lesen wir weiter mit. */
-    const geschafft = s.regelErreicht !== undefined ? s.regelErreicht : s.zielErreicht;
-    let zielMarke = "";
-    if (geschafft === true)       zielMarke = `<div class="ziel-marke gut">Unter ${REGEL.nicht}% geblieben ✓</div>`;
-    else if (geschafft === false) zielMarke = `<div class="ziel-marke schlecht">Über ${REGEL.nicht}% ✗</div>`;
-    else if (geschafft === null)  zielMarke = `<div class="ziel-marke">Keine Einnahmen eingetragen — nicht bewertet</div>`;
-
-    /* Der Kontostand kommt aus der KETTE, nicht aus der eingefrorenen
-       Zusammenfassung. Genau darin liegt der Sinn der Sache: Korrigierst du
-       einen früheren Monat, stehen hier sofort die neuen Zahlen — und zwar in
-       jedem Monat danach. Die alte `summary.kontostand` dient nur noch als
-       Rückfall für Einträge, deren Schnappschuss fehlt. */
-    const glied = kette && kette[m.id];
-    const start = glied ? glied.start : null;
-    const ende  = glied ? glied.ende  : Number(s.kontostand) || 0;
-
-    const ankerMarke = glied && glied.ausAnker
-      ? `<span class="anker-marke" title="Dieser Startwert ist von dir gesetzt">gesetzt</span>`
-      : "";
-
-    const kontoZeile = start === null
-      ? `<div class="archiv-konto">Kontostand am Ende ${euro(ende)}</div>`
-      : `<div class="archiv-konto">Start ${euro(start)} ${ankerMarke} → Ende ${euro(ende)}</div>`;
+  const eintraege = sichtbar.map(m => {
+    /* Die Knöpfe stehen IMMER im Dokument und werden nur über die Klasse
+       ein- und ausgeblendet. Sie erst beim Antippen zu erzeugen, würde bei
+       jedem Neuzeichnen die halbe Karte austauschen — und das kostet den
+       Fokus, wenn man gerade tippt. */
+    const offen = offenerArchivMonat === m.id;
+    const inArbeit = STATE.bearbeitung && STATE.bearbeitung.id === m.id;
 
     return `
-      <div class="archiv-eintrag">
-        <div>
-          <div class="archiv-monat">${monatLesbar(m.id)}</div>
-          <div class="archiv-detail">Gehalt ${euro(s.gehalt)} · Ausnahmen ${euro(s.nicht)} · gespart ${euro(s.gespart)}</div>
-          ${kontoZeile}
-          ${zielMarke}
-          ${trend}
-          <button type="button" class="archiv-korrigieren" data-korrigieren="${escapeAttr(m.id)}">
-            Startwert korrigieren
+      <div class="archiv-eintrag ${offen ? "archiv-offen" : ""} ${inArbeit ? "archiv-in-arbeit" : ""}">
+        <div class="archiv-kopf">
+          <button type="button" class="archiv-monat" data-archiv-monat="${escapeAttr(m.id)}">
+            ${monatLesbar(m.id)}
+          </button>
+          <button type="button" class="archiv-weg" data-monat-weg="${escapeAttr(m.id)}"
+                  title="aus dem Archiv nehmen">✕</button>
+        </div>
+        <div class="archiv-aktionen">
+          <button type="button" class="btn btn-leise" data-archiv-pdf="${escapeAttr(m.id)}">
+            Als PDF sichern
+          </button>
+          <button type="button" class="btn btn-leise" data-archiv-bearbeiten="${escapeAttr(m.id)}">
+            Bearbeiten
           </button>
         </div>
-        <span class="archiv-badge v${v.stufe}">${Math.round(quote)}%</span>
       </div>
     `;
   }).join("");
 
-  ziel.innerHTML = `<h2 class="archiv-titel">Archiv</h2>${eintraege}`;
+  /* Was ausgeblendet ist, ist nicht weg — und das muss man sehen können,
+     sonst ist das ✕ ein Loch, in das Monate fallen. */
+  const zurueck = versteckt > 0
+    ? `<button type="button" class="archiv-zeigen" data-archiv-zeigen>
+         ${versteckt === 1 ? "1 Monat ausgeblendet" : `${versteckt} Monate ausgeblendet`} · wieder zeigen
+       </button>`
+    : "";
+
+  ziel.innerHTML = `<h2 class="archiv-titel">Archiv</h2>${eintraege}${zurueck}`;
+}
+
+/* --- Der Balken ganz oben, während ein alter Monat offen ist.
+
+   Er muss laut sein: Alles darunter zeigt und speichert jetzt den Juli, und
+   wer das übersieht, trägt seinen August in den falschen Monat ein. --- */
+function renderBearbeitung() {
+  const ziel = document.getElementById("bearbeitung");
+  const b = STATE.bearbeitung;
+
+  document.body.classList.toggle("bearbeitung-offen", !!b);
+
+  if (!b) {
+    ziel.innerHTML = "";
+    return;
+  }
+
+  ziel.innerHTML = `
+    <div class="bearbeitung-balken">
+      <span>Du bearbeitest <strong>${monatLesbar(b.id)}</strong></span>
+      <button type="button" id="btn-bearbeitung-fertig" class="btn">fertig</button>
+    </div>
+  `;
 }
 
 /* --- 11k. Das Willkommens-Fenster beim ersten Besuch --- */
@@ -3507,17 +3534,20 @@ document.addEventListener("change", (e) => {
     return;
   }
 
-  /* Kontostand zu Beginn des Monats — ab jetzt ein ANKER.
-
-     Der Unterschied zu früher ist entscheidend: Was hier eingetragen wird,
-     überschreibt keine gerechnete Zahl mehr, sondern setzt einen neuen
-     Startpunkt für die Kette. Sie rechnet ab hier vorwärts, jeder Monat
-     danach korrigiert sich mit, und wegnehmen lässt es sich auch wieder.
-
-     Ein geleertes Feld löst den Anker auf, statt ihn auf 0 zu setzen —
-     „ich weiß es doch nicht" ist etwas anderes als „das Konto stand auf null". */
+  /* Der Kontostand dieses Monats. Ein geleertes Feld setzt ihn zurück auf
+     „noch nicht eingetragen" statt auf 0 — „ich weiß es doch nicht" ist
+     etwas anderes als „das Konto stand auf null". Genau das erledigt
+     betragAusText(): Es gibt für leere Eingaben null zurück. */
   if (e.target.id === "start-guthaben") {
-    STATE.currentMonth.anchorBalance = betragAusText(e.target.value);
+    STATE.currentMonth.startBalance = betragAusText(e.target.value);
+    speichern();
+    render();
+    return;
+  }
+
+  // Steckt in der Zahl oben schon das Gehalt?
+  if (e.target.id === "start-mit-gehalt") {
+    STATE.currentMonth.startMitGehalt = e.target.checked;
     speichern();
     render();
     return;
@@ -3581,11 +3611,6 @@ document.addEventListener("toggle", (e) => {
     return;
   }
 
-  if (e.target.classList && e.target.classList.contains("anker-setzen")) {
-    ankerAendernOffen = e.target.open;
-    return;
-  }
-
   const karte = e.target.closest && e.target.closest("[data-kat]");
   if (!karte) return;
 
@@ -3646,43 +3671,80 @@ document.addEventListener("click", (e) => {
       el.classList.toggle("posten-offen", el.dataset.posten === neuOffen));
   }
 
-  /* Den Anker des laufenden Monats auflösen: Er erbt wieder vom Vormonat.
-     Damit ist auch ein falsch gesetzter Anker keine Sackgasse. */
-  if (e.target.closest("#btn-anker-weg")) {
-    STATE.currentMonth.anchorBalance = null;
+  /* --- Das Archiv: ein Monat wird angetippt, weggenommen oder zurückgeholt. --- */
+
+  // Einen Monat aus dem Archiv nehmen. Die Zahlen bleiben, nur die Liste
+  // wird kürzer — siehe den Merker `versteckt` in migriere().
+  const monatWeg = e.target.closest("[data-monat-weg]");
+  if (monatWeg) {
+    const eintrag = (STATE.archive || []).find(m => m.id === monatWeg.dataset.monatWeg);
+    if (eintrag) {
+      eintrag.versteckt = true;
+      speichern();
+      render();
+    }
+    return;
+  }
+
+  // … und alle wieder zurück auf die Liste.
+  if (e.target.closest("[data-archiv-zeigen]")) {
+    (STATE.archive || []).forEach(m => { m.versteckt = false; });
     speichern();
     render();
     return;
   }
 
-  /* Einen Archiv-Monat korrigieren.
+  /* Den Bericht eines abgeschlossenen Monats als PDF sichern.
 
-     Nur der Startwert lässt sich hier ändern, und das ist Absicht: Er ist die
-     eine Zahl, die man im Nachhinein WISSEN kann — der Kontoauszug von damals
-     sagt sie. Alles andere (welcher Posten wie hoch war) müsste man raten.
-
-     Der Rest ergibt sich von selbst: Ab dem korrigierten Monat rechnet die
-     Kette neu vorwärts, und jeder Monat danach zieht mit. */
-  const korr = e.target.closest("[data-korrigieren]");
-  if (korr) {
-    const id = korr.dataset.korrigieren;
-    const eintrag = (STATE.archive || []).find(m => m.id === id);
+     Gerechnet wird aus seinem Schnappschuss, nicht aus einer gespeicherten
+     Zusammenfassung: So steht im Bericht dasselbe, was du siehst, wenn du
+     den Monat aufmachst — auch nachdem du ihn korrigiert hast. */
+  const pdf = e.target.closest("[data-archiv-pdf]");
+  if (pdf) {
+    const eintrag = (STATE.archive || []).find(m => m.id === pdf.dataset.archivPdf);
     if (!eintrag) return;
+    renderBericht(rechne(eintrag.snapshot), eintrag.snapshot);
+    alert(berichtHinweis());
+    window.print();
+    return;
+  }
 
-    const kette = kontostandKette();
-    const jetzt = kette[id] ? kette[id].start : runde(eintrag.snapshot.startBalance);
-    const eingabe = prompt(
-      `${monatLesbar(id)}: Was lag auf dem Konto, bevor die Einnahmen kamen?\n\n` +
-      `Gerechnet wird gerade mit ${euro(jetzt)}.\n` +
-      `Leer lassen nimmt die Korrektur zurück.`,
-      eintrag.snapshot.anchorBalance !== null && eintrag.snapshot.anchorBalance !== undefined
-        ? String(eintrag.snapshot.anchorBalance)
-        : ""
-    );
-    if (eingabe === null) return; // abgebrochen
+  /* Einen abgeschlossenen Monat wieder öffnen.
 
-    eintrag.snapshot.anchorBalance = betragAusText(eingabe);
+     Die App hat genau einen Platz für „der Monat, an dem ich gerade arbeite".
+     Hier wird der laufende Monat kurz zur Seite gelegt und der alte
+     hineingesetzt. Alle Stellen, die auf diesen Platz schauen, merken davon
+     nichts — sie bearbeiten weiter „den aktuellen Monat", nur ist das jetzt
+     eben der Juli. Zurückgetauscht wird in bearbeitungBeenden().
+
+     Kopiert wird dabei bewusst: Solange du arbeitest, bleibt der Schnappschuss
+     im Archiv unangetastet. Erst „fertig" schreibt ihn neu. */
+  const auf = e.target.closest("[data-archiv-bearbeiten]");
+  if (auf) {
+    if (STATE.bearbeitung) return;   // es kann immer nur einer offen sein
+    const eintrag = (STATE.archive || []).find(m => m.id === auf.dataset.archivBearbeiten);
+    if (!eintrag) return;
+    STATE.bearbeitung = { id: eintrag.id, zurueck: STATE.currentMonth };
+    STATE.currentMonth = JSON.parse(JSON.stringify(eintrag.snapshot));
+    offenerArchivMonat = "";
     speichern();
+    render();
+    window.scrollTo({ top: 0 });
+    return;
+  }
+
+  // Fertig mit dem Bearbeiten: der Monat geht mit seinen neuen Zahlen zurück.
+  if (e.target.closest("#btn-bearbeitung-fertig")) {
+    bearbeitungBeenden();
+    return;
+  }
+
+  // Einen Archiv-Monat antippen: seine beiden Knöpfe erscheinen, alle anderen
+  // klappen zu. Dieselbe Idee wie bei den Posten — immer nur einer offen.
+  const archivMonat = e.target.closest("[data-archiv-monat]");
+  if (archivMonat) {
+    const id = archivMonat.dataset.archivMonat;
+    offenerArchivMonat = (offenerArchivMonat === id) ? "" : id;
     render();
     return;
   }
@@ -3882,7 +3944,75 @@ document.addEventListener("submit", (e) => {
    (Fixkosten, Abos, Versicherungen) kommen automatisch mit,
    dein Ziel ebenfalls.
    ------------------------------------------------------------ */
+/* Die zusammengefassten Zahlen eines Monats fürs Archiv.
+
+   Steht als eigene Funktion da, weil sie an ZWEI Stellen gebraucht wird: beim
+   Abschließen und wieder, wenn ein Monat nachträglich bearbeitet wurde. Zwei
+   Kopien derselben Liste wären zwei Gelegenheiten, dass eine davon ein Feld
+   vergisst — und das fiele erst Monate später auf. */
+function summaryAus(z, zu) {
+  return {
+    gehalt: z.gehalt,
+    notwendig: z.notwendigUmlage,
+    nicht: z.nichtUmlage,
+    gespart: z.gespart,
+    // Getrennt festhalten, damit Notgroschen und Sparziel jeder ihre
+    // eigene Geschichte behalten. `gespart` bleibt die Summe aus beiden.
+    gespartPuffer: z.gespartPuffer,
+    gespartZiel: z.gespartZiel,
+    kontostand: z.kontostand,
+    quoteNicht: z.quoteNicht,
+    quoteNotwendig: z.quoteNotwendig,
+    quoteSpar: z.quoteSpar,
+    regelErreicht: z.regelErreicht,
+    /* Was dir in diesem Monat zugeflossen ist. Steht hier, obwohl es in
+       `snapshot` ohnehin mitkommt: Die Gesamtzahl auf der Karte summiert
+       nur diese beiden Felder und muss dafür nicht jeden Archiv-Monat
+       durchrechnen. */
+    zuflussSumme: zu.summe,
+    zuflussAnzahl: zu.anzahl,
+  };
+}
+
+/* Fertig mit dem Bearbeiten eines alten Monats.
+
+   Der bearbeitete Monat geht mit seinen neuen Zahlen zurück ins Archiv, der
+   laufende kommt von der Seite zurück auf seinen Platz. Die Zusammenfassung
+   wird dabei frisch gerechnet — sonst stünde im Archiv weiter, was vor der
+   Korrektur galt, und Notgroschen und Sparziel läsen die alte Zahl. */
+function bearbeitungBeenden() {
+  const b = STATE.bearbeitung;
+  if (!b) return;
+
+  const eintrag = (STATE.archive || []).find(m => m.id === b.id);
+  if (eintrag) {
+    const monat = STATE.currentMonth;
+    eintrag.snapshot = monat;
+    eintrag.summary = summaryAus(rechne(monat), zufluss(monat));
+  }
+
+  STATE.currentMonth = b.zurueck;
+  STATE.bearbeitung = null;
+  speichern();
+  render();
+  window.scrollTo({ top: 0 });
+}
+
+/* ------------------------------------------------------------
+   14. MONAT ABSCHLIESSEN
+   Den aktuellen Monat als Schnappschuss ins Archiv legen und
+   einen neuen Monat starten. Alle wiederkehrenden Kategorien
+   (Fixkosten, Abos, Versicherungen) kommen automatisch mit,
+   dein Ziel ebenfalls.
+   ------------------------------------------------------------ */
 document.getElementById("btn-monat-abschliessen").addEventListener("click", () => {
+  /* Während ein alter Monat offen ist, wäre „abschließen" ein Griff in den
+     falschen Monat: Der Juli würde ein zweites Mal ins Archiv wandern. */
+  if (STATE.bearbeitung) {
+    alert(`Du bearbeitest gerade ${monatLesbar(STATE.bearbeitung.id)}. Tipp oben auf „fertig", dann geht das wieder.`);
+    return;
+  }
+
   const monat = STATE.currentMonth;
   const z = rechneAktuell();
   const zu = zufluss(monat);
@@ -3890,46 +4020,25 @@ document.getElementById("btn-monat-abschliessen").addEventListener("click", () =
   const bestaetigt = confirm(
     `„${monatLesbar(monat.id)}" abschließen?\n\n` +
     `Er wandert ins Archiv. Fixkosten, Abos und Versicherungen nimmst du in den nächsten Monat mit.\n` +
-    `Kontostand ${euro(z.kontostand)} wird als neues Startguthaben übernommen.`
+    `Der neue Monat startet ohne Kontostand — du trägst ein, was dann auf dem Konto liegt.`
   );
   if (!bestaetigt) return;
-
-  /* Den Startwert aus der Kette in den Monat schreiben, BEVOR er kopiert wird.
-     Maßgeblich ist er nicht — die Kette rechnet ihn beim Anzeigen ohnehin neu.
-     Aber ein Schnappschuss, in dem eine überholte Zahl steht, wäre eine zweite
-     Wahrheit im Archiv, und irgendwer liest irgendwann die falsche. */
-  monat.startBalance = z.startBalance;
 
   // Schnappschuss + zusammengefasste Zahlen ins Archiv (vorne einfügen = neueste zuerst)
   STATE.archive.unshift({
     id: monat.id,
-    summary: {
-      gehalt: z.gehalt,
-      notwendig: z.notwendigUmlage,
-      nicht: z.nichtUmlage,
-      gespart: z.gespart,
-      // Getrennt festhalten, damit Notgroschen und Sparziel jeder ihre
-      // eigene Geschichte behalten. `gespart` bleibt die Summe aus beiden.
-      gespartPuffer: z.gespartPuffer,
-      gespartZiel: z.gespartZiel,
-      kontostand: z.kontostand,
-      quoteNicht: z.quoteNicht,
-      quoteNotwendig: z.quoteNotwendig,
-      quoteSpar: z.quoteSpar,
-      regelErreicht: z.regelErreicht,
-      /* Was dir in diesem Monat zugeflossen ist. Steht hier, obwohl es in
-         `snapshot` ohnehin mitkommt: Die Gesamtzahl auf der Karte summiert
-         nur diese beiden Felder und muss dafür nicht jeden Archiv-Monat
-         durchrechnen. */
-      zuflussSumme: zu.summe,
-      zuflussAnzahl: zu.anzahl,
-    },
+    summary: summaryAus(z, zu),
     snapshot: JSON.parse(JSON.stringify(monat)), // tiefe Kopie, damit spätere Änderungen sie nicht betreffen
+    versteckt: false,
   });
 
-  // Neuen Monat bauen: wiederkehrende Posten wandern mit, der Rest startet leer.
-  // Abgelaufene Pausen enden dabei von selbst (siehe neuerMonat).
-  STATE.currentMonth = neuerMonat(naechsterMonat(monat.id), z.kontostand, monat);
+  /* Neuen Monat bauen: wiederkehrende Posten wandern mit, der Rest startet leer.
+     Abgelaufene Pausen enden dabei von selbst (siehe neuerMonat).
+
+     Der Kontostand wandert ausdrücklich NICHT mit. Jeder Monat steht für sich,
+     und was am Ersten wirklich auf dem Konto liegt, weiß nur die Bank —
+     inklusive allem, was die App nie gesehen hat. */
+  STATE.currentMonth = neuerMonat(naechsterMonat(monat.id), null, monat);
 
   /* Merken, wann zuletzt abgeschlossen wurde. Daraus weiß die Zyklus-Karte,
      ob seit dem letzten Gehaltseingang schon ein Monat abgeschlossen wurde —
@@ -3998,14 +4107,17 @@ function berichtHinweis() {
     "Dein Bericht wird dann als Datei gespeichert, gedruckt wird nichts.";
 }
 
-document.getElementById("btn-bericht").addEventListener("click", () => {
-  renderBericht(rechneAktuell());
-  alert(berichtHinweis());
-  window.print();
-});
+/* Den Bericht bauen.
 
-function renderBericht(z) {
-  const monat = STATE.currentMonth;
+   `monat` steht ausdrücklich als Parameter da und wird nicht aus dem STATE
+   geholt: Gedruckt wird nur noch ein ABGESCHLOSSENER Monat, und der liegt im
+   Archiv. Mitten im Monat gibt es keinen Bericht mehr — was da drinstünde,
+   wäre eine Halbzeit-Zahl, die morgen anders lautet.
+
+   Notgroschen-Stand und Jahresauswertung bekommen deshalb die ID des Monats
+   mitgereicht: Sie zählen nur bis dahin. Auf dem Juli-Blatt steht der Puffer,
+   wie er Ende Juli war — nicht der von heute, den es damals noch nicht gab. */
+function renderBericht(z, monat) {
   const heute = new Date().toLocaleDateString("de-DE", {
     day: "2-digit", month: "long", year: "numeric",
   });
@@ -4067,10 +4179,10 @@ function renderBericht(z) {
        </table>`
     : "";
 
-  // Der Notgroschen-Stand, sofern überhaupt Fixkosten da sind.
+  // Der Notgroschen-Stand am Ende dieses Monats, sofern Fixkosten da sind.
   let puffer = "";
   if (z.notwendigUmlage > 0) {
-    const n = notgroschen(z);
+    const n = notgroschen(z, monat.id);
     puffer = `<h2 class="bericht-titel">Notgroschen</h2>
       <table class="bericht-tabelle">
         ${zeile("Ziel (" + n.stufe + ")", n.ziel)}
@@ -4083,14 +4195,13 @@ function renderBericht(z) {
      großen Zahlen-Tabelle, sondern als eigener Block darunter: Es ist kein
      Einkommen, das man verrechnet, sondern eine Liste, die man liest. */
   const zu = zufluss(monat);
-  const jahreZu = zuflussJahre();
   let zugeflossen = "";
   if (zu.anzahl > 0) {
-    /* Unter der Monatsliste steht dieselbe Jahresauswertung wie auf der
-       Karte. Sie gehört in den Bericht, weil er das Blatt ist, das man
-       aufhebt: In einem Jahr liest man dort nicht nur den Juli nach,
-       sondern auch, was das Jahr insgesamt gebracht hat. */
-    const jahresZeilen = jahreZu.map(j => `
+    /* Unter der Monatsliste steht die Jahresauswertung, wie sie zu diesem
+       Zeitpunkt aussah. Sie gehört in den Bericht, weil er das Blatt ist, das
+       man aufhebt: In einem Jahr liest man dort nicht nur den Juli nach,
+       sondern auch, was das Jahr bis dahin gebracht hat. */
+    const jahresZeilen = zuflussJahre(monat.id).map(j => `
       <tr><th>${j.jahr}</th>
           <td>${j.summe > 0 ? euro(j.summe) : "ohne Preis"} · ${malText(j.anzahl)}</td></tr>`).join("");
 
@@ -4102,8 +4213,8 @@ function renderBericht(z) {
         <tr class="summe"><th>${malText(zu.anzahl)} in diesem Monat</th>
           <td>${euro(zu.summe)}</td></tr>
       </table>
-      <h3 class="bericht-untertitel">Jahresauswertung</h3>
-      <table class="bericht-tabelle">${jahresZeilen}</table>`;
+      ${jahresZeilen ? `<h3 class="bericht-untertitel">Jahresauswertung</h3>
+      <table class="bericht-tabelle">${jahresZeilen}</table>` : ""}`;
   }
 
   // Der Anhang: jeder einzelne Posten, nach Kategorie sortiert. Das macht
@@ -4213,7 +4324,7 @@ function importDatei(datei) {
 /* ------------------------------------------------------------
    16. LOSLEGEN — einmal beim Laden der Seite alles zeichnen.
    ------------------------------------------------------------ */
-// Zuerst: Stammt der Stand aus der Zeit vor der Kontostand-Kette, wird hier
-// einmalig geprüft, dass sich beim Umstieg keine Zahl verschoben hat.
-ankerAbsichern();
+// Zuerst: Stammt der Stand noch aus der Zeit der Kontostand-Kette, bekommt
+// hier jeder Monat einmalig seinen eigenen Startwert — ohne Zahlensprung.
+startwerteFestschreiben();
 render();

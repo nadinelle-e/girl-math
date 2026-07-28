@@ -69,18 +69,18 @@
   <meta name="apple-mobile-web-app-title" content="girl math" />
 
   <!--
-    Das ?v=17 hinter dem Dateinamen ist ein Versionsstempel.
+    Das ?v=18 hinter dem Dateinamen ist ein Versionsstempel.
 
     Warum: Browser legen Dateien für eine Weile beiseite, statt sie jedes Mal
     neu zu holen. Nach einem Update sähe man deshalb bis zu zehn Minuten lang
-    noch die alte Fassung. Für den Browser ist "styles.css?v=17" aber eine
-    andere Adresse als "styles.css?v=16" — also holt er sie sofort frisch.
+    noch die alte Fassung. Für den Browser ist "styles.css?v=18" aber eine
+    andere Adresse als "styles.css?v=17" — also holt er sie sofort frisch.
 
     ➜ WICHTIG: Bei jeder Änderung an styles.css oder app.js die Zahl an BEIDEN
       Stellen um eins hochzählen (unten beim <script> steht dieselbe). Vergisst
       man es, ist nichts kaputt, es dauert nur wieder bis zu zehn Minuten.
   -->
-  <link rel="stylesheet" href="styles.css?v=17" />
+  <link rel="stylesheet" href="styles.css?v=18" />
 </head>
 <body>
   <!-- Die Leiste, die beim Scrollen oben kleben bleibt: Kontostand, Ausnahmen-
@@ -88,6 +88,12 @@
        .wrap, damit sie über die volle Breite geht.
        Wird von app.js gefüllt (renderStand). -->
   <div id="stand"></div>
+
+  <!-- Der Balken, der erscheint, während ein abgeschlossener Monat zum
+       Korrigieren offen ist. Alles darunter zeigt dann diesen alten Monat,
+       und das muss man sehen, bevor man etwas eintippt.
+       Wird von app.js gefüllt (renderBearbeitung) und ist sonst leer. -->
+  <div id="bearbeitung"></div>
 
   <div class="wrap">
 
@@ -157,7 +163,6 @@
     <!-- Werkzeugleiste: Monat abschließen, Sichern (Export), Laden (Import). -->
     <div class="werkzeuge">
       <button id="btn-monat-abschliessen" class="btn btn-stark">Monat abschließen</button>
-      <button id="btn-bericht" class="btn">Monatsbericht als PDF sichern</button>
       <button id="btn-export" class="btn">Sicherung speichern</button>
       <!-- Für den Import brauchen wir ein verstecktes Datei-Auswahlfeld,
            das der Button per Klick auslöst. -->
@@ -165,20 +170,15 @@
       <input id="import-datei" type="file" accept="application/json" hidden />
     </div>
 
-    <!-- Zwei Sätze, die man nicht sehen kann: dass beim PDF nichts gedruckt wird
-         (und wo der Knopf dafür je nach Gerät sitzt), und dass die Zahlen nur in
-         diesem Browser liegen. Alles andere sagen die Knöpfe selbst. -->
-    <p class="werkzeuge-hinweis">
-      Beim <strong>Monatsbericht</strong> öffnet sich die Druckansicht, gedruckt wird nichts:
-      dort „Als PDF sichern“ wählen (am iPhone über das Teilen-Symbol).
-    </p>
-
+    <!-- Der eine Satz, den man nicht sehen kann: dass die Zahlen nur in diesem
+         Browser liegen. Alles andere sagen die Knöpfe selbst. -->
     <p class="werkzeuge-hinweis">
       Deine Zahlen liegen nur in diesem Browser. Ohne <strong>Sicherung</strong> sind sie weg,
       sobald du den Verlauf löschst oder das Gerät wechselst.
     </p>
 
-    <!-- Archiv: abgeschlossene Monate + einfacher Trend.
+    <!-- Archiv: die abgeschlossenen Monate, jeder nur mit seinem Namen. Ein
+         Tipp darauf öffnet PDF und Bearbeiten.
          Wird von app.js gefüllt (renderArchiv). -->
     <section id="archiv"></section>
 
@@ -207,6 +207,6 @@
 
   <!-- Die Logik ganz am Ende laden, damit die Bereiche oben schon existieren. -->
   <!-- Die Zahl hier muss dieselbe sein wie oben beim Stylesheet. -->
-  <script src="app.js?v=17"></script>
+  <script src="app.js?v=18"></script>
 </body>
 </html>

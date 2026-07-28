@@ -95,6 +95,20 @@ def oeffne(posten):
     return posten
 
 
+def archiv_bericht(page, index=0):
+    """Den PDF-Bericht eines abgeschlossenen Monats oeffnen.
+
+    Seit es die Pille „Monatsbericht" unten nicht mehr gibt, fuehrt der einzige
+    Weg zum Bericht ueber das Archiv: Monat antippen, dann „Als PDF sichern".
+    `index` 0 ist der neueste Monat.
+    """
+    eintrag = page.locator(".archiv-eintrag").nth(index)
+    # Ein zweiter Tipp wuerde ihn wieder zuklappen — also nur, wenn noetig.
+    if "archiv-offen" not in (eintrag.get_attribute("class") or ""):
+        eintrag.locator(".archiv-monat").click()
+    eintrag.locator("[data-archiv-pdf]").click()
+
+
 def setze(page, selektor, wert):
     """Feld fuellen und das change-Ereignis ausloesen."""
     page.locator(selektor).fill(str(wert))
@@ -257,9 +271,11 @@ with sync_playwright() as p:
     pruefe("Kontostand", norm(ergebnis.locator(".konto-betrag").inner_text()), "-88,00 €")
     pruefe("Ergebniszeile als negativ markiert",
            page.locator(".konto-zeile.ergebnis.negativ").count(), 1)
-    pruefe("Feld klar beschriftet",
+    pruefe("Feld fragt nach dem Stand von jetzt",
            page.locator(".konto-block .beschriftung").first.inner_text().lower(),
-           "kontostand zu beginn dieses monats")
+           "was liegt gerade auf dem konto?")
+    pruefe("und das Gehalt-Haekchen steht daneben",
+           page.locator("#start-mit-gehalt").count(), 1)
 
     # Die Aufschluesselung macht die Rechnung nachvollziehbar: sechs Zeilen,
     # und die Summe der fuenf oberen ergibt die sechste. Genau daran haette
@@ -352,21 +368,7 @@ with sync_playwright() as p:
            page.locator("details[data-kat][open]").count(), 1)
     page.locator('details[data-kat="abos"] summary').click()
 
-    print("\n=== 15. Monatsbericht als PDF ===")
-    pruefe("am Bildschirm unsichtbar", page.locator("#bericht").is_visible(), False)
-    page.click("#btn-bericht")
-    inhalt = page.locator("#bericht").text_content()
-    for teil in ["Monatsbericht", "Die Zahlen", "50/30/20", "Alle Posten im Einzelnen",
-                 "nirgendwo hochgeladen"]:
-        pruefe(f"Bericht enthaelt '{teil}'", teil in inhalt, True)
-    page.emulate_media(media="print")
-    pruefe("beim Drucken sichtbar", page.locator("#bericht").is_visible(), True)
-    pruefe("App beim Drucken ausgeblendet", page.locator(".wrap").is_visible(), False)
-    page.pdf(path=f"{SHOTS}/monatsbericht.pdf", format="A4")
-    page.emulate_media(media="screen")
-    pruefe("danach wieder normal", page.locator(".wrap").is_visible(), True)
-
-    print("\n=== 16. Monatsabschluss: Uebernahme, Serie, automatische Sicherung ===")
+    print("\n=== 15. Monatsabschluss: Uebernahme, Serie, automatische Sicherung ===")
     with page.expect_download(timeout=15000) as dl:
         page.click("#btn-monat-abschliessen")
     pruefe("Sicherung wird automatisch heruntergeladen",
@@ -392,7 +394,43 @@ with sync_playwright() as p:
     print("  Serie:", serien_text)
     pruefe("Serie nennt Monate", "1 Monat" in serien_text, True)
     pruefe("Serie kommt ohne Prozente aus", "%" in serien_text, False)
-    pruefe("Archiv zeigt: unter der Marke", page.locator(".ziel-marke.gut").count(), 1)
+    pruefe("der abgeschlossene Monat blieb unter der Marke",
+           page.evaluate("STATE.archive[0].summary.regelErreicht"), True)
+
+    # Der neue Monat faengt ohne Kontostand an: Was am Ersten wirklich auf dem
+    # Konto liegt, weiss nur die Bank — die App raet es nicht.
+    pruefe("neuer Monat startet ohne Kontostand",
+           page.evaluate("STATE.currentMonth.startBalance"), None)
+    pruefe("und sagt das auch",
+           "fehlt noch" in page.locator(".konto-rechnung").inner_text(), True)
+    pruefe("das Feld steht leer da", page.locator("#start-guthaben").input_value(), "")
+
+    print("\n=== 16. Das Archiv: nur der Monatsname, alles Weitere auf Tipp ===")
+    eintrag = page.locator(".archiv-eintrag").first
+    pruefe("ein Monat im Archiv", page.locator(".archiv-eintrag").count(), 1)
+    pruefe("und zwar der Juli", eintrag.locator(".archiv-monat").inner_text().strip(), "Juli 2026")
+    # Die Zahlenwand von frueher ist weg — sie stand ohnehin alle im Bericht.
+    pruefe("keine Zahlen daneben", "€" in eintrag.inner_text(), False)
+    pruefe("Knoepfe erst nach dem Antippen",
+           eintrag.locator("[data-archiv-pdf]").is_visible(), False)
+    eintrag.locator(".archiv-monat").click()
+    pruefe("angetippt zeigt er beide Knoepfe",
+           eintrag.locator("[data-archiv-pdf]").is_visible()
+           and eintrag.locator("[data-archiv-bearbeiten]").is_visible(), True)
+
+    print("\n=== 16b. Monatsbericht als PDF, aus dem Archiv ===")
+    pruefe("am Bildschirm unsichtbar", page.locator("#bericht").is_visible(), False)
+    archiv_bericht(page)
+    inhalt = page.locator("#bericht").text_content()
+    for teil in ["Monatsbericht", "Juli 2026", "Die Zahlen", "50/30/20",
+                 "Alle Posten im Einzelnen", "nirgendwo hochgeladen"]:
+        pruefe(f"Bericht enthaelt '{teil}'", teil in inhalt, True)
+    page.emulate_media(media="print")
+    pruefe("beim Drucken sichtbar", page.locator("#bericht").is_visible(), True)
+    pruefe("App beim Drucken ausgeblendet", page.locator(".wrap").is_visible(), False)
+    page.pdf(path=f"{SHOTS}/monatsbericht.pdf", format="A4")
+    page.emulate_media(media="screen")
+    pruefe("danach wieder normal", page.locator(".wrap").is_visible(), True)
 
     print("\n=== 17. Serie reisst, leerer Monat wird nicht bewertet ===")
     pruefe("neuer Monat urteilt noch nicht", page.locator(".verdikt.v-neutral").count(), 1)
@@ -408,15 +446,16 @@ with sync_playwright() as p:
         page.click("#btn-monat-abschliessen")
     page.wait_for_selector(".serie-weg")
     pruefe("Serie auf 0", page.locator(".serie-weg").count(), 1)
-    pruefe("Archiv zeigt: darueber", page.locator(".ziel-marke.schlecht").count(), 1)
+    pruefe("der Monat liegt ueber der Marke",
+           page.evaluate("STATE.archive[0].summary.regelErreicht"), False)
 
     with page.expect_download(timeout=15000):
         page.click("#btn-monat-abschliessen")   # Monat ohne jede Eingabe
     page.wait_for_selector(".archiv-eintrag")
-    marken = page.locator(".ziel-marke").all_inner_texts()
-    print("  Archiv-Marken:", marken)
+    # Ohne Einnahmen wird nicht geurteilt: weder gut noch schlecht, sondern gar nicht.
     pruefe("leerer Monat gilt nicht als Versagen",
-           sum(1 for m in marken if "nicht bewertet" in m), 1)
+           page.evaluate("STATE.archive[0].summary.regelErreicht"), None)
+    pruefe("drei Monate im Archiv", page.locator(".archiv-eintrag").count(), 3)
 
     print("\n=== 18. Einnahmen OHNE Arbeit (Buergergeld, Geschenk, Flohmarkt) ===")
     neu_starten(page)
@@ -506,7 +545,7 @@ with sync_playwright() as p:
 
     print("\n=== 23. Gesicherter Stand enthaelt alles ===")
     stand = page.evaluate("JSON.parse(JSON.stringify(STATE))")
-    pruefe("Version 3", stand.get("version"), 3)
+    pruefe("Version 4", stand.get("version"), 4)
     pruefe("Wochenstunden gespeichert", stand["einstellungen"]["wochenstunden"], 40)
     pruefe("Notgroschen-Startwert gespeichert", stand["einstellungen"]["notgroschenStart"], 0)
     pruefe("Versicherungen im Monat", "versicherungen" in stand["currentMonth"], True)
@@ -519,7 +558,7 @@ with sync_playwright() as p:
     # Anleitung zum PDF geprueft wird.
     for geraetename, erwarteter_satz in [("Pixel 7", "Als PDF speichern"),
                                          ("iPhone 14", "In Dateien sichern")]:
-        gctx = browser.new_context(**p.devices[geraetename])
+        gctx = browser.new_context(**p.devices[geraetename], accept_downloads=True)
         gpage = gctx.new_page()
         gpage.on("pageerror", lambda e, n=geraetename: fehler.append(f"{n}: JS-Fehler: {e}"))
         gpage.on("console",
@@ -553,7 +592,11 @@ with sync_playwright() as p:
         k.locator("summary").click()
         pruefe(f"{geraetename}: Karte klappt zu", k.get_attribute("open") is None, True)
 
-        gpage.click("#btn-bericht")
+        # Den Bericht gibt es nur noch fuer einen abgeschlossenen Monat.
+        with gpage.expect_download(timeout=15000):
+            gpage.click("#btn-monat-abschliessen")
+        gpage.wait_for_selector(".archiv-eintrag")
+        archiv_bericht(gpage)
         pruefe(f"{geraetename}: Anleitung zum PDF passt zum Geraet",
                bool(hinweise) and erwarteter_satz in hinweise[-1], True)
         gpage.emulate_media(media="print")
@@ -860,12 +903,6 @@ with sync_playwright() as p:
     zufluss_add(page, "", 99)
     pruefe("namenloser Eintrag wird abgelehnt", page.locator(".zufluss-eintrag").count(), 3)
 
-    # Der Bericht nennt die Momente beim Namen, auch die ohne Preisschild.
-    page.click("#btn-bericht")
-    bericht = page.locator("#bericht").inner_text()
-    pruefe("Bericht listet die Momente", "Oma hat mir was zugesteckt" in bericht, True)
-    pruefe("und schreibt bei den unbezifferten „ohne Preis“", "ohne Preis" in bericht, True)
-
     # Loeschen laeuft ueber denselben Weg wie bei den Posten.
     page.locator(".zufluss-eintrag", has_text="Blumen von Nadja").locator(".del").click()
     pruefe("geloescht", page.locator(".zufluss-eintrag").count(), 2)
@@ -874,6 +911,13 @@ with sync_playwright() as p:
 
     # Monatswechsel: Die Momente bleiben im alten Monat, das Jahr zaehlt weiter.
     page.click("#btn-monat-abschliessen")
+    page.wait_for_selector(".archiv-eintrag")
+
+    # Der Bericht des abgeschlossenen Monats nennt die Momente beim Namen.
+    archiv_bericht(page)
+    bericht = page.locator("#bericht").inner_text()
+    pruefe("Bericht listet die Momente", "Oma hat mir was zugesteckt" in bericht, True)
+
     pruefe("neuer Monat startet ohne Momente",
            page.evaluate("STATE.currentMonth.zufluesse.length"), 0)
     pruefe("Archiv haelt die Summe fest",
@@ -916,11 +960,15 @@ with sync_playwright() as p:
     pruefe("das abgeschlossene Jahr ohne „bisher“",
            "bisher" in page.locator(".zufluss-jahr-name").nth(1).inner_text(), False)
 
-    # Der Bericht traegt dieselbe Jahresauswertung.
-    page.click("#btn-bericht")
+    # Der Bericht traegt dieselbe Jahresauswertung — allerdings so, wie sie zum
+    # Ende des berichteten Monats aussah. Der laufende Monat mit seinem Kaffee
+    # steht noch nicht drin: Auf einem Blatt von damals hat er nichts verloren.
+    archiv_bericht(page)
     bericht = page.locator("#bericht").inner_text()
     pruefe("Bericht nennt die Jahresauswertung", "Jahresauswertung" in bericht, True)
     pruefe("und das abgeschlossene Jahr darin", "87 Mal" in bericht, True)
+    pruefe("der Kaffee von heute steht noch nicht drin",
+           "74,00" in norm(bericht), False)
 
     # Momente ganz ohne Wert: dann verschwindet der Euro-Betrag, die Anzahl bleibt.
     neu_starten(page)
@@ -928,6 +976,15 @@ with sync_playwright() as p:
     zufluss_add(page, "Zum Essen eingeladen")
     zahlen = page.locator(".zufluss-gross").all_inner_texts()
     pruefe("ohne Werte keine Null-Summe", [norm(t) for t in zahlen], ["2 ×"])
+
+    # … und auch im Bericht steht dann kein erfundener Betrag.
+    with page.expect_download(timeout=15000):
+        page.click("#btn-monat-abschliessen")
+    page.wait_for_selector(".archiv-eintrag")
+    archiv_bericht(page)
+    bericht = page.locator("#bericht").inner_text()
+    pruefe("Bericht schreibt bei den unbezifferten „ohne Preis“",
+           "ohne Preis" in bericht, True)
 
     # Ein Stand aus der Zeit vor dieser Karte darf weder abstuerzen noch etwas erfinden.
     page.evaluate("""
@@ -1085,10 +1142,9 @@ with sync_playwright() as p:
     # Auch der Kartenkopf zaehlt nur noch, was laeuft: 20 statt 59,90.
     pruefe("Kartenkopf zaehlt das ruhende Abo nicht mit",
            norm(page.locator(f'{auf(page, "abos")} .karte-summe').inner_text()), "20,00 €")
-    pruefe("Kontostand-Karte weist die Pause aus",
-           "40,00 €" in norm(page.locator(".konto-pause").inner_text()), True)
-    pruefe("Pause nennt den Posten beim Namen",
-           "Gym" in page.locator(".konto-pause").inner_text(), True)
+    # Dass die Pause wirkt, sagt die Rechnung selbst — der Kontostand liegt um
+    # die 40 € hoeher. Ein eigener Kasten darunter sagte dasselbe ein drittes Mal.
+    pruefe("kein extra Kasten fuer die Pause", page.locator(".konto-pause").count(), 0)
 
     # Pause verlaengern: bis September, dann ueberlebt sie einen Monatswechsel.
     gym.locator("[data-pause-bis]").select_option("2026-09")
@@ -1194,9 +1250,8 @@ with sync_playwright() as p:
     pruefe("Tempo nennt das Ausnahmen-Budget", "92% vom Ausnahmen-Budget" in tempo, True)
 
     print("\n=== 37. Kontostand rundet auf ganze Cent ===")
-    # Ohne Rundung schleppt der Monatswechsel Nachkommastellen weiter: Aus dem
-    # errechneten Kontostand wird das neue Startguthaben, und im Eingabefeld
-    # stand dann 1066,1399999999999.
+    # Ohne Rundung sammeln sich Nachkommastellen an: Aus 1066,14 plus ein paar
+    # Bewegungen wurde im Feld 1066,1399999999999.
     pruefe("runde() macht aus Rechen-Rauschen einen Cent-Betrag",
            page.evaluate("runde(1066.1399999999999)"), 1066.14)
     neu_starten(page)
@@ -1206,126 +1261,91 @@ with sync_playwright() as p:
     add(page, "abos", "Prime", 8.99, rhythmus="monatlich", haken=False)
     add(page, "abos", "Kindle", 4.99, rhythmus="monatlich", haken=False)
     setze(page, "#start-guthaben", 1066.14)
-    with page.expect_download(timeout=15000):
-        page.click("#btn-monat-abschliessen")
-    page.wait_for_selector(".archiv-eintrag")
-    uebernommen = page.evaluate("STATE.currentMonth.startBalance")
-    print("  uebernommenes Startguthaben:", uebernommen)
-    pruefe("hoechstens zwei Nachkommastellen",
-           round(uebernommen, 2) == uebernommen, True)
     # 1066,14 + 1951,80 + 126,50 − 716 − 8,99 − 4,99 = 2414,46
-    pruefe("Startguthaben genau uebernommen", uebernommen, 2414.46)
+    kontostand = page.evaluate("rechneAktuell().kontostand")
+    print("  Kontostand:", kontostand)
+    pruefe("hoechstens zwei Nachkommastellen",
+           round(kontostand, 2) == kontostand, True)
+    pruefe("Kontostand stimmt auf den Cent", kontostand, 2414.46)
 
-    print("\n=== 38. Die Kontostand-Kette: ein Fehler bleibt korrigierbar ===")
-    # Frueher schrieb jeder Monatsabschluss den Kontostand als feste Zahl in den
-    # naechsten Monat. Ein falscher Startwert war damit fuer immer in jedem
-    # Folgemonat drin. Jetzt wird die Kette bei jeder Anzeige neu gerechnet,
-    # und eine Korrektur in der Vergangenheit zieht bis heute durch.
+    print("\n=== 38. Jeder Monat steht fuer sich ===")
+    # Frueher war der Kontostand eine Kette: Jeder Monat erbte den Schlussstand
+    # seines Vormonats, und eine Korrektur ganz hinten zog durch bis heute.
+    # Jetzt hat jeder Monat genau eine eigene Zahl.
     neu_starten(page)
 
-    def monat_bauen(start_anker=None, mit_miete=False):
-        """Einen Monat mit 1000 Einnahmen fuellen.
-
-        Die Miete wird nur EINMAL eingetragen: Fixkosten sind wiederkehrend und
-        wandern beim Abschluss von allein in den naechsten Monat. Einnahmen tun
-        das nicht, die kommen jeden Monat neu dazu.
-        """
-        if start_anker is not None:
-            setze(page, "#start-guthaben", start_anker)
-        add(page, "income", "Gehalt", 1000, haken=True)
-        if mit_miete:
-            add(page, "fixkosten", "Miete", 400, rhythmus="monatlich")
+    def start_von(monat_id=None):
+        """Der Startwert eines Monats, so wie die App ihn rechnet."""
+        if monat_id is None:
+            return page.evaluate("rechneAktuell().startBalance")
+        return page.evaluate(
+            "id => rechne(STATE.archive.find(m => m.id === id).snapshot).startBalance",
+            monat_id)
 
     def abschliessen():
         with page.expect_download(timeout=15000):
             page.click("#btn-monat-abschliessen")
         page.wait_for_selector(".archiv-eintrag")
 
-    def kette():
-        return page.evaluate("kontostandKette()")
-
-    # --- Monat 1: der Anker. -300 im Minus, 1000 rein, 400 Miete raus.
+    # --- Monat 1: 1000 rein, 700 raus, Start 500 -> Ende 800.
+    add(page, "income", "Gehalt", 1000, haken=True)
+    add(page, "fixkosten", "Miete", 700, rhythmus="monatlich")
+    setze(page, "#start-guthaben", 500)
     m1 = page.evaluate("STATE.currentMonth.id")
-    monat_bauen(-300, mit_miete=True)
-    pruefe("erster Monat hat ein offenes Eingabefeld",
-           page.locator(".konto-block > #start-guthaben").count(), 1)
-    pruefe("Monat 1 startet beim Anker", kette()[m1]["start"], -300)
-    pruefe("Monat 1 endet bei 300", kette()[m1]["ende"], 300)   # -300 + 1000 - 400
-    pruefe("Monat 1 ist als Anker markiert", kette()[m1]["ausAnker"], True)
+    pruefe("Monat 1 startet, wo sie es sagt", start_von(), 500)
+    pruefe("Monat 1 endet bei 800", page.evaluate("rechneAktuell().kontostand"), 800)
 
-    # --- Monat 2 erbt. Hier darf kein offenes Feld mehr stehen: Genau da hat
-    #     man frueher den Stand aus der Banking-App eingetippt (in dem das
-    #     Gehalt schon drin war) und es damit doppelt gezaehlt.
+    # --- Monat 2 erbt NICHTS. Er beginnt leer und wartet auf ihre Zahl.
     abschliessen()
     m2 = page.evaluate("STATE.currentMonth.id")
-    pruefe("geerbter Monat zeigt den Wert als Text", page.locator(".konto-geerbt").count(), 1)
-    pruefe("geerbter Wert stimmt", norm(page.locator(".konto-geerbt").inner_text()), "300,00 €")
-    pruefe("kein offenes Eingabefeld mehr",
-           page.locator(".konto-block > #start-guthaben").count(), 0)
-    pruefe("Korrektur-Weg steht bereit", page.locator(".anker-setzen #start-guthaben").count(), 1)
-    herkunft = page.locator(".konto-block .feld-hinweis").first.inner_text()
-    print("  Herkunft:", herkunft.replace("\n", " "))
-    pruefe("Herkunft nennt den Vormonat", "Schlussstand" in herkunft, True)
-    pruefe("Herkunft bleibt ein kurzer Satz", len(herkunft) < 40, True)
+    pruefe("Monat 2 erbt nichts", page.evaluate("STATE.currentMonth.startBalance"), None)
+    pruefe("und rechnet solange ab null", start_von(), 0)
+    pruefe("die Rechnung sagt, dass die Zahl fehlt",
+           "fehlt noch" in page.locator(".konto-rechnung").inner_text(), True)
 
-    monat_bauen()
-    pruefe("Monat 2 startet beim Schlussstand von Monat 1", kette()[m2]["start"], 300)
-    pruefe("Monat 2 endet bei 900", kette()[m2]["ende"], 900)
-    pruefe("Monat 2 ist KEIN Anker", kette()[m2]["ausAnker"], False)
-    pruefe("Monat 2 kennt seine Herkunft", kette()[m2]["vonMonat"], m1)
+    setze(page, "#start-guthaben", 2000)
+    add(page, "income", "Gehalt", 1000, haken=True)
+    pruefe("Monat 2 nimmt ihre Zahl", start_von(), 2000)
+    # 2000 + 1000 − 700 Miete = 2300
+    pruefe("Monat 2 endet bei 2300", page.evaluate("rechneAktuell().kontostand"), 2300)
 
-    # --- Monat 3.
-    abschliessen()
-    m3 = page.evaluate("STATE.currentMonth.id")
-    monat_bauen()
-    pruefe("Monat 3 startet bei 900", kette()[m3]["start"], 900)
-    pruefe("Monat 3 endet bei 1500", kette()[m3]["ende"], 1500)
+    # --- DER KERN: Monat 1 nachtraeglich aendern ruehrt Monat 2 nicht an.
+    page.evaluate("id => { STATE.archive.find(m => m.id === id).snapshot.startBalance = -500;"
+                  "        speichern(); render(); }", m1)
+    pruefe("Monat 1 traegt seine neue Zahl", start_von(m1), -500)
+    pruefe("Monat 2 bleibt davon voellig unberuehrt", start_von(), 2000)
+    pruefe("und sein Ende auch", page.evaluate("rechneAktuell().kontostand"), 2300)
 
-    # --- DER KERN: Monat 1 im Archiv korrigieren. -300 war falsch, es waren -500.
-    #     Alles danach muss um genau 200 nach unten wandern, ohne dass man
-    #     Monat 2 oder 3 anfassen muesste.
-    page.evaluate("window.prompt = () => '-500'")
-    page.click(f'[data-korrigieren="{m1}"]')
-    k = kette()
-    pruefe("Monat 1 korrigiert", k[m1]["start"], -500)
-    pruefe("Korrektur erreicht Monat 1s Ende", k[m1]["ende"], 100)
-    pruefe("Korrektur erreicht Monat 2", k[m2]["start"], 100)
-    pruefe("Korrektur erreicht Monat 2s Ende", k[m2]["ende"], 700)
-    pruefe("Korrektur erreicht Monat 3", k[m3]["start"], 700)
-    pruefe("Korrektur erreicht bis heute durch", k[m3]["ende"], 1300)
-    pruefe("die Anzeige zieht mit",
-           norm(page.locator(".konto-geerbt").inner_text()), "700,00 €")
+    print("\n=== 38b. Das Haekchen: mein Gehalt ist da schon drauf ===")
+    # Wer mitten im Monat aufs Konto sieht, sieht dort auch sein Gehalt. Ohne
+    # das Haekchen zaehlte die Rechnung es doppelt.
+    setze(page, "#start-guthaben", 2000)
+    page.locator("#start-mit-gehalt").check()
+    pruefe("das Gehalt wird wieder abgezogen", start_von(), 1000)
+    pruefe("und der Satz darunter sagt es",
+           "1.000,00" in norm(page.locator(".konto-block .feld-hinweis").inner_text()), True)
+    # 1000 + 1000 − 700 = 1300
+    pruefe("Kontostand ohne Doppelzaehlung",
+           page.evaluate("rechneAktuell().kontostand"), 1300)
 
-    # --- Ein Anker MITTEN in der Zeit: ab Monat 2 zaehlt nur noch die neue Zahl.
-    page.evaluate("window.prompt = () => '1000'")
-    page.click(f'[data-korrigieren="{m2}"]')
-    k = kette()
-    pruefe("Anker in Monat 2 sticht die Kette", k[m2]["start"], 1000)
-    pruefe("Monat 1 bleibt davon unberuehrt", k[m1]["start"], -500)
-    pruefe("Monat 3 rechnet ab dem neuen Anker", k[m3]["start"], 1600)
-    pruefe("Anker im Archiv markiert", page.locator(".anker-marke").count() >= 1, True)
+    # Das Haekchen rechnet live mit: Aendert sich das Gehalt, zieht der
+    # Startwert nach, statt einmal falsch festzustehen.
+    add(page, "income", "Bonus", 500, haken=True)
+    pruefe("mehr Einnahmen, weniger Startwert", start_von(), 500)
 
-    # --- Und wieder aufloesen: leere Eingabe nimmt den Anker zurueck.
-    page.evaluate("window.prompt = () => ''")
-    page.click(f'[data-korrigieren="{m2}"]')
-    k = kette()
-    pruefe("Anker aufgeloest, Monat 2 erbt wieder", k[m2]["start"], 100)
-    pruefe("Monat 3 wieder in der alten Kette", k[m3]["start"], 700)
+    page.locator("#start-mit-gehalt").uncheck()
+    pruefe("Haekchen weg, ihre Zahl gilt wieder", start_von(), 2000)
 
-    # --- Der laufende Monat laesst sich genauso verankern und wieder loesen.
-    page.locator(".anker-setzen > summary").click()
-    setze(page, ".anker-setzen #start-guthaben", 2500)
-    pruefe("laufender Monat verankert", kette()[m3]["start"], 2500)
-    pruefe("jetzt steht dort ein offenes Feld",
-           page.locator(".konto-block > #start-guthaben").count(), 1)
-    page.click("#btn-anker-weg")
-    pruefe("Anker weggenommen, wieder geerbt", kette()[m3]["start"], 700)
-    pruefe("und wieder als Text statt Feld", page.locator(".konto-geerbt").count(), 1)
+    # Feld leeren heisst „ich weiss es nicht" — und nicht „das Konto stand auf null".
+    setze(page, "#start-guthaben", "")
+    pruefe("geleertes Feld setzt zurueck",
+           page.evaluate("STATE.currentMonth.startBalance"), None)
 
     print("\n=== 39. Alte Staende steigen ohne Zahlensprung um ===")
-    # Ein Stand aus der Zeit vor der Kette hat noch keinen Anker. Er bekommt
-    # ihn beim Laden gesetzt — und die Zahl, die sie gestern gesehen hat,
-    # muss dieselbe bleiben.
+    # Ein Stand aus der Zeit der Kette: Der Juli traegt einen gesetzten Anker,
+    # der August erbte seinen Startwert. Nach dem Umstieg muss jeder Monat
+    # dieselbe Zahl zeigen wie vorher — ein Update darf Zahlen besser machen,
+    # aber niemals heimlich verschieben.
     alt = {
         "version": 3,
         "einstellungen": {"wochenstunden": 40},
@@ -1341,7 +1361,7 @@ with sync_playwright() as p:
             "summary": {"gehalt": 2000, "nicht": 0, "gespart": 0, "quoteNicht": 0,
                         "kontostand": 1200},
             "snapshot": {
-                "id": "2026-07", "startBalance": 0,
+                "id": "2026-07", "startBalance": 0, "anchorBalance": 0,
                 "income": [{"id": "c1", "label": "Gehalt", "amount": 2000}],
                 "fixkosten": [{"id": "c2", "label": "Miete", "amount": 800}],
                 "abos": [], "versicherungen": [], "lebensmittel": [],
@@ -1353,19 +1373,19 @@ with sync_playwright() as p:
     page.evaluate("d => localStorage.setItem('girlmath.v1', JSON.stringify(d))", alt)
     page.reload()
     page.wait_for_selector(".verdikt")
-    k = kette()
-    # Juli: 0 + 2000 - 800 = 1200. Genau das stand vorher eingefroren im August.
-    pruefe("aeltester Monat wird zum Anker", k["2026-07"]["ausAnker"], True)
-    pruefe("Anker uebernimmt den alten Wert", k["2026-07"]["start"], 0)
-    pruefe("Kette rechnet den alten Schlussstand nach", k["2026-07"]["ende"], 1200)
-    pruefe("laufender Monat startet unveraendert", k["2026-08"]["start"], 1200)
-    pruefe("kein Zahlensprung beim Umstieg",
-           k["2026-08"]["start"], page.evaluate("STATE.currentMonth.startBalance"))
-    pruefe("und der laufende Monat braucht keinen eigenen Anker",
-           page.evaluate("STATE.currentMonth.anchorBalance"), None)
+    pruefe("der Anker von damals ist jetzt der Startwert",
+           page.evaluate("STATE.archive[0].snapshot.startBalance"), 0)
+    pruefe("der geerbte Wert steht fest im laufenden Monat",
+           page.evaluate("STATE.currentMonth.startBalance"), 1200)
+    pruefe("und die angezeigte Zahl bleibt exakt wie vorher",
+           page.evaluate("rechneAktuell().startBalance"), 1200)
+    pruefe("das Feld der Kette ist weg",
+           page.evaluate("'anchorBalance' in STATE.currentMonth"), False)
+    pruefe("und der Umstiegs-Merker auch",
+           page.evaluate("'ankerAusAltemStand' in STATE.archive[0].snapshot"), False)
 
-    # Gegenprobe: ein Stand mit LUECKENHAFTEM Archiv. Hier kaeme die Kette auf
-    # eine andere Zahl — dann muss der bisherige Wert stehen bleiben.
+    # Gegenprobe: ein Stand mit LUECKENHAFTEM Archiv. Die alte Kette waere hier
+    # auf 0 gelaufen — der gespeicherte Wert muss trotzdem stehen bleiben.
     luecke = {
         "version": 3,
         "einstellungen": {"wochenstunden": 40},
@@ -1375,7 +1395,7 @@ with sync_playwright() as p:
             "fixkosten": [], "abos": [], "versicherungen": [], "lebensmittel": [],
             "luxus": [], "konsum": [], "sparen": [],
         },
-        # Schnappschuss ohne jede Bewegung: die Kette wuerde hier auf 0 landen.
+        # Schnappschuss ohne jede Bewegung und ohne Anker.
         "archive": [{"id": "2026-07",
                      "summary": {"gehalt": 2000, "nicht": 0, "gespart": 0,
                                  "quoteNicht": 0, "kontostand": 1200},
@@ -1385,10 +1405,85 @@ with sync_playwright() as p:
     page.evaluate("d => localStorage.setItem('girlmath.v1', JSON.stringify(d))", luecke)
     page.reload()
     page.wait_for_selector(".verdikt")
-    pruefe("bei luecken Archiv wird der laufende Monat verankert",
-           page.evaluate("STATE.currentMonth.anchorBalance"), 1200)
-    pruefe("die angezeigte Zahl bleibt exakt wie vorher",
-           kette()["2026-08"]["start"], 1200)
+    pruefe("auch bei luecken Archiv bleibt die Zahl stehen",
+           page.evaluate("rechneAktuell().startBalance"), 1200)
+
+    print("\n=== 40. Einen Monat aus dem Archiv nehmen und zurueckholen ===")
+    # „Loeschen" heisst hier: von der Liste nehmen. Die Zahlen bleiben, denn
+    # zurueckgelegt hat sie das Geld ja trotzdem.
+    neu_starten(page)
+    add(page, "income", "Gehalt", 2000, haken=True)
+    add(page, "fixkosten", "Miete", 800, rhythmus="monatlich")
+    add(page, "sparen", "Ruecklage", 200)
+    with page.expect_download(timeout=15000):
+        page.click("#btn-monat-abschliessen")
+    page.wait_for_selector(".archiv-eintrag")
+
+    puffer_vorher = norm(page.locator(".notgroschen-ist").inner_text())
+    serie_vorher = page.locator(".serie-laeuft").count()
+    pruefe("der Monat hat 200 in den Puffer gelegt", puffer_vorher, "200,00 €")
+
+    page.locator(".archiv-eintrag").first.locator(".archiv-weg").click()
+    pruefe("Monat verschwindet aus der Liste", page.locator(".archiv-eintrag").count(), 0)
+    pruefe("aber nicht aus den Daten", page.evaluate("STATE.archive.length"), 1)
+    pruefe("der Notgroschen behaelt sein Geld",
+           norm(page.locator(".notgroschen-ist").inner_text()), puffer_vorher)
+    pruefe("und die Serie laeuft weiter", page.locator(".serie-laeuft").count(), serie_vorher)
+    pruefe("die Rueckhol-Zeile sagt, wie viele weg sind",
+           "1 Monat ausgeblendet" in page.locator(".archiv-zeigen").inner_text(), True)
+
+    # Ein Neuladen darf das nicht vergessen.
+    page.reload()
+    page.wait_for_selector(".verdikt")
+    pruefe("ausgeblendet bleibt ausgeblendet", page.locator(".archiv-eintrag").count(), 0)
+
+    page.click("[data-archiv-zeigen]")
+    pruefe("und wieder da", page.locator(".archiv-eintrag").count(), 1)
+    pruefe("die Rueckhol-Zeile verschwindet mit", page.locator(".archiv-zeigen").count(), 0)
+
+    print("\n=== 41. Einen abgeschlossenen Monat nochmal bearbeiten ===")
+    august = page.evaluate("STATE.currentMonth.id")
+    juli = page.evaluate("STATE.archive[0].id")
+    setze(page, "#start-guthaben", 999)   # damit man sieht, dass der August wiederkommt
+
+    eintrag = page.locator(".archiv-eintrag").first
+    eintrag.locator(".archiv-monat").click()
+    eintrag.locator("[data-archiv-bearbeiten]").click()
+
+    pruefe("der alte Monat liegt jetzt vorne", page.evaluate("STATE.currentMonth.id"), juli)
+    pruefe("der Balken sagt, welcher",
+           juli[:4] in page.locator(".bearbeitung-balken").inner_text(), True)
+    pruefe("der laufende Monat liegt zur Seite",
+           page.evaluate("STATE.bearbeitung.zurueck.id"), august)
+    pruefe("Monat abschliessen ist aus dem Weg",
+           page.locator(".werkzeuge").is_visible(), False)
+    pruefe("die Miete von damals steht da",
+           page.locator(f'{auf(page, "fixkosten")} .posten').count(), 1)
+
+    # Die Korrektur: die Miete war in Wahrheit 900.
+    miete = page.locator(f'{auf(page, "fixkosten")} .posten').first
+    miete.locator('input[data-field="amount"]').fill("900")
+    miete.locator('input[data-field="amount"]').dispatch_event("change")
+
+    # Auch ein Neuladen mittendrin darf die Arbeit nicht zerreissen.
+    page.reload()
+    page.wait_for_selector(".verdikt")
+    pruefe("nach dem Neuladen immer noch in Bearbeitung",
+           page.evaluate("STATE.bearbeitung && STATE.bearbeitung.id"), juli)
+    pruefe("mit der Korrektur drin",
+           page.evaluate('STATE.currentMonth.fixkosten[0].amount'), 900)
+
+    page.click("#btn-bearbeitung-fertig")
+    pruefe("der August ist zurueck", page.evaluate("STATE.currentMonth.id"), august)
+    pruefe("und wie sie ihn verlassen hat",
+           page.evaluate("STATE.currentMonth.startBalance"), 999)
+    pruefe("die Bearbeitung ist beendet", page.evaluate("STATE.bearbeitung"), None)
+    pruefe("der Balken ist weg", page.locator(".bearbeitung-balken").count(), 0)
+    pruefe("die Korrektur steht im Archiv",
+           page.evaluate("STATE.archive[0].snapshot.fixkosten[0].amount"), 900)
+    pruefe("und die Zusammenfassung wurde neu gerechnet",
+           page.evaluate("STATE.archive[0].summary.notwendig"), 900)
+    page.screenshot(path=f"{SHOTS}/05-archiv.png", full_page=True)
 
     browser.close()
 
