@@ -385,6 +385,21 @@ body.modal-offen { overflow: hidden; }
   margin: 8px 0 0 2px;
 }
 
+/* Die Bedienelemente eines Postens — Häkchen und Pausieren.
+
+   Sie erscheinen nur an dem Posten, den man gerade angetippt hat. Acht Abos
+   mit je einem Häkchen und einem Knopf sind sechzehn Bedienelemente auf
+   einem Schirm; angesehen hat man sie sich nie, weggeschaut schon. */
+.posten-bedienung { display: none; }
+.posten-offen .posten-bedienung,
+.posten:focus-within .posten-bedienung {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin: 8px 0 0 2px;
+}
+
 .posten input[type="text"],
 .posten input[type="number"] {
   width: 100%;
@@ -488,15 +503,25 @@ body.modal-offen { overflow: hidden; }
 }
 
 /* Lila statt Pink oder Rot: Eine Pause ist keine Warnung und kein Fehler,
-   sondern ein dritter Zustand. Sie braucht eine eigene Farbe. */
+   sondern ein dritter Zustand. Sie braucht eine eigene Farbe.
+
+   Schild und Monatsauswahl sind EIN Element: „⏸ pausiert bis [Aug ⌄]".
+   Vorher stand der Monat zweimal da — einmal im Schild, einmal daneben
+   im Auswahlfeld. */
 .pause-schild {
   font-size: 12px;
   font-weight: 700;
   color: #7A5FA8;
   background: #EFE7F8;
   border-radius: 999px;
-  padding: 3px 10px;
+  padding: 3px 4px 3px 10px;
   white-space: nowrap;
+}
+.pause-schild .mini-auswahl {
+  border-color: #D9C9EC;
+  background: #FBF8FE;
+  color: #7A5FA8;
+  padding: 2px 6px;
 }
 
 /* Der ruhende Posten: blass, Betrag durchgestrichen. Die Bedienelemente
@@ -735,29 +760,6 @@ body.modal-offen { overflow: hidden; }
 .legende-punkt.seg-uebrig    { background: var(--sand); }
 .legende-text { color: var(--braun-weich); }
 .legende-wert { color: var(--braun); }
-
-/* --- Die Zahlen darunter --- */
-.zahlenzeile {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 8px 0;
-  border-top: 1px dashed var(--linie);
-  font-size: 14px;
-}
-.zahlenzeile:first-of-type { border-top: none; }
-.zahlenzeile strong { font-weight: 800; }
-.zahlenzeile.dick { font-size: 16px; }
-
-/* Der Satz unter „Von diesem Monat noch frei". Er beantwortet die eine Frage,
-   die diese Zahl neben dem Kontostand darüber aufwirft: warum sie eine andere
-   ist. Klein und ruhig, es ist eine Fußnote und keine Warnung. */
-.zahlen-fussnote {
-  margin: 8px 0 0;
-  font-size: 12px;
-  line-height: 1.5;
-  color: var(--braun-weich);
-}
 
 .wert-positiv { color: var(--gruen); font-weight: 800; }
 .wert-nicht   { color: var(--rot);   font-weight: 800; }
@@ -1162,54 +1164,6 @@ body.modal-offen { overflow: hidden; }
   background: #FBEAF2;
   border-radius: 999px;
   padding: 3px 10px;
-}
-
-/* ============================================================
-   Rücklage: was du diesen Monat weglegen solltest
-   ============================================================ */
-.ruecklage-karte { border-left: 6px solid var(--gruen); background: #F4FBF7; }
-.ruecklage-betrag {
-  font-size: 28px;
-  font-weight: 900;
-  color: var(--gruen);
-  margin: 2px 0 6px;
-  letter-spacing: -0.5px;
-}
-
-/* Die Rechnung hinter der Summe — damit die Zahl nachvollziehbar wird. */
-.ruecklage-rechnung { margin: 0 0 10px; }
-.ruecklage-zeile {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  gap: 10px;
-  padding: 6px 0;
-  border-top: 1px dashed var(--linie);
-  font-size: 14px;
-}
-.ruecklage-name { font-weight: 700; }
-.ruecklage-name small {
-  display: block;
-  font-weight: 600;
-  font-size: 11px;
-  color: var(--braun-weich);
-}
-.ruecklage-anteil {
-  font-weight: 800;
-  white-space: nowrap;
-  color: var(--gruen);
-}
-.ruecklage-summe {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  gap: 10px;
-  margin-top: 8px;
-  padding-top: 8px;
-  border-top: 1px solid var(--linie);
-  font-weight: 900;
-  font-size: 14px;
-  color: var(--gruen);
 }
 
 /* ============================================================

@@ -208,9 +208,9 @@ const VERDIKTE = [
       d => hatNamen(d.top) &&
         `Spar-Königin 👑 Dein größter Ausrutscher: ${d.top.label} für ${euro(d.top.betrag)}. Ich hab extra nachgerechnet, ob ich dich dafür fertigmachen kann. Kann ich nicht. Ätzend.`,
       d => d.summe > 0 &&
-        `${d.prozent}%. ${euro(d.summe)} raus, der Rest liegt noch da. Und jetzt? Soll ich klatschen? Ich klatsch nicht.`,
+        `${euro(d.summe)} raus, der Rest liegt noch da. Und jetzt? Soll ich klatschen? Ich klatsch nicht.`,
       d => `Spar-Königin 👑 Dein Konto sieht aus wie das einer erwachsenen Frau. Verstörend.`,
-      d => `Unter 10%. Entweder Disziplin oder Grippe. Ich zähl beides.`,
+      d => `Entweder Disziplin oder Grippe. Ich zähl beides.`,
     ],
   },
   {
@@ -254,9 +254,7 @@ const VERDIKTE = [
         `Konsumopfer 🛍️ ${euro(d.top.betrag)} an ${d.top.label}. Du bist da keine Kundin mehr. Du bist Sponsorin.`,
       d => d.miete &&
         `Über die Hälfte weg. ${euro(d.summe)}, ${d.miete}. Herzlichen Glückwunsch zum Zweitjob.`,
-      d => d.ueberRegel > 0 &&
-        `${d.prozent}%. Erlaubt wären 30. ${euro(d.ueberRegel)} Unterschied, aber du wirst deine Gründe haben.`,
-      d => `Dein Ernst? ${d.prozent}%. Ich frag nicht mal mehr wofür.`,
+      d => `Dein Ernst? Ich frag nicht mal mehr wofür.`,
     ],
   },
   {
@@ -679,14 +677,17 @@ function fixNameMit(artikel, name) {
 /* Einen Betrag ins Verhältnis zur größten notwendigen Ausgabe setzen.
    `fix` ist { label, betrag } — meist die Miete, sonst Strom oder Einkauf.
 
-   Unter 10% bleibt es still: "3% deiner Miete" wäre kein Argument,
-   sondern nur eine Zahl, und die App soll nicht bei jedem Kaffee reden. */
+   Dieser Vergleich spricht nur noch in Vielfachen: „2,4× deine Miete".
+   Der alte Prozent-Fall („20% deiner Miete") stand direkt unter der
+   Prozentzahl des Banners, die den Anteil am GEHALT misst — zwei
+   Prozentzeichen untereinander mit zwei verschiedenen Bezugsgrößen liest
+   man nicht als zwei Aussagen, sondern als Zahlensalat. Und unterhalb
+   einer ganzen Miete ist der Vergleich ohnehin kein Argument. */
 function mietenText(betrag, fix) {
   if (!fix || !(fix.betrag > 0) || !(betrag > 0)) return "";
   const anteil = betrag / fix.betrag;
-  if (anteil < 0.1) return "";
+  if (anteil < 1) return "";
   const name = (fix.label && fix.label !== "(ohne Namen)") ? fix.label : "Fixkosten";
-  if (anteil < 1)  return Math.round(anteil * 100) + "% " + fixNameMit("deiner", name);
   if (anteil < 10) return anteil.toFixed(1).replace(".", ",") + "× " + fixNameMit("deine", name);
   return Math.round(anteil) + "× " + fixNameMit("deine", name);
 }
@@ -761,10 +762,17 @@ function datumLesbar(d) {
   return d.getDate() + ". " + MONATSNAMEN[d.getMonth()];
 }
 
-// Aus "2026-08" ein kurzes "Aug 26" machen — für enge Stellen wie Auswahlfelder.
+/* Aus "2026-08" ein kurzes "Aug" machen — für enge Stellen wie Auswahlfelder.
+
+   Die Jahreszahl steht nur dann dabei, wenn der Monat NICHT ins laufende
+   Jahr fällt. Innerhalb des Jahres ist sie überflüssig, und überflüssige
+   Zahlen liest man nicht als Präzision, sondern als Frage: Wieso steht da
+   ein Jahr, rechnet die App etwa über den Jahreswechsel? */
 function monatKurz(id) {
   const [jahr, monat] = String(id).split("-").map(Number);
-  return MONATE_KURZ[monat - 1] + " " + String(jahr).slice(2);
+  const kurz = MONATE_KURZ[monat - 1];
+  const diesesJahr = Number(String(STATE.currentMonth.id).split("-")[0]);
+  return jahr === diesesJahr ? kurz : kurz + " " + String(jahr).slice(2);
 }
 
 /* Wo im Gehaltszyklus stehst du heute?
@@ -923,7 +931,17 @@ function standardEinstellungen() {
   return {
     wochenstunden: 40,      // für die Lebenszeit-Umrechnung
     notgroschenStart: 0,    // was du schon zurückgelegt hast, außerhalb der App
-    zugeklappt: [],         // welche Kategorie-Karten du eingeklappt hast
+    /* Welche EINE Kategorie gerade offen ist ("abos") — oder "" für alle zu.
+
+       Vorher stand hier eine Liste der zugeklappten Karten, und damit waren
+       alle acht gleichzeitig offen, bis man sie einzeln zuklappte. Man
+       bearbeitet aber immer nur eine Kategorie. Die anderen sieben nehmen
+       Platz weg und lenken ab, ohne dass man je an ihnen etwas tut.
+
+       Beim allerersten Öffnen der App steht „Einnahmen" offen. Acht
+       zugeklappte Karten und kein einziges Eingabefeld wären ein Rätsel
+       statt einer Einladung. */
+    offeneKategorie: "income",
     eigeneAffirmationen: [],  // nur deine selbst getippten; die 111 stehen im Programm
     sparziel: leeresSparziel(), // dein eines Ziel, auf das du zusparst
     zyklusStart: "",        // "" = noch nie gedrückt, sonst "2026-07-25"
@@ -1029,9 +1047,14 @@ function migriere(daten) {
     einstellungen: {
       wochenstunden: (stunden > 0 && stunden <= 80) ? stunden : 40,
       notgroschenStart: Math.max(0, Number(roheEinst.notgroschenStart) || 0),
-      // Nur Kategorie-Schlüssel durchlassen, die es wirklich gibt.
-      zugeklappt: (Array.isArray(roheEinst.zugeklappt) ? roheEinst.zugeklappt : [])
-        .filter(key => KATEGORIEN.some(kat => kat.key === key)),
+      /* Nur einen Kategorie-Schlüssel durchlassen, den es wirklich gibt.
+
+         Das alte Feld `zugeklappt` (eine Liste) wird nicht übernommen: Aus
+         „diese drei sind zu" lässt sich nicht ableiten, welche EINE offen
+         sein soll. Alte Stände starten deshalb mit allen Karten zu — ein
+         Antippen, und der Zustand steht wieder. */
+      offeneKategorie: KATEGORIEN.some(kat => kat.key === roheEinst.offeneKategorie)
+        ? roheEinst.offeneKategorie : "",
       /* Hier stehen NUR selbst getippte Sätze. Die 111 Vorschläge liegen im
          Programm und sind ohnehin immer da.
 
@@ -1296,8 +1319,6 @@ function rechne(monat, startUeberschreibung) {
     notwendigReal: 0,   nichtReal: 0,     // was wirklich abgeht
     faelligJetzt: [],                     // große Brocken DIESEN Monat
     faelligBald: [],                      // … und in den nächsten zwei
-    ruecklageProMonat: 0,                 // was du zurücklegen solltest
-    ruecklagePosten: [],                  // … und woraus sich diese Summe zusammensetzt
     ausnahmen: [],                        // alle Ausnahmen einzeln (für die Rangliste)
     notwendige: [],                       // Miete, Strom & Co. (als Vergleichsmaßstab)
     vertraege: [],                        // Abos + Versicherungen (Kündigungs-Blick)
@@ -1374,6 +1395,7 @@ function rechne(monat, startUeberschreibung) {
       if (kat.vertrag && betrag > 0) {
         z.vertraege.push({
           label: posten.label || "(ohne Namen)",
+          betrag: betrag,        // was auf der Rechnung steht, ungeteilt
           proMonat: umlage,
           proJahr: umlage * 12,
           notwendig: istNotwendig,
@@ -1384,16 +1406,6 @@ function rechne(monat, startUeberschreibung) {
 
       // Nur nicht-monatliche Posten sind eine Warnung wert.
       if (intervall > 1 && betrag > 0) {
-        z.ruecklageProMonat += umlage;
-        // Die Einzelteile mitnehmen, damit die Rücklagen-Karte die Rechnung
-        // zeigen kann und nicht nur das Ergebnis.
-        z.ruecklagePosten.push({
-          label: posten.label || "(ohne Namen)",
-          betrag: betrag,       // der volle Betrag, wie er auf der Rechnung steht
-          intervall: intervall, // durch wie viele Monate er geteilt wird
-          umlage: umlage,       // sein Anteil an einem einzelnen Monat
-          rhythmus: posten.rhythmus,
-        });
         const merker = {
           label: posten.label || "(ohne Namen)",
           betrag: betrag,
@@ -1907,6 +1919,14 @@ let sparzielAendernOffen = false;
 // … und für „Stimmt das nicht?" in der Kontostand-Karte.
 let ankerAendernOffen = false;
 
+/* Welcher Posten zeigt gerade seine Bedienelemente?
+
+   Häkchen und Pausieren-Knopf an jeder einzelnen Zeile machen aus einer
+   Liste mit acht Abos eine Wand aus Knöpfen. Beides gehört zu einem
+   Posten, den man GERADE bearbeitet — nicht zu allen gleichzeitig.
+   Deshalb: immer nur einer offen, und der bleibt es auch beim Neuzeichnen. */
+let offenerPosten = null;
+
 /* Welcher Satz ist heute dran?
 
    Wir zählen die Tage seit dem 1.1.1970 durch und teilen mit Rest durch die
@@ -2273,9 +2293,9 @@ function kategorieHtml(kat, z) {
   if (kat.typ === "positiv" || kat.typ === "sparen") summenKlasse = "summe-positiv";
   if (kat.typ === "nicht") summenKlasse = "summe-nicht";
 
-  const zeilen = liste.length === 0
-    ? `<p class="leer-hinweis">Noch nichts eingetragen.</p>`
-    : liste.map(p => postenHtml(kat, p, z)).join("");
+  // Eine leere Kategorie bleibt leer. „Noch nichts eingetragen" stand unter
+  // einer sichtbar leeren Liste und sagte ihr nur nach, was sie schon zeigt.
+  const zeilen = liste.map(p => postenHtml(kat, p, z)).join("");
 
   // Zweite Zeile im Hinzufügen-Formular: Häkchen und/oder Rhythmus.
   const extras = [];
@@ -2311,11 +2331,12 @@ function kategorieHtml(kat, z) {
   const zeitfeld = kat.zeitfeld ? wochenstundenHtml(z) : "";
 
   /* Jede Kategorie ist ein <details>-Element: Der Kopf bleibt immer sichtbar,
-     der Inhalt klappt darunter auf und zu. Das spart Platz, ohne dass du die
-     Übersicht verlierst — Summe und Anzahl stehen auch im eingeklappten
-     Zustand im Kopf.
-     Welche Karten zu sind, merkt sich die App in den Einstellungen. */
-  const offen = !STATE.einstellungen.zugeklappt.includes(kat.key);
+     der Inhalt klappt darunter auf und zu. Das kostet nichts an Übersicht —
+     Titel, Anzahl und Summe stehen auch im zugeklappten Kopf.
+
+     Offen ist immer nur EINE: die, die du zuletzt angetippt hast. Öffnest du
+     die nächste, klappt die vorige von allein zu. */
+  const offen = STATE.einstellungen.offeneKategorie === kat.key;
   // „Posten" ist Buchhalter-Sprache. Im Kartenkopf steht deshalb „Eintrag".
   const anzahl = liste.length === 1 ? "1 Eintrag" : `${liste.length} Einträge`;
 
@@ -2403,24 +2424,40 @@ function monatsOptionen(aktuell) {
    Weiter zurück als der laufende Monat geht nicht: Eine Pause, die schon
    vorbei ist, wäre keine. */
 function pauseMonatsOptionen(aktuell) {
-  const opts = [];
-  for (let i = 0; i < 12; i++) {
-    const id = monatPlus(STATE.currentMonth.id, i);
-    opts.push(`<option value="${id}" ${id === aktuell ? "selected" : ""}>${monatKurz(id)}</option>`);
-  }
-  return opts.join("");
+  const [jahr, monat] = String(STATE.currentMonth.id).split("-").map(Number);
+  const ids = [];
+  // Nur bis Dezember dieses Jahres: Die App rechnet in Monaten dieses Jahres,
+  // und eine Liste, die in den nächsten Januar läuft, behauptet etwas anderes.
+  for (let m = monat; m <= 12; m++) ids.push(monatPlus(STATE.currentMonth.id, m - monat));
+  /* Ein früher gewählter Monat im Folgejahr würde sonst still auf den ersten
+     Eintrag springen. Er kommt ans Ende der Liste — mit Jahreszahl, damit man
+     sieht, warum er aus der Reihe fällt. */
+  if (aktuell && !ids.includes(aktuell)) ids.push(aktuell);
+  return ids.map(id =>
+    `<option value="${id}" ${id === aktuell ? "selected" : ""}>${monatKurz(id)}</option>`
+  ).join("");
 }
 
-// HTML für eine einzelne Posten-Zeile.
+/* HTML für eine einzelne Posten-Zeile.
+
+   Zwei Reihen unter dem Betrag, und die Trennung ist der Punkt:
+
+   `meta`      — was der Posten IST: sein Rhythmus, sein Zeitpreis, was er
+                 am Sparziel verschiebt. Steht immer da, man liest es beim
+                 Überfliegen.
+   `bedienung` — was man am Posten TUN kann: als notwendig markieren,
+                 pausieren. Erscheint nur an dem Posten, den man gerade
+                 angetippt hat. */
 function postenHtml(kat, p, z) {
-  // Alles, was unter die Betrags-Zeile gehört (Häkchen, Rhythmus, Arbeitszeit).
   const meta = [];
+  const bedienung = [];
   const betrag = Number(p.amount) || 0;
   const pausiert = kat.wiederkehrend && istPausiert(p, STATE.currentMonth.id);
+  const offen = offenerPosten === p.id;
 
   if (schalterZeigen(kat)) {
     const feld = kat.schalter.feld;
-    meta.push(`<label class="schalter">
+    bedienung.push(`<label class="schalter">
       <input type="checkbox" data-field="${feld}" data-cat="${kat.key}" data-id="${p.id}" ${p[feld] ? "checked" : ""}>
       ${kat.schalter.text}
     </label>`);
@@ -2435,21 +2472,20 @@ function postenHtml(kat, p, z) {
     if (intervall > 1) {
       meta.push(`<span class="rhythmus-schild">${RHYTHMUS_TEXT[p.rhythmus]} · ab ${MONATE_KURZ[(p.faellig || 1) - 1]}</span>`);
       // Der Satz, der den Schock nimmt: was das pro Monat bedeutet.
-      meta.push(`<span class="umlage-hinweis">= ${euro(betrag / intervall)} / Monat</span>`);
+      meta.push(`<span class="umlage-hinweis">= ${euro(betrag / intervall)} im Monat</span>`);
     }
 
     /* Die Pause-Bedienung. Zwei Zustände, und beide zeigen sofort, was gilt:
        Läuft der Posten, steht dort ein Knopf zum Pausieren. Ruht er, steht
        dort bis wann — änderbar, ohne den Posten zu löschen und neu anzulegen. */
     if (pausiert) {
-      meta.push(`<span class="pause-schild">⏸ pausiert bis ${monatKurz(p.pausiertBis)}</span>`);
-      meta.push(`<label class="mini-label">bis
+      bedienung.push(`<label class="mini-label pause-schild">⏸ pausiert bis
         <select class="mini-auswahl" data-pause-bis data-cat="${kat.key}" data-id="${p.id}">${pauseMonatsOptionen(p.pausiertBis)}</select>
       </label>`);
-      meta.push(`<button type="button" class="mini-knopf" data-pause-aus
+      bedienung.push(`<button type="button" class="mini-knopf" data-pause-aus
         data-cat="${kat.key}" data-id="${p.id}">läuft wieder</button>`);
     } else {
-      meta.push(`<button type="button" class="mini-knopf" data-pause-an
+      bedienung.push(`<button type="button" class="mini-knopf" data-pause-an
         data-cat="${kat.key}" data-id="${p.id}">⏸ pausieren</button>`);
     }
   }
@@ -2469,10 +2505,17 @@ function postenHtml(kat, p, z) {
     if (zs) meta.push(`<span class="ziel-schild">🎯 ${zs}</span>`);
   }
 
+  /* Die Bedienzeile steht immer im HTML und wird per CSS ein- und
+     ausgeblendet. Sie erst beim Antippen zu erzeugen hieße neu zeichnen,
+     und das Neuzeichnen würde den Cursor aus dem gerade angetippten
+     Eingabefeld werfen. */
   const metaZeile = meta.length ? `<div class="posten-meta">${meta.join("")}</div>` : "";
+  const bedienZeile = bedienung.length
+    ? `<div class="posten-bedienung">${bedienung.join("")}</div>` : "";
 
   return `
-    <div class="posten ${pausiert ? "posten-pausiert" : ""}">
+    <div class="posten ${pausiert ? "posten-pausiert" : ""} ${offen ? "posten-offen" : ""}"
+         data-posten="${p.id}">
       <div class="posten-zeile">
         <input type="text" value="${escapeAttr(p.label)}" placeholder="${kat.platzhalter}"
                data-field="label" data-cat="${kat.key}" data-id="${p.id}" />
@@ -2481,6 +2524,7 @@ function postenHtml(kat, p, z) {
         <button class="del" data-del data-cat="${kat.key}" data-id="${p.id}" title="löschen">✕</button>
       </div>
       ${metaZeile}
+      ${bedienZeile}
     </div>
   `;
 }
@@ -2516,39 +2560,12 @@ function renderFaellig(z) {
       ${z.faelligBald.map(e => zeile(e, " · im " + MONATSNAMEN[e.monatNr - 1])).join("")}
     </div>` : "";
 
-  // Die Rechnung hinter der Summe: jeder nicht-monatliche Posten mit seinem
-  // vollen Betrag, der Teilung und dem Anteil, der auf diesen Monat entfällt.
-  // Größter Anteil zuerst — der erklärt die Summe am meisten.
-  const aufschluesselung = [...z.ruecklagePosten]
-    .sort((a, b) => b.umlage - a.umlage)
-    .map(p => `
-      <div class="ruecklage-zeile">
-        <span class="ruecklage-name">${escapeAttr(p.label)}
-          <small>${euro(p.betrag)} ÷ ${p.intervall} Monate</small></span>
-        <span class="ruecklage-anteil">${euro(p.umlage)}</span>
-      </div>`).join("");
-
-  // Die Summenzeile lohnt sich erst ab zwei Posten. Bei einem einzigen stünde
-  // dieselbe Zahl sonst dreimal auf derselben Karte.
-  const summenzeile = z.ruecklagePosten.length > 1 ? `
-    <div class="ruecklage-summe">
-      <span>zusammen jeden Monat weglegen</span>
-      <span>${euro(z.ruecklageProMonat)}</span>
-    </div>` : "";
-
-  // Der Schritt, der aus Wissen Handeln macht: das Geld auch wirklich weglegen.
-  const ruecklage = z.ruecklageProMonat > 0 ? `
-    <div class="karte ruecklage-karte">
-      <h3 class="faellig-titel">🏦 Deine Rücklage für diesen Monat</h3>
-      <p class="ruecklage-betrag">${euro(z.ruecklageProMonat)}</p>
-      <div class="ruecklage-rechnung">
-        ${aufschluesselung}
-        ${summenzeile}
-      </div>
-      <p class="faellig-unter">Rechnen tut die App. Weglegen musst du selbst.</p>
-    </div>` : "";
-
-  ziel.innerHTML = jetzt + bald + ruecklage;
+  /* Hier stand einmal ein Rücklagen-Auftrag: „leg 8,08 € pro Monat weg".
+     Rechnerisch richtig, praktisch macht das niemand — für acht Euro
+     überweist man nichts auf ein zweites Konto. Was hilft, ist die
+     Erinnerung, dass der Posten DIESEN Monat dran ist, und die steht
+     schon oben in „Diesen Monat geht zusätzlich ab". */
+  ziel.innerHTML = jetzt + bald;
 }
 
 /* --- 11e. Kündigungs-Blick: was kostet dich das im JAHR? --- */
@@ -2560,17 +2577,30 @@ function renderVertraege(z) {
     return;
   }
 
+  /* Die Zeile sagt jede Sache genau einmal — und sagt sie so, wie sie abgeht.
+
+     „108,00 € / Monat · monatlich" stand doppelt da, und „im Jahr" stand an
+     jeder der zehn Zeilen, obwohl die Überschrift und die Summe darunter von
+     nichts anderem reden.
+
+     Vor allem aber log die Zeile bei nicht-monatlichen Verträgen: „7,00 €
+     im Monat · alle 3 Monate" nennt einen Betrag, der so nie abgebucht wird.
+     Dort steht jetzt der Betrag, der wirklich kommt, mit seinem Takt:
+     „21,00 € alle 3 Monate". */
   const zeilen = z.vertraege.map(v => {
     const zp = massstab(v.proJahr, z);
+    const takt = v.rhythmus === "monatlich"
+      ? `${euro(v.proMonat)} im Monat`
+      : `${euro(v.betrag)} ${RHYTHMUS_TEXT[v.rhythmus]}`;
     return `
       <div class="vertrag-zeile ${v.notwendig ? "" : "kandidat"}">
         <div class="vertrag-name">
           ${escapeAttr(v.label)}
           ${v.notwendig ? "" : `<span class="kandidat-schild">kündigen?</span>`}
-          <small>${euro(v.proMonat)} / Monat · ${RHYTHMUS_TEXT[v.rhythmus]}</small>
+          <small>${takt}</small>
         </div>
         <div class="vertrag-jahr">
-          ${euro(v.proJahr)}<small>im Jahr${zp ? ` · ${zp}` : ""}</small>
+          ${euro(v.proJahr)}${zp ? `<small>${zp}</small>` : ""}
         </div>
       </div>
     `;
@@ -2681,12 +2711,6 @@ function renderKonto(z, kette, zy) {
       <span class="konto-betrag">${euro(betrag)}</span>
     </div>`;
 
-  // Nur zeigen, wenn Umlage und echte Abbuchung auseinandergehen.
-  const echtZeile = z.hatUmlage
-    ? `<p class="konto-fussnote">Oben steht, was <strong>wirklich</strong> abgeht (${euro(z.ausgegebenReal)}).
-         Die Übersicht darunter verteilt Jahresrechnungen auf alle Monate (${euro(z.ausgegebenUmlage)}).</p>`
-    : "";
-
   // Was diesen Monat pausiert und deshalb in keiner Zeile oben auftaucht.
   const pauseZeile = z.pausiertSumme > 0
     ? `<p class="konto-pause">⏸ Pausiert: ${z.pausiert.map(p => escapeAttr(p.label)).join(", ")}.
@@ -2718,7 +2742,6 @@ function renderKonto(z, kette, zy) {
       <p class="konto-fussnote"><strong>Vorschau</strong> aufs Monatsende: Hier ist schon abgezogen,
         was erst noch abgebucht wird. Deine Bank zeigt heute eine andere Zahl.</p>
       ${pauseZeile}
-      ${echtZeile}
     </div>
   `;
 }
@@ -2739,24 +2762,16 @@ function renderUebersicht(z) {
     </div>
   `;
 
-  /* Die Zahlenzeilen nennen bewusst KEINE Prozente mehr.
-
-     Sie standen hier, und der Anteil steht im Diagramm darüber und in den
-     Regel-Balken darunter ohnehin. Dreimal dieselbe Prozentzahl auf einer
-     Karte liest niemand als drei Aussagen — man liest sie als Rauschen. Hier
-     ist der Euro-Betrag das Neue, und der bekommt jetzt die Zeile für sich. */
+  /* Hier standen einmal dieselben vier Euro-Beträge wie in der Kontostand-Karte
+     darüber — nur mit Jahresrechnungen auf die Monate verteilt und ohne Start-
+     guthaben. Zwei Tabellen mit denselben Zeilen und zwei verschiedenen End-
+     summen liest niemand als zwei Aussagen, man liest sie als Widerspruch.
+     Die Euro-Beträge stehen jetzt genau einmal, oben in der Kontostand-Karte.
+     Diese Karte beantwortet die andere Frage: wie das Geld aufgeteilt ist. */
   document.getElementById("uebersicht").innerHTML = `
     <h2 class="nr-titel">Monats-Übersicht</h2>
     <div class="karte uebersicht-karte">
       ${donutHtml(z)}
-
-      <div class="zahlenzeile"><span>Gehalt gesamt</span><span class="wert-positiv">${euro(z.gehalt)}</span></div>
-      <div class="zahlenzeile"><span>Notwendige Ausgaben</span><span>${euro(z.notwendigUmlage)}</span></div>
-      <div class="zahlenzeile"><span>Ausnahmen</span><span class="wert-nicht">${euro(z.nichtUmlage)}</span></div>
-      <div class="zahlenzeile"><span>Gespart</span><span class="wert-positiv">${euro(z.gespart)}</span></div>
-      <div class="zahlenzeile dick"><span><strong>Von diesem Monat noch frei</strong></span><span><strong>${euro(z.uebrig)}</strong></span></div>
-      <p class="zahlen-fussnote">Ohne dein Startguthaben, und mit Jahresrechnungen auf die Monate
-        verteilt. Was wirklich auf dem Konto bleibt, steht in der Karte darüber.</p>
 
       ${ranglisteHtml(z)}
 
@@ -3002,9 +3017,6 @@ function renderSparziel(z) {
     ziel.innerHTML = `
       <h2 class="nr-titel">Dein Sparziel</h2>
       <div class="karte sparziel-karte leer">
-        <p class="sparziel-text">Eine Sache, auf die du zusparst. Trag ein, was sie kostet,
-          und ich rechne dir aus, wann du da bist. Und wie viel früher, wenn ein Teil
-          deiner Ausnahmen stattdessen hierher geht.</p>
         ${felder(sz)}
       </div>
     `;
@@ -3354,13 +3366,14 @@ function renderModal() {
         <h2 id="modal-titel" class="modal-titel">Hey 💅</h2>
         <p class="modal-text">
           Ich bin die Freundin, die dir sagt, was dein Kontoauszug wirklich über dich denkt.
-          Vier Sätze, dann kannst du loslegen:
+          Fünf Sätze, dann kannst du loslegen:
         </p>
         <ol class="modal-liste">
           <li><strong>Einnahmen eintragen.</strong> Alles, was reinkommt: Gehalt, Bürgergeld, Unterhalt, Geschenke. Das Häkchen „dafür gearbeitet?“ nur da, wo du wirklich Stunden geleistet hast.</li>
           <li><strong>Fixkosten, Abos und Versicherungen einmal eintippen.</strong> Die wandern von allein in jeden neuen Monat.</li>
           <li><strong>Rhythmus setzen</strong>, wenn etwas nur vierteljährlich oder jährlich abgeht. Ich warne dich rechtzeitig vor.</li>
           <li><strong>Ausnahmen ehrlich eintragen.</strong> Sushi ist keine Lebensmittel-Kategorie, Schatz.</li>
+          <li><strong>Runde auf.</strong> Spart dir Geld und Kommastellen. (z.B. 14,44 € = 15 €)</li>
         </ol>
         <p class="modal-fuss">
           Deine Zahlen bleiben nur in diesem Browser. Kein Server, kein Konto, niemand außer dir sieht sie.
@@ -3577,23 +3590,62 @@ document.addEventListener("toggle", (e) => {
   if (!karte) return;
 
   const key = karte.dataset.kat;
-  const zu = STATE.einstellungen.zugeklappt;
-  const platz = zu.indexOf(key);
+  const bisher = STATE.einstellungen.offeneKategorie;
 
-  /* Nur speichern, wenn sich wirklich etwas geändert hat.
+  /* Die neu geöffnete Karte wird DIE offene, eine zugeklappte lässt keine
+     offen. Nur speichern, wenn sich wirklich etwas ändert: Der Browser meldet
+     "toggle" auch, wenn eine Karte beim Neuzeichnen frisch entsteht — sonst
+     schriebe jedes render() acht Mal umsonst. */
+  const neu = karte.open ? key : (bisher === key ? "" : bisher);
+  if (neu === bisher) return;
 
-     Wichtig: Der Browser meldet "toggle" auch dann, wenn eine Karte beim
-     Neuzeichnen frisch entsteht. Ohne diese Prüfung würde jedes render()
-     acht überflüssige Schreibvorgänge auslösen. */
-  let geaendert = false;
-  if (karte.open && platz >= 0) { zu.splice(platz, 1); geaendert = true; } // wieder offen
-  if (!karte.open && platz < 0) { zu.push(key);        geaendert = true; } // zugeklappt
+  STATE.einstellungen.offeneKategorie = neu;
+  speichern();
 
-  if (geaendert) speichern();
+  /* Die anderen sieben direkt im DOM zuklappen statt über render(): Ein
+     Neuzeichnen mitten im Aufklappen würde die Karte unter dem Finger
+     wegziehen und den Cursor aus einem offenen Eingabefeld werfen. */
+  if (neu) {
+    document.querySelectorAll("[data-kat]").forEach(el => {
+      if (el.dataset.kat !== neu) el.open = false;
+    });
+  }
 }, true);
 
 // Klicks: Löschen, Pause, Hilfe-Knopf, Willkommens-Fenster schließen
 document.addEventListener("click", (e) => {
+  /* Welcher Posten zeigt seine Bedienelemente? Der, den man gerade angetippt
+     hat — und nur der. Umgeschaltet wird direkt im DOM statt über render():
+     Neuzeichnen würde den Cursor aus dem angetippten Eingabefeld werfen.
+     Kein `return`, der Klick läuft danach ganz normal weiter. */
+  /* Eine Kategorie-Karte wurde am Kopf angetippt.
+
+     Der Zustand wird HIER gesetzt und nicht erst im "toggle"-Ereignis: Das
+     kommt asynchron, und ein render() dazwischen — ein getippter Buchstabe
+     genügt — läse noch die alte offene Kategorie und klappte die Karte
+     unter dem Finger wieder zu. */
+  const katKopf = e.target.closest("[data-kat] > summary");
+  if (katKopf) {
+    const karte = katKopf.parentElement;
+    // Das <details> wechselt seinen Zustand erst NACH diesem Klick.
+    const wirdOffen = !karte.open;
+    STATE.einstellungen.offeneKategorie = wirdOffen ? karte.dataset.kat : "";
+    speichern();
+    if (wirdOffen) {
+      document.querySelectorAll("[data-kat]").forEach(el => {
+        if (el !== karte) el.open = false;
+      });
+    }
+  }
+
+  const box = e.target.closest("[data-posten]");
+  const neuOffen = box ? box.dataset.posten : null;
+  if (neuOffen !== offenerPosten) {
+    offenerPosten = neuOffen;
+    document.querySelectorAll("[data-posten]").forEach(el =>
+      el.classList.toggle("posten-offen", el.dataset.posten === neuOffen));
+  }
+
   /* Den Anker des laufenden Monats auflösen: Er erbt wieder vom Vormonat.
      Damit ist auch ein falsch gesetzter Anker keine Sackgasse. */
   if (e.target.closest("#btn-anker-weg")) {

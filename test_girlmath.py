@@ -50,12 +50,25 @@ def karte(kat):
     return f'.karte:has(form[data-add="{kat}"])'
 
 
+def auf(page, kat):
+    """Die Karte dieser Kategorie aufklappen und ihren Selektor zurueckgeben.
+
+    Immer nur EINE Kategorie ist offen. Wer in einer Karte etwas pruefen oder
+    bedienen will, klappt sie vorher auf — genau wie eine Nutzerin.
+    """
+    el = page.locator(f'details[data-kat="{kat}"]')
+    if el.count() and el.get_attribute("open") is None:
+        el.locator("summary").click()
+    return f'.karte:has(form[data-add="{kat}"])'
+
+
 def add(page, kat, label, betrag, rhythmus=None, faellig=None, haken=None):
     """Traegt einen Posten ueber das Formular der Kategorie ein.
 
     `haken` bedient das Kategorie-Haekchen: bei Abos und Versicherungen
     „notwendig?", bei den Einnahmen „dafuer gearbeitet?".
     """
+    auf(page, kat)   # ihr Formular ist nur in der offenen Karte sichtbar
     form = page.locator(f'form[data-add="{kat}"]')
     form.locator("[data-add-label]").fill(label)
     form.locator("[data-add-amount]").fill(str(betrag))
@@ -69,6 +82,17 @@ def add(page, kat, label, betrag, rhythmus=None, faellig=None, haken=None):
         if box.is_checked() != haken:
             box.click()
     form.locator('button[type="submit"]').click()
+
+
+def oeffne(posten):
+    """Den Posten antippen.
+
+    Haekchen und Pausieren-Knopf erscheinen nur an dem Posten, den man
+    gerade bearbeitet — sonst waeren es bei acht Abos sechzehn Bedien-
+    elemente auf einem Schirm.
+    """
+    posten.locator('input[data-field="label"]').click()
+    return posten
 
 
 def setze(page, selektor, wert):
@@ -136,19 +160,23 @@ with sync_playwright() as p:
            page.locator(".verdikt .prozent").inner_text().split("%")[0], "19")
     pruefe("Verdikt-Stufe 1", page.locator(".verdikt.v1").count(), 1)
 
-    zahlen = page.locator(".uebersicht-karte .zahlenzeile").all_inner_texts()
-    print("  Uebersicht:", [z.replace("\n", " ") for z in zahlen])
-    pruefe("Notwendig umgelegt 1.188", any("1.188,00" in z for z in zahlen), True)
-    pruefe("Ausnahmen 370", any("370,00" in z for z in zahlen), True)
+    # Die Euro-Betraege stehen genau EINMAL, in der Kontostand-Karte, und zwar
+    # als echte Abbuchung: 800 + 58 + 300 + 360 (volle Kfz-Rechnung) = 1.518.
+    konto = page.locator(".konto-karte .konto-rechnung").inner_text()
+    print("  Kontostand-Karte:", konto.replace("\n", " "))
+    pruefe("Notwendig echt 1.518", "1.518,00" in konto, True)
+    pruefe("Ausnahmen 370", "370,00" in konto, True)
 
-    # Die Zahlenzeilen tragen NUR Euro-Betraege. Der Anteil steht im Diagramm
-    # darueber und in den Regel-Balken darunter — dreimal dieselbe Prozentzahl
-    # auf einer Karte liest niemand als drei Aussagen.
-    pruefe("Zahlenzeilen ohne Prozente", any("%" in z for z in zahlen), False)
-    # Und der Satz, der erklaert, warum diese Zahl eine andere ist als der
-    # Kontostand in der Karte darueber.
-    fussnote = page.locator(".uebersicht-karte .zahlen-fussnote").inner_text()
-    pruefe("Fussnote nennt das Startguthaben", "Startguthaben" in fussnote, True)
+    # Die Uebersicht wiederholt diese Betraege NICHT mehr. Zwei Tabellen mit
+    # denselben Zeilen und zwei verschiedenen Endsummen las niemand als zwei
+    # Aussagen — man las sie als Widerspruch.
+    pruefe("Uebersicht ohne zweite Tabelle",
+           page.locator(".uebersicht-karte .zahlenzeile").count(), 0)
+    pruefe("Uebersicht ohne Erklaer-Fussnote",
+           page.locator(".uebersicht-karte .zahlen-fussnote").count(), 0)
+    # Und die Kontostand-Karte muss den Unterschied nicht mehr wegerklaeren.
+    pruefe("Keine Umlage-Erklaerung mehr in der Kontostand-Karte",
+           "verteilt Jahresrechnungen" in page.locator(".konto-karte").inner_text(), False)
 
     print("\n=== 5. Prozente UND Kontostand, aber jede Zahl nur an EINER Stelle ===")
     # Dieser Monat ist der Beweisfall: 19% Ausnahmen (also unter der Marke),
@@ -182,20 +210,20 @@ with sync_playwright() as p:
     print("\n=== 6. Lebenszeit aus Arbeitseinkommen ===")
     # 2000 EUR / (40 h * 4,3333 Wochen) = 11,54 EUR pro Stunde
     pruefe("Stundenlohn ausgewiesen",
-           norm(page.locator(f'{karte("income")} .umlage-hinweis').inner_text()),
+           norm(page.locator(f'{auf(page, "income")} .umlage-hinweis').inner_text()),
            "≈ 11,54 € pro Stunde")
     # 150 EUR Klamotten / 11,54 = 13 h
     pruefe("Zeit-Schild an der Ausnahme",
-           page.locator(f'{karte("konsum")} .zeit-schild').inner_text(), "⏱ 13 h Arbeit")
+           page.locator(f'{auf(page, "konsum")} .zeit-schild').inner_text(), "⏱ 13 h Arbeit")
     pruefe("kein Schild bei Lebensmitteln",
-           page.locator(f'{karte("lebensmittel")} .zeit-schild').count(), 0)
+           page.locator(f'{auf(page, "lebensmittel")} .zeit-schild').count(), 0)
     pruefe("Schild bei Netflix (nicht notwendig)",
-           page.locator(f'{karte("abos")} .zeit-schild').count(), 1)
-    setze(page, "#wochenstunden", 20)
+           page.locator(f'{auf(page, "abos")} .zeit-schild').count(), 1)
+    auf(page, "income"); setze(page, "#wochenstunden", 20)
     pruefe("Stundenlohn folgt den Wochenstunden",
-           norm(page.locator(f'{karte("income")} .umlage-hinweis').inner_text()),
+           norm(page.locator(f'{auf(page, "income")} .umlage-hinweis').inner_text()),
            "≈ 23,08 € pro Stunde")
-    setze(page, "#wochenstunden", 40)
+    auf(page, "income"); setze(page, "#wochenstunden", 40)
 
     print("\n=== 7. Rangliste der teuersten Ausnahmen ===")
     pruefe("drei Plaetze", page.locator(".rang-zeile").count(), 3)
@@ -205,29 +233,23 @@ with sync_playwright() as p:
     print("\n=== 8. Nicht-monatliche Posten: Rhythmus, Umlage, Warnung ===")
     pruefe("keine Rhythmus-Auswahl in den Zeilen", page.locator(".posten select").count(), 0)
     pruefe("Miete ohne Schild",
-           page.locator(f'{karte("fixkosten")} .rhythmus-schild').count(), 0)
+           page.locator(f'{auf(page, "fixkosten")} .rhythmus-schild').count(), 0)
     pruefe("Kfz zeigt Rhythmus und Monat",
-           page.locator(f'{karte("versicherungen")} .rhythmus-schild').inner_text(),
+           page.locator(f'{auf(page, "versicherungen")} .rhythmus-schild').inner_text(),
            "einmal im Jahr · ab Jul")
     # Achtung: .umlage-hinweis traegt auch der Stundenlohn oben — deshalb
     # gezielt in der Versicherungs-Karte nachsehen.
     pruefe("Umlage-Hinweis 30 EUR/Monat",
-           "30,00 € / Monat" in norm(
-               page.locator(f'{karte("versicherungen")} .umlage-hinweis').inner_text()), True)
+           "30,00 € im Monat" in norm(
+               page.locator(f'{auf(page, "versicherungen")} .umlage-hinweis').inner_text()), True)
+    # Die Erinnerung reicht: der Posten ist DIESEN Monat dran, mit vollem Betrag.
     pruefe("Warnung 'geht diesen Monat ab'", page.locator(".faellig-karte.jetzt").count(), 1)
-    pruefe("Ruecklagen-Karte", page.locator(".ruecklage-betrag").inner_text(), "30,00 €")
-    # Die Rechnung hinter der Summe steht offen da: voller Betrag, Teilung, Anteil.
-    pruefe("Aufschluesselung: eine Zeile", page.locator(".ruecklage-zeile").count(), 1)
-    pruefe("Aufschluesselung nennt den Posten",
-           page.locator(".ruecklage-zeile .ruecklage-name").inner_text().split("\n")[0],
-           "Kfz-Versicherung")
-    pruefe("Aufschluesselung zeigt die Teilung",
-           norm(page.locator(".ruecklage-zeile .ruecklage-name small").inner_text()),
-           "360,00 € ÷ 12 Monate")
-    pruefe("Aufschluesselung zeigt den Monatsanteil",
-           norm(page.locator(".ruecklage-zeile .ruecklage-anteil").inner_text()), "30,00 €")
-    pruefe("keine Summenzeile bei einem einzigen Posten",
-           page.locator(".ruecklage-summe").count(), 0)
+    jetzt = norm(page.locator(".faellig-karte.jetzt").inner_text())
+    pruefe("Warnung nennt den Posten", "Kfz-Versicherung" in jetzt, True)
+    pruefe("Warnung nennt den vollen Betrag", "360,00 €" in jetzt, True)
+    # Kein Rücklagen-Auftrag mehr. Fuer 30 Euro im Monat legt niemand Geld
+    # auf ein zweites Konto — die Erinnerung oben tut denselben Dienst.
+    pruefe("keine Ruecklagen-Karte", page.locator(".ruecklage-karte").count(), 0)
 
     print("\n=== 9. Kontostand rechnet mit echtem Geld — und zeigt die Rechnung ===")
     # real = 800 + 58 + 300 + 360 (Kfz voll!) + 370 = 1888 | 2000 - 1888 - 200 = -88
@@ -256,7 +278,9 @@ with sync_playwright() as p:
     # Banking-App und haelt die Abweichung fuer einen Rechenfehler.
     fuss = " ".join(page.locator(".konto-fussnote").all_inner_texts())
     pruefe("Vorschau wird erklaert", "Vorschau" in fuss, True)
-    pruefe("Umlage-Unterschied wird erklaert", "1.888,00" in norm(fuss), True)
+    # Die zweite Fussnote ist weg: Sie erklaerte den Unterschied zu einer
+    # Umlage-Tabelle, die es nicht mehr gibt.
+    pruefe("kein Umlage-Vergleich mehr", "1.888,00" in norm(fuss), False)
 
     print("\n=== 10. Kuendigungs-Blick nach Jahreskosten ===")
     # Ticket 58*12 = 696 | Kfz 30*12 = 360 | Netflix 20*12 = 240
@@ -295,24 +319,38 @@ with sync_playwright() as p:
     pruefe("Zahl in der Mitte", page.locator(".donut-zahl").text_content(), "19%")
     page.screenshot(path=f"{SHOTS}/02-voll.png", full_page=True)
 
-    print("\n=== 14. Karten ein- und ausklappen ===")
+    print("\n=== 14. Karten ein- und ausklappen: immer nur EINE offen ===")
     k = page.locator('details[data-kat="luxus"]')
     pruefe("acht Klappkarten", page.locator("details[data-kat]").count(), 8)
-    pruefe("standardmaessig offen", k.get_attribute("open") is not None, True)
+    # Zugeklappt ist der Normalzustand: Man bearbeitet immer nur eine Kategorie,
+    # also steht hoechstens eine Karte offen.
+    pruefe("hoechstens eine Karte offen",
+           page.locator("details[data-kat][open]").count() <= 1, True)
     # „Posten" ist Buchhalter-Sprache und steht nirgends mehr in der Oberflaeche.
     pruefe("Anzahl im Kopf", k.locator(".karte-anzahl").inner_text(), "1 Eintrag")
     pruefe("das Wort Posten kommt nirgends vor",
            "Posten" in page.locator(".wrap").inner_text(), False)
-    k.locator("summary").click()
-    pruefe("zugeklappt", k.get_attribute("open") is None, True)
     pruefe("Summe bleibt sichtbar", k.locator(".karte-summe").is_visible(), True)
     pruefe("Inhalt verborgen", k.locator(".posten-liste").is_visible(), False)
+
+    k.locator("summary").click()
+    pruefe("aufgeklappt", k.get_attribute("open") is not None, True)
+    pruefe("Inhalt sichtbar", k.locator(".posten-liste").is_visible(), True)
+
+    # Die naechste Karte oeffnen laesst die vorige von allein zuklappen.
+    page.locator('details[data-kat="abos"] summary').click()
     page.wait_for_timeout(200)   # das toggle-Ereignis wird asynchron zugestellt
+    pruefe("die vorige klappt von allein zu", k.get_attribute("open") is None, True)
+    pruefe("und nur eine ist offen",
+           page.locator("details[data-kat][open]").count(), 1)
+
     page.reload()
     page.wait_for_selector(".verdikt")
-    pruefe("bleibt nach dem Neuladen zu",
-           page.locator('details[data-kat="luxus"]').get_attribute("open") is None, True)
-    page.locator('details[data-kat="luxus"] summary').click()
+    pruefe("die offene bleibt nach dem Neuladen offen",
+           page.locator('details[data-kat="abos"]').get_attribute("open") is not None, True)
+    pruefe("und die anderen bleiben zu",
+           page.locator("details[data-kat][open]").count(), 1)
+    page.locator('details[data-kat="abos"] summary').click()
 
     print("\n=== 15. Monatsbericht als PDF ===")
     pruefe("am Bildschirm unsichtbar", page.locator("#bericht").is_visible(), False)
@@ -336,13 +374,13 @@ with sync_playwright() as p:
     page.wait_for_selector(".archiv-eintrag")
 
     pruefe("neuer Monat ist August", "August 2026" in page.locator(".monat-zeile").inner_text(), True)
-    pruefe("Fixkosten mitgenommen", page.locator(f'{karte("fixkosten")} .posten').count(), 1)
-    pruefe("Abos mitgenommen", page.locator(f'{karte("abos")} .posten').count(), 2)
-    pruefe("Versicherung mitgenommen", page.locator(f'{karte("versicherungen")} .posten').count(), 1)
-    pruefe("Ausnahmen NICHT mitgenommen", page.locator(f'{karte("luxus")} .posten').count(), 0)
-    pruefe("Einnahmen NICHT mitgenommen", page.locator(f'{karte("income")} .posten').count(), 0)
+    pruefe("Fixkosten mitgenommen", page.locator(f'{auf(page, "fixkosten")} .posten').count(), 1)
+    pruefe("Abos mitgenommen", page.locator(f'{auf(page, "abos")} .posten').count(), 2)
+    pruefe("Versicherung mitgenommen", page.locator(f'{auf(page, "versicherungen")} .posten').count(), 1)
+    pruefe("Ausnahmen NICHT mitgenommen", page.locator(f'{auf(page, "luxus")} .posten').count(), 0)
+    pruefe("Einnahmen NICHT mitgenommen", page.locator(f'{auf(page, "income")} .posten').count(), 0)
     pruefe("Rhythmus mitgenommen",
-           page.locator(f'{karte("versicherungen")} .rhythmus-schild').inner_text(),
+           page.locator(f'{auf(page, "versicherungen")} .rhythmus-schild').inner_text(),
            "einmal im Jahr · ab Jul")
     zusammenfassung = page.evaluate("JSON.stringify(STATE.archive[0].summary)")
     pruefe("Archiv-Zusammenfassung ist gefuellt", "quoteNicht" in zusammenfassung, True)
@@ -393,15 +431,20 @@ with sync_playwright() as p:
     pruefe("Prozente rechnen mit ALLEN Einnahmen",
            page.locator(".verdikt .prozent").inner_text().split("%")[0], "6")
     pruefe("kein Stundenlohn ohne Arbeitseinkommen",
-           page.locator(f'{karte("income")} .umlage-hinweis').count(), 0)
+           page.locator(f'{auf(page, "income")} .umlage-hinweis').count(), 0)
     pruefe("App erklaert das",
            "keinen Stundenlohn" in page.locator(".zeit-zeile").inner_text(), True)
     # Statt erfundener Arbeitsstunden vergleicht die App mit der groessten
-    # Rechnung (meist der Miete).
-    banner = page.locator(".verdikt-zeit").inner_text()
-    print("  Banner-Vergleich:", banner)
-    pruefe("keine Arbeitszeit behauptet", "gearbeitet" in banner, False)
-    pruefe("stattdessen Vergleich mit der Miete", "Miete" in banner, True)
+    # Rechnung (meist der Miete) — aber erst, wenn der Vergleich etwas sagt.
+    # 55 EUR Ausnahmen gegen 400 EUR Miete waeren „14% deiner Miete" gewesen:
+    # eine dritte Prozentzahl unter zwei anderen, mit einer dritten Bezugsgroesse.
+    pruefe("kein Prozent-Vergleich unter einer ganzen Miete",
+           page.locator(".verdikt-zeit").count(), 0)
+    pruefe("erst recht keine Arbeitszeit behauptet",
+           "gearbeitet" in page.locator(".verdikt").inner_text(), False)
+    # Steigen die Ausnahmen ueber die Miete, meldet sich der Vergleich wieder —
+    # dann aber als Vielfaches, und das versteht man ohne Nachrechnen.
+    # (Der Vielfachen-Fall selbst steht in Abschnitt 33.)
     # 863 rein, 400 Miete + 55 Ausnahmen raus = 408
     pruefe("Kontostand rechnet trotzdem",
            norm(page.locator(".konto-zeile.ergebnis .konto-betrag").inner_text()), "408,00 €")
@@ -421,10 +464,10 @@ with sync_playwright() as p:
     add(page, "income", "Minijob", 500, haken=True)
     # 500 / (40 * 4,3333) = 2,88 EUR pro Stunde
     pruefe("Stundenlohn nur aus dem Minijob",
-           norm(page.locator(f'{karte("income")} .umlage-hinweis').inner_text()),
+           norm(page.locator(f'{auf(page, "income")} .umlage-hinweis').inner_text()),
            "≈ 2,88 € pro Stunde")
     pruefe("Grundlage wird genannt",
-           "500,00" in norm(page.locator(f'{karte("income")} .feld-hinweis').inner_text()), True)
+           "500,00" in norm(page.locator(f'{auf(page, "income")} .feld-hinweis').inner_text()), True)
     # Einnahmen gesamt 1363, Ausnahmen 55 -> 4,0% -> 4%
     pruefe("Prozente weiter auf ALLEN Einnahmen",
            page.locator(".verdikt .prozent").inner_text().split("%")[0], "4")
@@ -522,25 +565,24 @@ with sync_playwright() as p:
 
     page.screenshot(path=f"{SHOTS}/04-migriert.png", full_page=True)
 
-    print("\n=== 25. Ruecklage: mehrere Posten ergeben eine Summe ===")
+    print("\n=== 25. Mehrere grosse Brocken im selben Monat ===")
     neu_starten(page)
     # Den laufenden Monat aus der Seite holen, damit der Test in jedem Monat
     # des Jahres funktioniert und nicht nur im Juli.
     dieser_monat = page.evaluate("new Date().getMonth() + 1")
     add(page, "income", "Gehalt", 2000, haken=True)
-    # 360 im Jahr -> 30 pro Monat | 120 alle 3 Monate -> 40 pro Monat | zusammen 70
+    # Beide sind DIESEN Monat faellig: 360 + 120 = 480 gehen wirklich ab.
     add(page, "versicherungen", "Kfz", 360, rhythmus="jaehrlich",
         faellig=dieser_monat, haken=True)
     add(page, "abos", "Fitness", 120, rhythmus="vierteljaehrlich",
         faellig=dieser_monat, haken=False)
-    pruefe("Summe aus zwei Posten", page.locator(".ruecklage-betrag").inner_text(), "70,00 €")
-    pruefe("zwei Zeilen in der Aufschluesselung", page.locator(".ruecklage-zeile").count(), 2)
-    pruefe("groesster Anteil steht oben",
-           page.locator(".ruecklage-zeile").first.locator(".ruecklage-anteil").inner_text(),
-           "40,00 €")
-    pruefe("Summenzeile taucht ab zwei Posten auf",
-           norm(page.locator(".ruecklage-summe").inner_text()).replace("\n", " "),
-           "zusammen jeden Monat weglegen 70,00 €")
+    jetzt = norm(page.locator(".faellig-karte.jetzt").inner_text())
+    pruefe("beide Posten stehen in der Warnung",
+           "Kfz" in jetzt and "Fitness" in jetzt, True)
+    pruefe("volle Betraege, nicht die Monatsanteile",
+           "360,00 €" in jetzt and "120,00 €" in jetzt, True)
+    pruefe("Summe der echten Abbuchungen", "480,00 €" in jetzt, True)
+    pruefe("kein Ruecklagen-Auftrag mehr", page.locator(".ruecklage-karte").count(), 0)
     page.screenshot(path=f"{SHOTS}/05-ruecklage.png", full_page=True)
 
     print("\n=== 26. Affirmationen: fest im Programm, eigene obendrauf ===")
@@ -621,7 +663,7 @@ with sync_playwright() as p:
     pruefe("ohne Ziel steht die Einladung da", page.locator(".sparziel-karte.leer").count(), 1)
     add(page, "sparen", "Ruecklage", 100)
     pruefe("ohne Ziel kein Haekchen, weder am Posten noch im Formular",
-           page.locator(f'{karte("sparen")} .schalter').count(), 0)
+           page.locator(f'{auf(page, "sparen")} .schalter').count(), 0)
 
     add(page, "income", "Gehalt", 2000, haken=True)
     add(page, "fixkosten", "Miete", 800)
@@ -637,11 +679,12 @@ with sync_playwright() as p:
     pruefe("Zielbetrag", norm(page.locator(".sparziel-summe").inner_text()), "2.000,00 €")
     pruefe("noch nichts dafuer zurueckgelegt", norm(page.locator(".sparziel-ist").inner_text()), "0,00 €")
     pruefe("jetzt gibt es das Haekchen am Posten",
-           page.locator(f'{karte("sparen")} .posten .schalter').count(), 1)
+           page.locator(f'{auf(page, "sparen")} .posten .schalter').count(), 1)
 
     # 200 EUR fuers Ziel weglegen — der Posten wandert damit aus dem Notgroschen raus.
     add(page, "sparen", "Reisekasse", 200)
-    page.locator(f'{karte("sparen")} .posten:has(input[value="Reisekasse"]) .schalter input').click()
+    oeffne(page.locator(f'{auf(page, "sparen")} .posten:has(input[value="Reisekasse"])'))
+    page.locator(f'{auf(page, "sparen")} .posten:has(input[value="Reisekasse"]) .schalter input').click()
     pruefe("Ziel-Sparen zaehlt zum Ziel", norm(page.locator(".sparziel-ist").inner_text()), "200,00 €")
     pruefe("und NICHT mehr zum Notgroschen",
            norm(page.locator(".notgroschen-ist").inner_text()), "100,00 €")
@@ -679,7 +722,7 @@ with sync_playwright() as p:
 
     # Das Ziel-Schild am Posten: 300 / 200 = 1,5 -> gerundet 2 Monate
     pruefe("Ziel-Schild am Ausnahme-Posten",
-           page.locator(f'{karte("luxus")} .ziel-schild').inner_text().strip(),
+           page.locator(f'{auf(page, "luxus")} .ziel-schild').inner_text().strip(),
            "🎯 2 Monate später: Lissabon")
 
     # Der Notgroschen-Vorrang steht da, solange der Puffer nicht steht.
@@ -714,7 +757,7 @@ with sync_playwright() as p:
     pruefe("Gespartes gehoert wieder dem Notgroschen",
            norm(page.locator(".notgroschen-ist").inner_text()), "300,00 €")
     pruefe("und die Haekchen sind weg",
-           page.locator(f'{karte("sparen")} .schalter').count(), 0)
+           page.locator(f'{auf(page, "sparen")} .schalter').count(), 0)
 
     print("\n=== 28. Jedes Haekchen startet leer ===")
     neu_starten(page)
@@ -724,12 +767,13 @@ with sync_playwright() as p:
                page.locator(f'form[data-add="{kat}"] [data-add-schalter]').is_checked(), False)
         add(page, kat, "Testposten", 100)
         pruefe(f"{kat}: neuer Posten ohne Haken",
-               page.locator(f'{karte(kat)} .posten input[type="checkbox"]').is_checked(), False)
+               page.locator(f'{auf(page, kat)} .posten input[type="checkbox"]').is_checked(), False)
 
     # Ohne Haken kein Arbeitseinkommen: die App rechnet keinen Stundenlohn,
     # statt einen zu erfinden, den niemand bestaetigt hat.
     pruefe("kein Stundenlohn ohne Haken", page.locator("#wochenstunden").count(), 0)
-    page.locator(f'{karte("income")} .posten input[type="checkbox"]').click()
+    oeffne(page.locator(f'{auf(page, "income")} .posten'))
+    page.locator(f'{auf(page, "income")} .posten input[type="checkbox"]').click()
     pruefe("nach dem Antippen rechnet sie ihn", page.locator("#wochenstunden").count(), 1)
 
     print("\n=== 29. Sparziel: alte Staende und der Monatswechsel ===")
@@ -762,7 +806,8 @@ with sync_playwright() as p:
     pruefe("das Ziel startet bei null", norm(page.locator(".sparziel-ist").inner_text()), "0,00 €")
 
     # Monatswechsel: die getrennten Summen landen im Archiv und werden weitergezaehlt.
-    page.locator(f'{karte("sparen")} .posten:has(input[value="Rücklage"]) .schalter input').click()
+    oeffne(page.locator(f'{auf(page, "sparen")} .posten:has(input[value="Rücklage"])'))
+    page.locator(f'{auf(page, "sparen")} .posten:has(input[value="Rücklage"]) .schalter input').click()
     pruefe("umgehaengt aufs Ziel", norm(page.locator(".sparziel-ist").inner_text()), "150,00 €")
     page.click("#btn-monat-abschliessen")
     pruefe("nach dem Abschluss zaehlt das Ziel weiter",
@@ -911,7 +956,7 @@ with sync_playwright() as p:
       speichern(); render();
     }""")
     pruefe("ein Eintrag, keine Einträge",
-           page.locator(f'{karte("luxus")} .karte-anzahl').inner_text(), "1 Eintrag")
+           page.locator(f'{auf(page, "luxus")} .karte-anzahl').inner_text(), "1 Eintrag")
     pruefe("ein Vertrag, keine Verträge",
            "für einen Vertrag, den du" in norm(page.locator(".vertrag-fazit").inner_text()), True)
 
@@ -945,21 +990,26 @@ with sync_playwright() as p:
 
     print("\n=== 33. Der Vergleich bleibt deutsch, egal wie die Rechnung heisst ===")
     # Du tippst den Namen selbst ein, und deutsche Grammatik haengt am
-    # Geschlecht des Wortes: „28% deiner Miete" stimmt, „28% deiner Strom" nicht.
+    # Geschlecht des Wortes: „2,0× deine Miete" stimmt, „2,0× deine Strom" nicht.
     grammatik = page.evaluate("""() => {
       const proben = ["Miete", "Wohnung", "Strom", "Kredit", "Auto", "Leasing Nr. 2"];
-      return proben.map(n => n + " -> " + mietenText(220, { label: n, betrag: 780 }));
+      return proben.map(n => n + " -> " + mietenText(1560, { label: n, betrag: 780 }));
     }""")
     for zeile in grammatik:
         print("   ", zeile)
     pruefe("bekannte weibliche Namen kurz",
-           page.evaluate('mietenText(220, {label:"Miete", betrag:780})'), "28% deiner Miete")
+           page.evaluate('mietenText(1560, {label:"Miete", betrag:780})'), "2,0× deine Miete")
     pruefe("alles andere ueber „Rechnung fuer“",
-           page.evaluate('mietenText(220, {label:"Strom", betrag:780})'),
-           "28% deiner Rechnung für Strom")
-    pruefe("auch beim Vielfachen",
+           page.evaluate('mietenText(1560, {label:"Strom", betrag:780})'),
+           "2,0× deine Rechnung für Strom")
+    pruefe("auch beim krummen Vielfachen",
            page.evaluate('mietenText(900, {label:"Auto", betrag:780})'),
            "1,2× deine Rechnung für Auto")
+    # Unterhalb einer ganzen Miete schweigt der Vergleich. Frueher stand hier
+    # „28% deiner Miete" — direkt unter der Prozentzahl des Banners, die den
+    # Anteil am Gehalt misst. Zwei Prozentzeichen, zwei Bezugsgroessen.
+    pruefe("unter einer ganzen Miete kein Prozent-Vergleich",
+           page.evaluate('mietenText(220, {label:"Miete", betrag:780})'), "")
     # Der „zweite Miete"-Spruch braucht ein weibliches Wort und faellt sonst aus.
     pruefe("Spruch faellt aus, wenn er nicht passt",
            page.evaluate("""VERDIKTE[2].sprueche[2]({
@@ -996,7 +1046,7 @@ with sync_playwright() as p:
     add(page, "abos", "Netflix", 20, rhythmus="monatlich", haken=False)
 
     def posten_von(kat, label):
-        return page.locator(f'{karte(kat)} .posten:has(input[value="{label}"])')
+        return page.locator(f'{auf(page, kat)} .posten:has(input[value="{label}"])')
 
     gym = posten_von("abos", "Gym")
     # Vorher: Ausnahmen 40 + 20 = 60 -> 3% | Kontostand 2000 - 800 - 60 = 1140
@@ -1007,14 +1057,24 @@ with sync_playwright() as p:
     pruefe("Gym steht im Kuendigungs-Blick",
            any("Gym" in n for n in page.locator(".vertrag-name").all_inner_texts()), True)
 
-    gym.locator("[data-pause-an]").click()
+    oeffne(gym).locator("[data-pause-an]").click()
 
     # Nachher: nur noch Netflix zaehlt -> 20/2000 = 1% | 2000 - 800 - 20 = 1180
     pruefe("Posten sichtbar als pausiert", gym.locator(".pause-schild").count(), 1)
     pruefe("Zeile als pausiert markiert",
-           page.locator(f'{karte("abos")} .posten-pausiert').count(), 1)
+           page.locator(f'{auf(page, "abos")} .posten-pausiert').count(), 1)
+    # Schild und Auswahl sind EIN Element: „⏸ pausiert bis [Jul]". Der Monat
+    # steht genau einmal da, und ohne Jahreszahl — die Auswahl reicht ohnehin
+    # nur bis Dezember dieses Jahres.
+    pruefe("Schild sagt den Monat nicht ein zweites Mal",
+           norm(gym.locator(".pause-schild").inner_text()).split("\n")[0],
+           "⏸ pausiert bis")
     pruefe("Pause laeuft bis zum laufenden Monat",
-           norm(gym.locator(".pause-schild").inner_text()), "⏸ pausiert bis Jul 26")
+           gym.locator("[data-pause-bis]").input_value(), "2026-07")
+    pruefe("Auswahl ohne Jahreszahl",
+           gym.locator("[data-pause-bis] option").first.inner_text(), "Jul")
+    pruefe("Auswahl endet im Dezember",
+           gym.locator("[data-pause-bis] option").count(), 6)
     pruefe("nach der Pause: 1% Ausnahmen",
            page.locator(".verdikt .prozent").inner_text().split("%")[0], "1")
     pruefe("nach der Pause: Kontostand 1.180",
@@ -1024,7 +1084,7 @@ with sync_playwright() as p:
            any("Gym" in n for n in page.locator(".vertrag-name").all_inner_texts()), False)
     # Auch der Kartenkopf zaehlt nur noch, was laeuft: 20 statt 59,90.
     pruefe("Kartenkopf zaehlt das ruhende Abo nicht mit",
-           norm(page.locator(f'{karte("abos")} .karte-summe').inner_text()), "20,00 €")
+           norm(page.locator(f'{auf(page, "abos")} .karte-summe').inner_text()), "20,00 €")
     pruefe("Kontostand-Karte weist die Pause aus",
            "40,00 €" in norm(page.locator(".konto-pause").inner_text()), True)
     pruefe("Pause nennt den Posten beim Namen",
@@ -1032,8 +1092,8 @@ with sync_playwright() as p:
 
     # Pause verlaengern: bis September, dann ueberlebt sie einen Monatswechsel.
     gym.locator("[data-pause-bis]").select_option("2026-09")
-    pruefe("Pause bis September", norm(gym.locator(".pause-schild").inner_text()),
-           "⏸ pausiert bis Sep 26")
+    pruefe("Pause bis September",
+           gym.locator("[data-pause-bis]").input_value(), "2026-09")
 
     with page.expect_download(timeout=15000):
         page.click("#btn-monat-abschliessen")
@@ -1055,10 +1115,10 @@ with sync_playwright() as p:
            page.evaluate('STATE.currentMonth.abos.find(p => p.label === "Gym").pausiertBis'), "")
 
     # Von Hand wieder aktivieren
-    gym.locator("[data-pause-an]").click()
+    oeffne(gym).locator("[data-pause-an]").click()
     gym = posten_von("abos", "Gym")
     pruefe("wieder pausiert", gym.locator(".pause-schild").count(), 1)
-    gym.locator("[data-pause-aus]").click()
+    oeffne(gym).locator("[data-pause-aus]").click()
     gym = posten_von("abos", "Gym")
     pruefe("Knopf 'laeuft wieder' hebt die Pause auf", gym.locator(".pause-schild").count(), 0)
 
