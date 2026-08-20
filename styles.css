@@ -1357,6 +1357,123 @@ body.bearbeitung-offen .archiv-weg { display: none; }
 }
 
 /* ============================================================
+   Der Notwendig-Blick: was in dieser Schublade liegt
+
+   Aufbau wie beim Kündigungs-Blick — eine Zeile pro Posten, Name links,
+   Betrag rechts. Der Unterschied steckt in der Auszeichnung: Posten, die
+   nur durch ein Häkchen hier stehen, bekommen ein pinkes Schild. Sie sind
+   die einzigen, an denen eine Entscheidung hängt.
+   ============================================================ */
+.notwendig-zeile {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 9px 0;
+  border-top: 1px dashed var(--linie);
+  font-size: 14px;
+}
+.notwendig-zeile:first-of-type { border-top: none; }
+
+.notwendig-name { font-weight: 700; }
+.notwendig-name small {
+  display: block;
+  font-weight: 600;
+  font-size: 11px;
+  color: var(--braun-weich);
+  margin-top: 2px;
+}
+
+/* Das Schild an den selbst angehakten Posten. Pink statt rot: Es ist keine
+   Warnung, sondern ein Hinweis darauf, wer hier entschieden hat. */
+.selbst-schild {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--pink);
+  background: var(--pink-weich);
+  border-radius: 999px;
+  padding: 2px 8px;
+  margin-left: 6px;
+  vertical-align: 1px;
+}
+
+.notwendig-wert {
+  text-align: right;
+  font-weight: 900;
+  font-size: 15px;
+  white-space: nowrap;
+}
+.notwendig-wert small {
+  display: block;
+  font-weight: 600;
+  font-size: 11px;
+  color: var(--braun-weich);
+}
+
+.notwendig-summe {
+  text-align: right;
+  font-weight: 900;
+  font-size: 15px;
+  margin-top: 10px;
+  padding-top: 9px;
+  border-top: 1px solid var(--linie);
+}
+
+/* Die Blöcke unter der Summe. Drei Zustände, drei Farben — man soll schon
+   an der Kante sehen, ob es hier eng wird oder nicht. */
+.notwendig-fazit,
+.notwendig-haken {
+  margin-top: 14px;
+  padding: 12px 14px;
+  border-radius: var(--radius-klein);
+  background: var(--creme);
+  font-size: 13px;
+  line-height: 1.55;
+}
+.notwendig-fazit p,
+.notwendig-haken p { margin: 8px 0 0; }
+.notwendig-fazit p:first-of-type,
+.notwendig-haken p:first-of-type { margin-top: 6px; }
+
+.notwendig-fazit.warnung { border-left: 4px solid var(--rot); }
+.notwendig-fazit.gut     { border-left: 4px solid var(--gruen); }
+.notwendig-fazit.ruhig   { color: var(--braun-weich); }
+.notwendig-haken         { border-left: 4px solid var(--pink); }
+
+.fazit-titel {
+  font-weight: 900;
+  font-size: 14px;
+  letter-spacing: -0.2px;
+}
+
+/* Die eine Zahl, um die es in dem Block geht. Gross genug, dass man sie im
+   Vorbeiscrollen mitnimmt, ohne den Satz darunter lesen zu muessen. */
+.fazit-zahl {
+  font-size: 20px;
+  font-weight: 900;
+  letter-spacing: -0.5px;
+  margin-top: 4px;
+}
+/* Die Jahreszahl gehoert dazu, aber nicht in dieselbe Groesse: nebeneinander
+   waren beide zusammen zu lang fuers Handy und brachen mitten im Betrag um. */
+.fazit-zahl small {
+  display: block;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0;
+  color: var(--braun-weich);
+  margin-top: 1px;
+}
+.notwendig-fazit.warnung .fazit-zahl { color: var(--rot); }
+.notwendig-fazit.gut .fazit-zahl     { color: var(--gruen); }
+.notwendig-haken .fazit-zahl         { color: var(--pink); }
+.notwendig-fazit.warnung .fazit-titel { color: var(--rot); }
+.notwendig-haken .fazit-titel         { color: var(--pink); }
+
+/* ============================================================
    Notgroschen
    ============================================================ */
 .notgroschen-kopf {

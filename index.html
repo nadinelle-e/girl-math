@@ -69,18 +69,18 @@
   <meta name="apple-mobile-web-app-title" content="girl math" />
 
   <!--
-    Das ?v=18 hinter dem Dateinamen ist ein Versionsstempel.
+    Das ?v=19 hinter dem Dateinamen ist ein Versionsstempel.
 
     Warum: Browser legen Dateien für eine Weile beiseite, statt sie jedes Mal
     neu zu holen. Nach einem Update sähe man deshalb bis zu zehn Minuten lang
-    noch die alte Fassung. Für den Browser ist "styles.css?v=18" aber eine
-    andere Adresse als "styles.css?v=17" — also holt er sie sofort frisch.
+    noch die alte Fassung. Für den Browser ist "styles.css?v=19" aber eine
+    andere Adresse als "styles.css?v=18" — also holt er sie sofort frisch.
 
     ➜ WICHTIG: Bei jeder Änderung an styles.css oder app.js die Zahl an BEIDEN
       Stellen um eins hochzählen (unten beim <script> steht dieselbe). Vergisst
       man es, ist nichts kaputt, es dauert nur wieder bis zu zehn Minuten.
   -->
-  <link rel="stylesheet" href="styles.css?v=18" />
+  <link rel="stylesheet" href="styles.css?v=19" />
 </head>
 <body>
   <!-- Die Leiste, die beim Scrollen oben kleben bleibt: Kontostand, Ausnahmen-
@@ -137,6 +137,12 @@
          Ausnahmen, Realitäts-Check.
          Wird von app.js gefüllt (renderUebersicht). -->
     <section id="uebersicht"></section>
+
+    <!-- Der Notwendig-Blick: jeder Posten, der als notwendig zählt, einzeln —
+         mit dem Vermerk, ob die Kategorie das entschieden hat oder ein Häkchen
+         von dir. Darunter, was ein Stand über 50% konkret kostet.
+         Wird von app.js gefüllt (renderNotwendig). -->
+    <section id="notwendig"></section>
 
     <!-- Notgroschen: 3 Monatsausgaben als Puffer, mit Fortschritt.
          Wird von app.js gefüllt (renderNotgroschen). -->
@@ -207,6 +213,6 @@
 
   <!-- Die Logik ganz am Ende laden, damit die Bereiche oben schon existieren. -->
   <!-- Die Zahl hier muss dieselbe sein wie oben beim Stylesheet. -->
-  <script src="app.js?v=18"></script>
+  <script src="app.js?v=19"></script>
 </body>
 </html>

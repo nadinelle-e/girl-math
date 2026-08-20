@@ -1318,6 +1318,7 @@ function rechne(monat) {
     gespartPuffer: 0,     // … davon für den Notgroschen
     notwendigUmlage: 0, nichtUmlage: 0,   // auf den Monat verteilt
     notwendigReal: 0,   nichtReal: 0,     // was wirklich abgeht
+    notwendigSelbst: 0,                   // … davon nur durch DEIN Häkchen notwendig
     faelligJetzt: [],                     // große Brocken DIESEN Monat
     faelligBald: [],                      // … und in den nächsten zwei
     ausnahmen: [],                        // alle Ausnahmen einzeln (für die Rangliste)
@@ -1384,7 +1385,24 @@ function rechne(monat) {
       // der ehrlichste Vergleichsmaßstab, den die App hat: eine Zahl, die du
       // selbst eingetragen hast und die niemand wegdiskutieren kann.
       if (istNotwendig && betrag > 0) {
-        z.notwendige.push({ label: posten.label || "(ohne Namen)", betrag: umlage });
+        /* Warum dieser Posten als notwendig zählt, wird mitgeschrieben — es
+           gibt zwei ganz verschiedene Gründe:
+
+             durch die KATEGORIE   Miete und Lebensmittel. Da hast du nichts
+                                   entschieden, das ist einfach so.
+             durch DEIN HÄKCHEN    Abos und Versicherungen. Da hast du gesagt,
+                                   dass es notwendig ist.
+
+           Nur das zweite kannst du zurücknehmen. Und nur das zweite kann eine
+           Notlüge an dich selbst sein — deshalb muss man es sehen können. */
+        const durchHaken = !!(kat.schalter && kat.schalter.feld === "notwendig");
+        z.notwendige.push({
+          label: posten.label || "(ohne Namen)",
+          betrag: umlage,
+          kategorie: kat.titel,
+          selbstMarkiert: durchHaken,
+        });
+        if (durchHaken) z.notwendigSelbst += umlage;
       }
 
       // Für die Rangliste: jede einzelne Ausnahme merken.
@@ -1461,6 +1479,15 @@ function rechne(monat) {
   z.quoteNotwendig = anteil(z.notwendigUmlage);
   z.quoteNicht     = anteil(z.nichtUmlage);   // <- das ist der Konsumopfer-Wert
   z.quoteSpar      = anteil(z.gespart);
+
+  /* Die 50%-Grenze in Euro — die Zahl, die der Balken „Notwendig" nur als
+     Strich zeigt. Ein Prozentsatz sagt dir nicht, worum es geht; 390 € im
+     Monat schon.
+
+     `ueberNotwendig` ist der Betrag, der über der Grenze liegt, und damit die
+     Antwort auf „was hätte ich denn davon". Bei 0 bist du drunter. */
+  z.notwendigGrenze  = z.gehalt * (REGEL.notwendig / 100);
+  z.ueberNotwendig   = Math.max(0, z.notwendigUmlage - z.notwendigGrenze);
 
   // Ohne Gehalt sind Prozente sinnlos — dann urteilen wir gar nicht erst.
   z.keinGehalt = z.gehalt <= 0;
@@ -2014,6 +2041,9 @@ function render() {
   renderVertraege(z);
   renderKonto(z, zy);
   renderUebersicht(z);
+  // Steht direkt unter dem Balken „Notwendig 63%" und beantwortet die Frage,
+  // die dieser Balken aufwirft: woraus besteht das, und was kostet es mich?
+  renderNotwendig(z);
   renderNotgroschen(z);
   renderSparziel(z);
   // Bekommt bewusst kein `z`: Diese Karte hängt an keiner Zahl der großen
@@ -2892,6 +2922,141 @@ function donutHtml(z) {
         <text class="donut-unter" x="70" y="86" text-anchor="middle">Ausnahmen</text>
       </svg>
       <div class="legende">${legende}</div>
+    </div>
+  `;
+}
+
+/* --- 11g2. Der Notwendig-Blick: was du dazu erklärt hast, und was es kostet ---
+
+   Warum es diese Karte gibt: „Notwendig" ist die einzige Schublade der App,
+   die man selbst öffnen und zuschieben kann — bei jedem Abo und jeder
+   Versicherung entscheidet ein Häkchen darüber. Ein Posten mit Häkchen
+   verschwindet aus dem Konsumopfer-Verdikt und aus dem Kündigungs-Blick. Er
+   wird also nicht billiger, nur unsichtbar.
+
+   Genau das ist die Falle: Man hakt etwas ab, weil man die Zahl oben nicht
+   sehen will, und drei Monate später weiß man nicht mehr, warum die
+   notwendigen Kosten bei 63% stehen. Diese Karte macht die Schublade wieder
+   auf — jeden Posten einzeln, mit seinem Anteil, und mit dem Vermerk, wer
+   entschieden hat: die Kategorie oder du.
+
+   Der Ton hier ist der ernste. Der Rest der App darf schadenfroh sein, dieser
+   Block nicht: Es geht um die eine Grenze, hinter der es eng wird. --- */
+function renderNotwendig(z) {
+  const ziel = document.getElementById("notwendig");
+
+  if (z.notwendige.length === 0) {
+    ziel.innerHTML = "";
+    return;
+  }
+
+  // "2 · Fixkosten 🏠" -> "Fixkosten 🏠". Die Nummer hilft beim Eintragen
+  // (dort steht die Reihenfolge), hier ist sie nur Ballast.
+  const katKurz = (titel) => titel.replace(/^\d+\s*·\s*/, "");
+  const anteil  = (betrag) => (z.gehalt > 0 ? Math.round((betrag / z.gehalt) * 100) : null);
+
+  const zeilen = z.notwendige.map(n => {
+    const p = anteil(n.betrag);
+    /* Die Herkunft steht an jeder Zeile, weil sie die Frage beantwortet, mit
+       der man hier gelandet ist: Kann ich daran überhaupt etwas ändern? */
+    const herkunft = n.selbstMarkiert
+      ? `<span class="selbst-schild">von dir angehakt</span>`
+      : `<small>${escapeAttr(katKurz(n.kategorie))}</small>`;
+    return `
+      <div class="notwendig-zeile ${n.selbstMarkiert ? "selbst" : ""}">
+        <div class="notwendig-name">${escapeAttr(n.label)} ${herkunft}</div>
+        <div class="notwendig-wert">
+          ${euro(n.betrag)}${p !== null ? `<small>${p}% deines Geldes</small>` : ""}
+        </div>
+      </div>
+    `;
+  }).join("");
+
+  const summe = `
+    <div class="notwendig-summe">
+      zusammen ${euro(z.notwendigUmlage)}${
+        z.keinGehalt ? "" : ` · ${Math.round(z.quoteNotwendig)}% deines Geldes`}
+    </div>`;
+
+  ziel.innerHTML = `
+    <h2 class="nr-titel">Was du als notwendig führst</h2>
+    <div class="karte notwendig-karte">
+      <p class="kat-hinweis">Notwendig heißt: geht weg, egal wie der Monat läuft. Hier steht alles, was diese Schublade gerade enthält.</p>
+      ${zeilen}
+      ${summe}
+      ${grenzeHtml(z)}
+      ${haekchenHtml(z)}
+    </div>
+  `;
+}
+
+/* Der Block über der Grenze.
+
+   Hier standen erst drei Absätze Fließtext: der Betrag, der Notgroschen-Effekt
+   und die Herkunft der 50%-Regel. Alles richtig, alles zu viel. Wer auf 63%
+   steht, liest keinen Aufsatz, sondern will eine Zahl.
+
+   Also: die Zahl groß, ein Satz darunter, fertig. Woher die Regel kommt, steht
+   ohnehin schon in der Übersicht unter „Woher kommen diese Zahlen?". */
+function grenzeHtml(z) {
+  // Ohne Einnahmen gibt es keine Grenze, an der man sich messen könnte.
+  if (z.keinGehalt) {
+    return `<div class="notwendig-fazit ruhig">
+      Sobald deine Einnahmen drinstehen, rechne ich dir aus, wie das zur 50%-Grenze steht.</div>`;
+  }
+
+  const punkte = Math.round(z.quoteNotwendig - REGEL.notwendig);
+
+  // Unter der Grenze: die Luft, die bleibt, und ein Bild dafür. Sonst nichts.
+  if (z.ueberNotwendig <= 0) {
+    return `
+      <div class="notwendig-fazit gut">
+        <div class="fazit-titel">Unter der Grenze</div>
+        <div class="fazit-zahl">${euro(z.notwendigGrenze - z.notwendigUmlage)} Luft im Monat</div>
+        <p>Genau die federt eine kaputte Waschmaschine ab.</p>
+      </div>`;
+  }
+
+  /* Der Notgroschen-Vergleich rechnet mit derselben Formel wie die Karte
+     darunter (drei Monatsausgaben), damit die beiden Zahlen zueinander
+     passen und nicht zwei Wahrheiten behaupten. Angezeigt wird nur noch die
+     Differenz: Drei Beträge nebeneinander waren eine Rechenaufgabe. */
+  const pufferDiff = (z.notwendigUmlage - z.notwendigGrenze) * 3;
+
+  return `
+    <div class="notwendig-fazit warnung">
+      <div class="fazit-titel">${punkte} ${punkte === 1 ? "Punkt" : "Punkte"} über der Grenze</div>
+      <div class="fazit-zahl">${euro(z.ueberNotwendig)} im Monat<small>${euro(z.ueberNotwendig * 12)} im Jahr</small></div>
+      <p>Bei 50% wäre das Geld frei. Und dein Notgroschen-Ziel läge
+        ${euro(pufferDiff)} niedriger.</p>
+    </div>
+  `;
+}
+
+/* Der Häkchen-Block: was passiert, wenn du eins zurücknimmst.
+
+   Die ehrliche Pointe steht am Ende — am Geld ändert ein Häkchen nichts. Es
+   verschiebt den Betrag nur von einer Spalte in die andere. Die App darf hier
+   keine Verbesserung suggerieren, die keine ist: Ohne den letzten Satz läse
+   sich „Notwendig fiele auf 58%" wie ein Gewinn. */
+function haekchenHtml(z) {
+  const angehakt = z.notwendige.filter(n => n.selbstMarkiert);
+  if (angehakt.length === 0 || z.keinGehalt) return "";
+
+  // Was wäre, wenn alle Häkchen fielen? Die Posten wandern in die Ausnahmen.
+  const ohneNotwendig = ((z.notwendigUmlage - z.notwendigSelbst) / z.gehalt) * 100;
+  const mitAusnahmen  = ((z.nichtUmlage + z.notwendigSelbst) / z.gehalt) * 100;
+
+  const wieViele = angehakt.length === 1
+    ? "Einen Eintrag"
+    : `${angehakt.length} Einträge`;
+
+  return `
+    <div class="notwendig-haken">
+      <div class="fazit-titel">${wieViele} hast du selbst angehakt</div>
+      <div class="fazit-zahl">${euro(z.notwendigSelbst)} im Monat</div>
+      <p>Ohne die Häkchen: Notwendig ${Math.round(ohneNotwendig)}%,
+        Ausnahmen ${Math.round(mitAusnahmen)}%. Am Geld ändert das nichts.</p>
     </div>
   `;
 }

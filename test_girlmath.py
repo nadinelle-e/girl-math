@@ -9,6 +9,7 @@ Staende.
 Aufruf:  python3 test_girlmath.py
 """
 import subprocess, sys, time
+from datetime import date
 from pathlib import Path
 
 from playwright.sync_api import sync_playwright
@@ -162,8 +163,12 @@ with sync_playwright() as p:
     add(page, "fixkosten", "Miete", 800, rhythmus="monatlich")
     add(page, "abos", "Netflix", 20, rhythmus="monatlich", haken=False)
     add(page, "abos", "Deutschlandticket", 58, rhythmus="monatlich", haken=True)
-    # Jaehrliche Kfz-Versicherung, faellig im Juli (= laufender Monat): 360 -> 30/Monat
-    add(page, "versicherungen", "Kfz-Versicherung", 360, rhythmus="jaehrlich", faellig=7, haken=True)
+    # Jaehrliche Kfz-Versicherung, faellig im LAUFENDEN Monat: 360 -> 30/Monat.
+    # Der Monat wird zur Laufzeit geholt, nicht fest eingetragen: Stand hier eine
+    # feste 7, war die Rechnung ab dem 1. August nicht mehr faellig und die
+    # Pruefungen darunter erwarteten Zahlen, die es nicht mehr gab.
+    add(page, "versicherungen", "Kfz-Versicherung", 360, rhythmus="jaehrlich",
+        faellig=date.today().month, haken=True)
     add(page, "lebensmittel", "Wocheneinkauf", 300)
     add(page, "konsum", "Klamotten", 150)
     add(page, "sparen", "Ruecklage", 200)
@@ -315,6 +320,47 @@ with sync_playwright() as p:
     text = page.locator(".regel-details").inner_text()
     pruefe("nennt Warren", "Elizabeth Warren" in text, True)
     pruefe("erklaert Insolvenz in Klartext", "zahlungsunfähig" in text, True)
+
+    print("\n=== 11b. Notwendig-Blick: die Schublade aufgemacht ===")
+    # notwendig = Miete 800 + Wocheneinkauf 300 + Ticket 58 + Kfz 30 = 1.188
+    # Das sind 59% von 2.000 — also 188 EUR ueber der 50%-Grenze.
+    namen = [n.split("\n")[0].strip() for n in page.locator(".notwendig-name").all_inner_texts()]
+    print("  Reihenfolge:", namen)
+    pruefe("alle vier notwendigen Posten stehen da", len(namen), 4)
+    pruefe("nach Betrag sortiert", namen[0].startswith("Miete"), True)
+    # Nur Ticket und Kfz haengen an einem Haekchen — die Miete nicht.
+    pruefe("zwei Posten sind selbst angehakt", page.locator(".selbst-schild").count(), 2)
+    summe = norm(page.locator(".notwendig-summe").inner_text())
+    pruefe("Summe der Schublade", "1.188,00 €" in summe, True)
+    pruefe("Summe nennt den Anteil", "59%" in summe, True)
+
+    # Der Block ist bewusst kurz: Titel, EINE Zahl, ein Satz. Wer auf 59% steht,
+    # liest keinen Aufsatz.
+    fazit = norm(page.locator(".notwendig-fazit").inner_text())
+    print("  Fazit:", fazit.replace("\n", " | "))
+    pruefe("Fazit warnt", page.locator(".notwendig-fazit.warnung").count(), 1)
+    pruefe("nennt den Abstand in Punkten", "9 Punkte über der Grenze" in fazit, True)
+    pruefe("die Zahl steht gross da, das Jahr klein darunter",
+           norm(page.locator(".notwendig-fazit .fazit-zahl").inner_text()).replace("\n", " | "),
+           "188,00 € im Monat | 2.256,00 € im Jahr")
+    # Der Doppelschlag: hohe Fixkosten heben das Notgroschen-Ziel mit an.
+    # Gezeigt wird nur die Differenz (3 x 188), nicht die ganze Rechnung.
+    pruefe("nennt den Notgroschen-Aufschlag", "564,00 € niedriger" in fazit, True)
+    # Der Block darf nie wieder zum Aufsatz werden: Titel, Zahl, EIN Satz.
+    pruefe("genau ein Fliesstext-Absatz", page.locator(".notwendig-fazit p").count(), 1)
+    pruefe("und der bleibt kurz",
+           len(page.locator(".notwendig-fazit p").inner_text()) < 100, True)
+
+    haken = norm(page.locator(".notwendig-haken").inner_text())
+    print("  Haken:", haken.replace("\n", " | "))
+    pruefe("Haekchen-Block nennt die Summe der angehakten",
+           norm(page.locator(".notwendig-haken .fazit-zahl").inner_text()), "88,00 € im Monat")
+    # Ohne die Haekchen: notwendig (1188-88)/2000 = 55%, Ausnahmen (370+88)/2000 = 23%
+    pruefe("zeigt, wie es ohne Haekchen stuende",
+           "Ohne die Häkchen: Notwendig 55%, Ausnahmen 23%" in haken, True)
+    # Der ehrliche Satz: ein Haekchen verschiebt nur die Spalte, nicht das Geld.
+    pruefe("sagt, dass sich am Geld nichts aendert",
+           "Am Geld ändert das nichts" in haken, True)
 
     print("\n=== 12. Notgroschen mit Stufen ===")
     # notwendig 1188 -> 3 Monate = 3564, 6 Monate = 7128
