@@ -63,11 +63,12 @@ def auf(page, kat):
     return f'.karte:has(form[data-add="{kat}"])'
 
 
-def add(page, kat, label, betrag, rhythmus=None, faellig=None, haken=None):
+def add(page, kat, label, betrag, rhythmus=None, faellig=None, haken=None, bar=None):
     """Traegt einen Posten ueber das Formular der Kategorie ein.
 
     `haken` bedient das Kategorie-Haekchen: bei Abos und Versicherungen
     „notwendig?", bei den Einnahmen „dafuer gearbeitet?".
+    `bar` bedient das Bargeld-Haekchen, das jede Kategorie hat.
     """
     auf(page, kat)   # ihr Formular ist nur in der offenen Karte sichtbar
     form = page.locator(f'form[data-add="{kat}"]')
@@ -79,8 +80,13 @@ def add(page, kat, label, betrag, rhythmus=None, faellig=None, haken=None):
     if faellig:
         form.locator("[data-add-faellig]").select_option(str(faellig))
     if haken is not None:
-        box = form.locator("[data-add-schalter]")
+        # Das Kategorie-eigene Haekchen — alles ausser „bar".
+        box = form.locator('[data-add-schalter]:not([data-add-schalter="bar"])')
         if box.is_checked() != haken:
+            box.click()
+    if bar is not None:
+        box = form.locator('[data-add-schalter="bar"]')
+        if box.is_checked() != bar:
             box.click()
     form.locator('button[type="submit"]').click()
 
@@ -751,8 +757,10 @@ with sync_playwright() as p:
     # Ohne Ziel gibt es weder Haekchen an den Sparposten noch eine Rechnung.
     pruefe("ohne Ziel steht die Einladung da", page.locator(".sparziel-karte.leer").count(), 1)
     add(page, "sparen", "Ruecklage", 100)
-    pruefe("ohne Ziel kein Haekchen, weder am Posten noch im Formular",
-           page.locator(f'{auf(page, "sparen")} .schalter').count(), 0)
+    pruefe("ohne Ziel kein Ziel-Haekchen am Posten",
+           page.locator(f'{auf(page, "sparen")} .posten [data-field="fuersZiel"]').count(), 0)
+    pruefe("ohne Ziel kein Ziel-Haekchen im Formular",
+           page.locator(f'{auf(page, "sparen")} [data-add-schalter="fuersZiel"]').count(), 0)
 
     add(page, "income", "Gehalt", 2000, haken=True)
     add(page, "fixkosten", "Miete", 800)
@@ -768,12 +776,12 @@ with sync_playwright() as p:
     pruefe("Zielbetrag", norm(page.locator(".sparziel-summe").inner_text()), "2.000,00 €")
     pruefe("noch nichts dafuer zurueckgelegt", norm(page.locator(".sparziel-ist").inner_text()), "0,00 €")
     pruefe("jetzt gibt es das Haekchen am Posten",
-           page.locator(f'{auf(page, "sparen")} .posten .schalter').count(), 1)
+           page.locator(f'{auf(page, "sparen")} .posten [data-field="fuersZiel"]').count(), 1)
 
     # 200 EUR fuers Ziel weglegen — der Posten wandert damit aus dem Notgroschen raus.
     add(page, "sparen", "Reisekasse", 200)
     oeffne(page.locator(f'{auf(page, "sparen")} .posten:has(input[value="Reisekasse"])'))
-    page.locator(f'{auf(page, "sparen")} .posten:has(input[value="Reisekasse"]) .schalter input').click()
+    page.locator(f'{auf(page, "sparen")} .posten:has(input[value="Reisekasse"]) [data-field="fuersZiel"]').click()
     pruefe("Ziel-Sparen zaehlt zum Ziel", norm(page.locator(".sparziel-ist").inner_text()), "200,00 €")
     pruefe("und NICHT mehr zum Notgroschen",
            norm(page.locator(".notgroschen-ist").inner_text()), "100,00 €")
@@ -845,24 +853,28 @@ with sync_playwright() as p:
     pruefe("Karte ist wieder die Einladung", page.locator(".sparziel-karte.leer").count(), 1)
     pruefe("Gespartes gehoert wieder dem Notgroschen",
            norm(page.locator(".notgroschen-ist").inner_text()), "300,00 €")
-    pruefe("und die Haekchen sind weg",
-           page.locator(f'{auf(page, "sparen")} .schalter').count(), 0)
+    pruefe("und die Ziel-Haekchen sind weg",
+           page.locator(f'{auf(page, "sparen")} [data-field="fuersZiel"]').count(), 0)
 
     print("\n=== 28. Jedes Haekchen startet leer ===")
     neu_starten(page)
     # Kein Haekchen setzt sich von allein — weder im Formular noch am neuen Posten.
     for kat in ("income", "abos", "versicherungen"):
         pruefe(f"{kat}: Formular-Haekchen leer",
-               page.locator(f'form[data-add="{kat}"] [data-add-schalter]').is_checked(), False)
+               page.locator(f'form[data-add="{kat}"] [data-add-schalter]:not([data-add-schalter="bar"])').is_checked(), False)
+        pruefe(f"{kat}: Bargeld-Haekchen im Formular leer",
+               page.locator(f'form[data-add="{kat}"] [data-add-schalter="bar"]').is_checked(), False)
         add(page, kat, "Testposten", 100)
         pruefe(f"{kat}: neuer Posten ohne Haken",
-               page.locator(f'{auf(page, kat)} .posten input[type="checkbox"]').is_checked(), False)
+               page.locator(f'{auf(page, kat)} .posten input[type="checkbox"]:not([data-field="bar"])').is_checked(), False)
+        pruefe(f"{kat}: neuer Posten nicht bar",
+               page.locator(f'{auf(page, kat)} .posten [data-field="bar"]').is_checked(), False)
 
     # Ohne Haken kein Arbeitseinkommen: die App rechnet keinen Stundenlohn,
     # statt einen zu erfinden, den niemand bestaetigt hat.
     pruefe("kein Stundenlohn ohne Haken", page.locator("#wochenstunden").count(), 0)
     oeffne(page.locator(f'{auf(page, "income")} .posten'))
-    page.locator(f'{auf(page, "income")} .posten input[type="checkbox"]').click()
+    page.locator(f'{auf(page, "income")} .posten [data-field="gearbeitet"]').click()
     pruefe("nach dem Antippen rechnet sie ihn", page.locator("#wochenstunden").count(), 1)
 
     print("\n=== 29. Sparziel: alte Staende und der Monatswechsel ===")
@@ -896,7 +908,7 @@ with sync_playwright() as p:
 
     # Monatswechsel: die getrennten Summen landen im Archiv und werden weitergezaehlt.
     oeffne(page.locator(f'{auf(page, "sparen")} .posten:has(input[value="Rücklage"])'))
-    page.locator(f'{auf(page, "sparen")} .posten:has(input[value="Rücklage"]) .schalter input').click()
+    page.locator(f'{auf(page, "sparen")} .posten:has(input[value="Rücklage"]) [data-field="fuersZiel"]').click()
     pruefe("umgehaengt aufs Ziel", norm(page.locator(".sparziel-ist").inner_text()), "150,00 €")
     page.click("#btn-monat-abschliessen")
     pruefe("nach dem Abschluss zaehlt das Ziel weiter",
@@ -1530,6 +1542,96 @@ with sync_playwright() as p:
     pruefe("und die Zusammenfassung wurde neu gerechnet",
            page.evaluate("STATE.archive[0].summary.notwendig"), 900)
     page.screenshot(path=f"{SHOTS}/05-archiv.png", full_page=True)
+
+    print("\n=== 42. Bargeld laeuft am Konto vorbei ===")
+    neu_starten(page)
+    setze(page, "#start-guthaben", 1000)
+    add(page, "income", "Gehalt", 2000, haken=True)
+    add(page, "fixkosten", "Miete", 800, rhythmus="monatlich")
+
+    # Solange nichts bar ist, sieht die Karte aus wie immer — kein Block,
+    # keine Zusaetze an den Zeilen.
+    pruefe("ohne Bargeld kein Bargeld-Block", page.locator(".bargeld-block").count(), 0)
+    zeilen = [norm(t).replace("\n", " ") for t in page.locator(".konto-zeile").all_inner_texts()]
+    pruefe("die Zeile heisst schlicht 'Einnahmen'",
+           any("Einnahmen" in z and "2.000,00 €" in z for z in zeilen), True)
+    pruefe("nirgends steht 'aufs Konto'", any("aufs Konto" in z for z in zeilen), False)
+
+    # 200 bar bekommen (Trinkgeld), 100 davon bar wieder ausgegeben.
+    add(page, "income", "Trinkgeld", 200, haken=True, bar=True)
+    add(page, "luxus", "Sushi", 100, bar=True)
+
+    # Fuer die Prozente ist Bargeld ganz normales Geld.
+    pruefe("Bargeld zaehlt in die Einnahmen", page.evaluate("rechneAktuell().gehalt"), 2200)
+    pruefe("und in die Ausnahmen", page.evaluate("rechneAktuell().nichtUmlage"), 100)
+    pruefe("und in die Arbeitszeit", page.evaluate("rechneAktuell().arbeitsEinkommen"), 2200)
+
+    # Der Kontostand nicht: 1000 + 2000 − 800 = 2200. Ohne die Haekchen
+    # stuenden dort 2300 — Geld, das nie auf dem Konto lag.
+    pruefe("Kontostand rechnet ohne Bargeld", page.evaluate("rechneAktuell().kontostand"), 2200)
+    pruefe("bar bekommen", page.evaluate("rechneAktuell().barEin"), 200)
+    pruefe("bar bezahlt", page.evaluate("rechneAktuell().barAus"), 100)
+    pruefe("liegt in der Tasche", page.evaluate("rechneAktuell().bargeld"), 100)
+
+    zeilen = [norm(t).replace("\n", " ") for t in page.locator(".konto-rechnung:not(.bargeld-block) .konto-zeile").all_inner_texts()]
+    print("  Kontostand mit Bargeld:", zeilen)
+    pruefe("die Einnahmen-Zeile sagt jetzt 'aufs Konto'",
+           any("Einnahmen aufs Konto" in z and "2.000,00 €" in z for z in zeilen), True)
+    pruefe("die Ausnahmen sind vom Konto aus bei null",
+           any("Ausnahmen vom Konto" in z and "0,00 €" in z for z in zeilen), True)
+
+    block = norm(page.locator(".bargeld-block").inner_text()).replace("\n", " ")
+    print("  Bargeld-Block:", block)
+    pruefe("er nennt, was bar reinkam", "200,00 €" in block, True)
+    pruefe("was bar rausging", "100,00 €" in block, True)
+    pruefe("und was liegen bleibt", "Liegt in der Tasche" in block, True)
+    pruefe("er sagt dazu, dass die Prozente mitzaehlen",
+           "Prozenten oben trotzdem voll mit" in block, True)
+
+    # Das Haekchen „mein Gehalt ist da schon drauf" darf nur Konto-Geld
+    # abziehen: 1000 − 2000 = −1000, und nicht −1200 wegen des Trinkgelds.
+    page.locator("#start-mit-gehalt").check()
+    pruefe("nur die Konto-Einnahmen werden abgezogen",
+           page.evaluate("rechneAktuell().startBalance"), -1000)
+    pruefe("und der Kontostand bleibt stimmig",
+           page.evaluate("rechneAktuell().kontostand"), 200)
+    page.locator("#start-mit-gehalt").uncheck()
+
+    # Mehr bar bezahlt als bar bekommen? Dann steckt Automatengeld drin, und
+    # die Karte sagt das, statt eine ratlose Minuszahl hinzustellen.
+    add(page, "luxus", "Konzert", 250, bar=True)
+    block = norm(page.locator(".bargeld-block").inner_text()).replace("\n", " ")
+    pruefe("Bargeld im Minus wird benannt", "Zu viel bar bezahlt" in block, True)
+    pruefe("und erklaert, woher das kommt", "Automaten" in block, True)
+    page.screenshot(path=f"{SHOTS}/09-bargeld.png", full_page=True)
+
+    # Das Haekchen ueberlebt das Neuladen.
+    page.reload()
+    page.wait_for_selector(".verdikt")
+    pruefe("bar bleibt bar", page.evaluate("rechneAktuell().barEin"), 200)
+    pruefe("auch am Posten selbst",
+           page.locator(f'{auf(page, "income")} .posten:has(input[value="Trinkgeld"]) [data-field="bar"]').is_checked(), True)
+
+    # Und ein Stand von vor dem Haekchen rechnet auf den Cent weiter wie bisher.
+    page.evaluate("d => localStorage.setItem('girlmath.v1', JSON.stringify(d))", {
+        "version": 1,
+        "currentMonth": {
+            "id": "2026-07", "startBalance": 500,
+            "income": [{"id": "b1", "label": "Gehalt", "amount": 1000}],
+            "fixkosten": [{"id": "b2", "label": "Miete", "amount": 400}],
+            "abos": [], "versicherungen": [], "lebensmittel": [],
+            "luxus": [], "konsum": [], "sparen": [],
+        },
+        "archive": [],
+    })
+    page.reload()
+    page.wait_for_selector(".verdikt")
+    pruefe("alter Stand: nichts gilt als bar",
+           page.evaluate("rechneAktuell().barEin + rechneAktuell().barAus"), 0)
+    pruefe("und der Kontostand steht wie eh und je",
+           page.evaluate("rechneAktuell().kontostand"), 1100)
+    pruefe("kein Bargeld-Block, wo kein Bargeld ist",
+           page.locator(".bargeld-block").count(), 0)
 
     browser.close()
 

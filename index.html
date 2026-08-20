@@ -69,18 +69,18 @@
   <meta name="apple-mobile-web-app-title" content="girl math" />
 
   <!--
-    Das ?v=19 hinter dem Dateinamen ist ein Versionsstempel.
+    Das ?v=20 hinter dem Dateinamen ist ein Versionsstempel.
 
     Warum: Browser legen Dateien für eine Weile beiseite, statt sie jedes Mal
     neu zu holen. Nach einem Update sähe man deshalb bis zu zehn Minuten lang
-    noch die alte Fassung. Für den Browser ist "styles.css?v=19" aber eine
-    andere Adresse als "styles.css?v=18" — also holt er sie sofort frisch.
+    noch die alte Fassung. Für den Browser ist "styles.css?v=20" aber eine
+    andere Adresse als "styles.css?v=19" — also holt er sie sofort frisch.
 
     ➜ WICHTIG: Bei jeder Änderung an styles.css oder app.js die Zahl an BEIDEN
       Stellen um eins hochzählen (unten beim <script> steht dieselbe). Vergisst
       man es, ist nichts kaputt, es dauert nur wieder bis zu zehn Minuten.
   -->
-  <link rel="stylesheet" href="styles.css?v=19" />
+  <link rel="stylesheet" href="styles.css?v=20" />
 </head>
 <body>
   <!-- Die Leiste, die beim Scrollen oben kleben bleibt: Kontostand, Ausnahmen-
@@ -213,6 +213,6 @@
 
   <!-- Die Logik ganz am Ende laden, damit die Bereiche oben schon existieren. -->
   <!-- Die Zahl hier muss dieselbe sein wie oben beim Stylesheet. -->
-  <script src="app.js?v=19"></script>
+  <script src="app.js?v=20"></script>
 </body>
 </html>

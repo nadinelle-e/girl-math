@@ -418,7 +418,9 @@ body.modal-offen { overflow: hidden; }
   box-shadow: 0 0 0 3px rgba(255, 45, 120, 0.15);
 }
 
-/* Der „notwendig?"-Schalter bei Abos und Versicherungen */
+/* Die Häkchen an einem Posten — „notwendig?", „dafür gearbeitet?", „bar?".
+   Eine Kategorie kann zwei davon tragen; sie stehen dann nebeneinander in
+   derselben Zeile und rutschen auf schmalen Schirmen untereinander. */
 .schalter {
   display: inline-flex;
   align-items: center;
@@ -1064,6 +1066,38 @@ body.bearbeitung-offen .archiv-weg { display: none; }
 .konto-zeile.ergebnis.negativ .konto-betrag,
 .konto-zeile.ergebnis.negativ .konto-text { color: var(--rot); }
 
+
+/* Der Bargeld-Block: Geld, das nie aufs Konto kam.
+
+   Er sitzt unter der Konto-Rechnung und benutzt bewusst deren drei Spalten
+   weiter — dieselbe Form, damit man ihn ohne Umgewöhnung liest. Abgesetzt
+   ist er nur durch die Cremefläche: Das hier ist eine ZWEITE Kasse, keine
+   Fortsetzung der ersten. Wer beide addiert, hat sich verrechnet. */
+.bargeld-block {
+  margin-top: 14px;
+  padding: 12px 14px 4px;
+  border-top: none;
+  background: var(--creme);
+  border-radius: var(--radius-klein);
+}
+.bargeld-titel {
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--braun);
+  letter-spacing: 0.02em;
+  margin-bottom: 2px;
+}
+/* Die Bargeld-Summe bleibt eine Spur kleiner als der Kontostand darueber.
+   Zwei gleich grosse Zahlen untereinander sehen aus, als gehoerten sie
+   zusammen — und addiert werden duerfen sie gerade nicht. */
+.bargeld-block .konto-zeile.ergebnis .konto-betrag { font-size: 18px; }
+.bargeld-hinweis {
+  margin: 0;
+  padding: 10px 0 8px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--braun-weich);
+}
 
 /* Die Erklärung, warum Kontostand und Übersicht auseinandergehen dürfen */
 .konto-fussnote {

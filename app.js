@@ -26,17 +26,20 @@
                       nicht     = eine „Ausnahme" (Sushi, Klamotten)
                       sparen    = zur Seite gelegt (wird positiv bewertet)
 
-     schalter       Ein Häkchen an jedem Posten dieser Kategorie:
+     schalter       Die Häkchen an jedem Posten dieser Kategorie. Eine LISTE,
+                    weil manche Kategorie zwei davon trägt. Jedes Häkchen ist:
                       feld = welches Feld am Posten gesetzt wird
                       text = was neben dem Häkchen steht
 
                     Neue Posten starten immer ohne Häkchen (siehe unten).
 
-                    Zwei Sorten gibt es:
-                      "notwendig" bei Abos und Versicherungen — entscheidet,
-                                  ob der Posten als Ausnahme zählt
+                    Drei Sorten gibt es:
+                      "notwendig"  bei Abos und Versicherungen — entscheidet,
+                                   ob der Posten als Ausnahme zählt
                       "gearbeitet" bei den Einnahmen — entscheidet, ob dieses
-                                  Geld in den Stundenlohn eingeht
+                                   Geld in den Stundenlohn eingeht
+                      "bar"        überall — entscheidet, ob dieses Geld übers
+                                   Konto läuft oder an der Bank vorbei
 
      wiederkehrend  true = läuft jeden Monat weiter und wandert beim
                     Monatswechsel automatisch mit. Diese Posten haben
@@ -49,9 +52,10 @@
                     (nur bei den Einnahmen, weil daraus der Stundenlohn
                     entsteht)
 
-     altHaken       Nur für gespeicherte Stände von früher: Womit die App
-                    damals gerechnet hat, als es das Häkchen noch nicht gab.
-                    Neue Posten sind davon nicht betroffen.
+     altHaken       Nur für gespeicherte Stände von früher: die Felder, die
+                    als gesetzt gelten, wenn im Posten noch gar nichts steht —
+                    weil die App damals so gerechnet hat, als es das Häkchen
+                    noch nicht gab. Neue Posten sind davon nicht betroffen.
 
      platzhalter    Das blasse Beispiel im leeren Eingabefeld
 
@@ -74,27 +78,48 @@ const SCHALTER_GEARBEITET = { feld: "gearbeitet", text: "dafür gearbeitet?" };
    gesetzt ist. Eine Frage nach etwas, das es nicht gibt, wäre nur ein Rätsel. */
 const SCHALTER_FUERS_ZIEL = { feld: "fuersZiel", text: "fürs Sparziel?", nurBeiSparziel: true };
 
+/* Das Bargeld-Häkchen hängt an JEDER Kategorie und stellt überall dieselbe
+   Frage: Läuft dieses Geld übers Konto — oder daran vorbei?
+
+   An den Prozenten ändert es nichts. Bargeld ist echtes Geld, das du hast und
+   ausgibst, und geht in die 50/30/20-Rechnung ein wie jeder andere Euro. Es
+   ändert nur die Kontostand-Kette: Was bar reinkommt, landet nie auf dem
+   Konto, und was bar bezahlt ist, geht nie davon ab.
+
+   Drei Beschriftungen, ein einziges Feld — „bar bekommen?" und „bar bezahlt?"
+   sind dieselbe Angabe, nur aus der Sicht der jeweiligen Kategorie gefragt.
+   Deshalb wird im Code nach dem FELD gefragt, nie nach dem Text. */
+const SCHALTER_BAR_REIN   = { feld: "bar", text: "bar bekommen?" };
+const SCHALTER_BAR_RAUS   = { feld: "bar", text: "bar bezahlt?" };
+const SCHALTER_BAR_WEG    = { feld: "bar", text: "bar zurückgelegt?" };
+
 const KATEGORIEN = [
-  { key: "income",         titel: "1 · Einnahmen 💰",              typ: "positiv",   zeitfeld: true, schalter: SCHALTER_GEARBEITET, altHaken: true, platzhalter: "z.B. Gehalt",
+  { key: "income",         titel: "1 · Einnahmen 💰",              typ: "positiv",   zeitfeld: true, schalter: [SCHALTER_GEARBEITET, SCHALTER_BAR_REIN], altHaken: ["gearbeitet"], platzhalter: "z.B. Gehalt",
     hinweis: "Auch Bürgergeld, Unterhalt, Kindergeld oder Geschenke." },
-  { key: "fixkosten",      titel: "2 · Fixkosten 🏠",              typ: "notwendig", wiederkehrend: true, platzhalter: "z.B. Miete" },
-  { key: "abos",           titel: "3 · Abos 📺",                   typ: "abo",       wiederkehrend: true, schalter: SCHALTER_NOTWENDIG, vertrag: true, platzhalter: "z.B. Netflix" },
-  { key: "versicherungen", titel: "4 · Versicherungen 🛡️",         typ: "abo",       wiederkehrend: true, schalter: SCHALTER_NOTWENDIG, altHaken: true, vertrag: true, platzhalter: "z.B. Haftpflicht" },
-  { key: "lebensmittel",   titel: "5 · Einkauf: Lebensmittel 🥑", typ: "notwendig", platzhalter: "z.B. Wocheneinkauf" },
-  { key: "luxus",          titel: "6 · Einkauf: Ausnahmen 🍣",    typ: "nicht",     platzhalter: "z.B. Sushi" },
-  { key: "konsum",         titel: "7 · Große Ausnahmen 🛍️",        typ: "nicht",     platzhalter: "z.B. Klamotten" },
-  { key: "sparen",         titel: "8 · Sparen 💌",                 typ: "sparen",    schalter: SCHALTER_FUERS_ZIEL, platzhalter: "z.B. Rücklage" },
+  { key: "fixkosten",      titel: "2 · Fixkosten 🏠",              typ: "notwendig", wiederkehrend: true, schalter: [SCHALTER_BAR_RAUS], platzhalter: "z.B. Miete" },
+  { key: "abos",           titel: "3 · Abos 📺",                   typ: "abo",       wiederkehrend: true, schalter: [SCHALTER_NOTWENDIG, SCHALTER_BAR_RAUS], vertrag: true, platzhalter: "z.B. Netflix" },
+  { key: "versicherungen", titel: "4 · Versicherungen 🛡️",         typ: "abo",       wiederkehrend: true, schalter: [SCHALTER_NOTWENDIG, SCHALTER_BAR_RAUS], altHaken: ["notwendig"], vertrag: true, platzhalter: "z.B. Haftpflicht" },
+  { key: "lebensmittel",   titel: "5 · Einkauf: Lebensmittel 🥑", typ: "notwendig", schalter: [SCHALTER_BAR_RAUS], platzhalter: "z.B. Wocheneinkauf" },
+  { key: "luxus",          titel: "6 · Einkauf: Ausnahmen 🍣",    typ: "nicht",     schalter: [SCHALTER_BAR_RAUS], platzhalter: "z.B. Sushi" },
+  { key: "konsum",         titel: "7 · Große Ausnahmen 🛍️",        typ: "nicht",     schalter: [SCHALTER_BAR_RAUS], platzhalter: "z.B. Klamotten" },
+  { key: "sparen",         titel: "8 · Sparen 💌",                 typ: "sparen",    schalter: [SCHALTER_FUERS_ZIEL, SCHALTER_BAR_WEG], platzhalter: "z.B. Rücklage" },
 ];
 
-/* Soll das Häkchen dieser Kategorie überhaupt zu sehen sein?
+/* Welche Häkchen dieser Kategorie sind gerade überhaupt zu sehen?
 
    Nur „fürs Sparziel?" hat eine Bedingung: Ohne Ziel wäre es eine Frage nach
-   etwas, das es nicht gibt. Die Prüfung steht hier an einer Stelle, weil das
-   Häkchen an ZWEI Orten gezeichnet wird — an jedem Posten und im Formular
+   etwas, das es nicht gibt. Die Prüfung steht hier an einer Stelle, weil die
+   Häkchen an ZWEI Orten gezeichnet werden — an jedem Posten und im Formular
    zum Hinzufügen. Stünde sie doppelt, liefen die beiden irgendwann auseinander. */
-function schalterZeigen(kat) {
-  if (!kat.schalter) return false;
-  return !kat.schalter.nurBeiSparziel || sparzielAktiv();
+function schalterVon(kat) {
+  return (kat.schalter || []).filter(s => !s.nurBeiSparziel || sparzielAktiv());
+}
+
+/* Trägt diese Kategorie ein bestimmtes Häkchen? Gefragt wird nach dem Feld,
+   nicht nach der Beschriftung — sonst müsste jede Stelle alle drei
+   Bargeld-Texte kennen. */
+function hatSchalter(kat, feld) {
+  return (kat.schalter || []).some(s => s.feld === feld);
 }
 
 /* Ist dieser Posten eine „Ausnahme"? Bei Abos und Versicherungen entscheidet
@@ -102,7 +127,7 @@ function schalterZeigen(kat) {
    Ausgaben sind nie Ausnahmen. */
 function istAusnahmePosten(kat, posten) {
   if (kat.typ === "positiv" || kat.typ === "sparen" || kat.typ === "notwendig") return false;
-  if (kat.schalter && kat.schalter.feld === "notwendig") return !posten.notwendig;
+  if (hatSchalter(kat, "notwendig")) return !posten.notwendig;
   return kat.typ === "nicht";
 }
 
@@ -1174,17 +1199,22 @@ function normalisierePosten(roh, kat, monatId) {
     label: typeof p.label === "string" ? p.label : "",
     amount: Number(p.amount) || 0,
   };
-  if (kat.schalter) {
-    const feld = kat.schalter.feld;
-    /* Steht im gespeicherten Posten schon ja oder nein, gilt das.
+  /* Steht im gespeicherten Posten schon ja oder nein, gilt das.
 
-       Fehlt das Feld ganz, ist der Stand älter als das Häkchen. Dann zählt,
-       was die App damals angenommen hat (`altHaken`): Einnahmen galten alle
-       als Arbeitseinkommen, Versicherungen alle als notwendig. Ohne diese
-       Zeile würden alte Stände beim Laden still ihre Arbeitszeit-Rechnung
-       verlieren und ihre Versicherungen plötzlich als Ausnahme zählen. */
-    posten[feld] = typeof p[feld] === "boolean" ? p[feld] : !!kat.altHaken;
-  }
+     Fehlt das Feld ganz, ist der Stand älter als das Häkchen. Dann zählt,
+     was die App damals angenommen hat (`altHaken`): Einnahmen galten alle
+     als Arbeitseinkommen, Versicherungen alle als notwendig. Ohne diese
+     Zeile würden alte Stände beim Laden still ihre Arbeitszeit-Rechnung
+     verlieren und ihre Versicherungen plötzlich als Ausnahme zählen.
+
+     Für „bar" steht in `altHaken` bewusst nirgends etwas: Vor diesem Häkchen
+     lief in der Rechnung alles übers Konto. Genau so bleibt jeder alte Stand
+     auf den Cent, bis du selbst etwas als bar markierst. */
+  const altJa = kat.altHaken || [];
+  (kat.schalter || []).forEach(schalter => {
+    const feld = schalter.feld;
+    posten[feld] = typeof p[feld] === "boolean" ? p[feld] : altJa.includes(feld);
+  });
   if (kat.wiederkehrend) {
     posten.rhythmus = INTERVALL[p.rhythmus] ? p.rhythmus : "monatlich";
     const f = Number(p.faellig);
@@ -1319,6 +1349,9 @@ function rechne(monat) {
     notwendigUmlage: 0, nichtUmlage: 0,   // auf den Monat verteilt
     notwendigReal: 0,   nichtReal: 0,     // was wirklich abgeht
     notwendigSelbst: 0,                   // … davon nur durch DEIN Häkchen notwendig
+    barEin: 0,                            // bar bekommen — kam nie aufs Konto
+    barNotwendig: 0, barNicht: 0,         // bar bezahlt — ging nie vom Konto ab
+    barGespart: 0,                        // bar zurückgelegt
     faelligJetzt: [],                     // große Brocken DIESEN Monat
     faelligBald: [],                      // … und in den nächsten zwei
     ausnahmen: [],                        // alle Ausnahmen einzeln (für die Rangliste)
@@ -1356,6 +1389,8 @@ function rechne(monat) {
         // durch deine Wochenstunden zu teilen wäre schlicht falsch gerechnet.
         z.gehalt += betrag;
         if (posten.gearbeitet) z.arbeitsEinkommen += betrag;
+        // Bar bekommen heißt: in die Prozente ja, aufs Konto nie.
+        if (posten.bar) z.barEin += betrag;
         return;
       }
       /* Gespartes zählt einmal in die Gesamtsumme (für die Sparquote) und
@@ -1366,6 +1401,7 @@ function rechne(monat) {
         z.gespart += betrag;
         if (posten.fuersZiel) z.gespartZiel += betrag;
         else                  z.gespartPuffer += betrag;
+        if (posten.bar) z.barGespart += betrag;
         return;
       }
 
@@ -1381,6 +1417,14 @@ function rechne(monat) {
       if (istNotwendig) { z.notwendigUmlage += umlage; z.notwendigReal += real; }
       else              { z.nichtUmlage     += umlage; z.nichtReal     += real; }
 
+      /* Bar bezahlt? Dann geht dieser Betrag nie vom Konto ab. Gezählt wird
+         die ECHTE Abbuchung und nicht die Umlage — die Kontostand-Kette
+         rechnet auch sonst nur mit dem, was diesen Monat wirklich fließt. */
+      if (posten.bar) {
+        if (istNotwendig) z.barNotwendig += real;
+        else              z.barNicht     += real;
+      }
+
       // Deine größte notwendige Ausgabe merken — meistens die Miete. Sie ist
       // der ehrlichste Vergleichsmaßstab, den die App hat: eine Zahl, die du
       // selbst eingetragen hast und die niemand wegdiskutieren kann.
@@ -1395,7 +1439,7 @@ function rechne(monat) {
 
            Nur das zweite kannst du zurücknehmen. Und nur das zweite kann eine
            Notlüge an dich selbst sein — deshalb muss man es sehen können. */
-        const durchHaken = !!(kat.schalter && kat.schalter.feld === "notwendig");
+        const durchHaken = hatSchalter(kat, "notwendig");
         z.notwendige.push({
           label: posten.label || "(ohne Namen)",
           betrag: umlage,
@@ -1449,6 +1493,32 @@ function rechne(monat) {
   z.ausgegebenUmlage = z.notwendigUmlage + z.nichtUmlage;
   z.ausgegebenReal   = z.notwendigReal + z.nichtReal;
   z.uebrig           = z.gehalt - z.ausgegebenUmlage - z.gespart;
+
+  /* --- Bargeld: das Geld, das an der Bank vorbeiläuft ---
+
+     Für alles oben ist Bargeld ganz normales Geld: bekommen ist bekommen,
+     ausgegeben ist ausgegeben, und die Prozente ändern sich dadurch um
+     keinen Punkt. Nur die Kontostand-Kette darunter darf es nicht anfassen —
+     sonst steht dort ein Guthaben, das nie auf dem Konto lag, oder eine
+     Abbuchung, die nie stattgefunden hat.
+
+     Deshalb bekommt jede Zeile der Kette ihren Konto-Anteil: alles, minus
+     dem, was bar lief.
+
+     Gemeint ist ausdrücklich Geld, das NIE aufs Konto kam — Trinkgeld,
+     Geschenke, bar bezahlte Nebenjobs. Was am Automaten geholt wird, ist
+     längst abgebucht und gehört hier nicht her. */
+  z.barAus           = z.barNotwendig + z.barNicht;
+  z.kontoEin         = z.gehalt - z.barEin;
+  z.kontoNotwendig   = z.notwendigReal - z.barNotwendig;
+  z.kontoNicht       = z.nichtReal - z.barNicht;
+  z.kontoSparen      = z.gespart - z.barGespart;
+  // Was am Monatsende in der Tasche liegt. Negativ heißt: mehr bar bezahlt
+  // als bar bekommen — dann steckt Automatengeld darin, und das Häkchen
+  // gehört an der Stelle wieder raus.
+  z.bargeld          = runde(z.barEin - z.barAus - z.barGespart);
+  z.hatBargeld       = (z.barEin + z.barAus + z.barGespart) > 0;
+
   /* Der Kontostand zu Beginn dieses Monats.
 
      `startFehlt` heißt: noch nichts eingetragen. Gerechnet wird dann ab null,
@@ -1458,12 +1528,13 @@ function rechne(monat) {
      `startMitGehalt` löst das Problem, dass ein Blick aufs Konto mitten im
      Monat das Gehalt schon enthält: Dann zählte die Rechnung es doppelt,
      einmal aus dem Kontostand und einmal aus den Einnahmen. Also ziehen wir
-     genau die Einnahmen wieder ab, die weiter oben zusammengezählt wurden. */
+     genau die Einnahmen wieder ab, die auch wirklich dort gelandet sind —
+     Bargeld war nie auf dem Konto und darf hier nicht abgezogen werden. */
   const eingetragen = monat.startBalance;
   z.startFehlt       = !(typeof eingetragen === "number" && Number.isFinite(eingetragen));
   z.startEingetragen = z.startFehlt ? 0 : runde(eingetragen);
   z.startMitGehalt   = monat.startMitGehalt === true;
-  z.startBalance     = runde(z.startMitGehalt ? z.startEingetragen - z.gehalt : z.startEingetragen);
+  z.startBalance     = runde(z.startMitGehalt ? z.startEingetragen - z.kontoEin : z.startEingetragen);
   /* Der Kontostand ist eine VORSCHAU aufs Monatsende, keine Momentaufnahme:
      Hier ist schon alles abgezogen, was diesen Monat noch abgebucht wird.
      Deine Banking-App zeigt heute deshalb eine andere Zahl — und genau das
@@ -1471,7 +1542,7 @@ function rechne(monat) {
 
      Gerundet, weil diese Zahl beim Monatsabschluss zum neuen Startguthaben
      wird und sonst Nachkommastellen ansammelt. */
-  z.kontostand       = runde(z.startBalance + z.gehalt - z.ausgegebenReal - z.gespart);
+  z.kontostand       = runde(z.startBalance + z.kontoEin - z.kontoNotwendig - z.kontoNicht - z.kontoSparen);
   z.imMinus          = z.kontostand < 0;
 
   // Prozente vom Gehalt — auf Basis der Umlage.
@@ -2362,12 +2433,14 @@ function kategorieHtml(kat, z) {
 
   // Zweite Zeile im Hinzufügen-Formular: Häkchen und/oder Rhythmus.
   const extras = [];
-  if (schalterZeigen(kat)) {
+  // Das Feld steht im data-Attribut, weil eine Kategorie zwei Häkchen tragen
+  // kann und das Formular sie beim Absenden auseinanderhalten muss.
+  schalterVon(kat).forEach(schalter => {
     extras.push(`<label class="schalter">
-      <input type="checkbox" data-add-schalter>
-      ${kat.schalter.text}
+      <input type="checkbox" data-add-schalter="${schalter.feld}">
+      ${schalter.text}
     </label>`);
-  }
+  });
   if (kat.wiederkehrend) {
     // Der Rhythmus wird EINMAL beim Eintragen gewählt und danach nicht mehr
     // angezeigt — sonst stünde in jeder Zeile „monatlich". Ändert sich etwas,
@@ -2518,13 +2591,13 @@ function postenHtml(kat, p, z) {
   const pausiert = kat.wiederkehrend && istPausiert(p, STATE.currentMonth.id);
   const offen = offenerPosten === p.id;
 
-  if (schalterZeigen(kat)) {
-    const feld = kat.schalter.feld;
+  schalterVon(kat).forEach(schalter => {
+    const feld = schalter.feld;
     bedienung.push(`<label class="schalter">
       <input type="checkbox" data-field="${feld}" data-cat="${kat.key}" data-id="${p.id}" ${p[feld] ? "checked" : ""}>
-      ${kat.schalter.text}
+      ${schalter.text}
     </label>`);
-  }
+  });
 
   let intervall = 1;
   if (kat.wiederkehrend) {
@@ -2730,8 +2803,12 @@ function startBlockHtml(z) {
   let hinweis;
   if (z.startFehlt) {
     hinweis = "Solange hier nichts steht, rechnen wir ab null.";
-  } else if (z.startMitGehalt && z.gehalt > 0) {
+  } else if (z.startMitGehalt && z.kontoEin > 0) {
     hinweis = `Dann rechnen wir mit ${euro(z.startBalance)} vor dem Gehalt.`;
+  } else if (z.startMitGehalt && z.barEin > 0) {
+    // Alles bar bekommen: Auf dem Konto liegt davon nichts, also gibt es
+    // auch nichts abzuziehen. Das sagen wir lieber, als still nichts zu tun.
+    hinweis = "Deine Einnahmen sind alle bar — auf dem Konto liegt davon nichts.";
   } else if (z.startMitGehalt) {
     hinweis = "Sobald deine Einnahmen eingetragen sind, ziehen wir sie hier ab.";
   } else {
@@ -2765,6 +2842,35 @@ function renderKonto(z, zy) {
     ? `Bleibt bis zum nächsten Gehalt am ${datumLesbar(zy.ende)}`
     : "Bleibt am Monatsende";
 
+  /* Sobald Bargeld im Spiel ist, sagt jede Zeile dazu, dass sie nur vom
+     Konto redet. Ohne Bargeld bliebe „aufs Konto" an jeder Zeile ein
+     Zusatz, der nichts unterscheidet — dann heißen sie schlicht wie vorher. */
+  const aufsKonto = z.hatBargeld ? " aufs Konto" : "";
+  const vomKonto  = z.hatBargeld ? " vom Konto"  : "";
+
+  /* Der Bargeld-Block: dieselben drei Spalten wie oben, damit man ihn ohne
+     Umgewöhnung liest. Er erscheint nur, wenn es Bargeld gibt.
+
+     Ein negatives Ergebnis ist kein Rechenfehler, sondern ein Hinweis: Dann
+     ist Geld vom Automaten als bar markiert, und das ist längst abgebucht. */
+  const bargeldSatz = z.bargeld < 0
+    ? "Mehr bar ausgegeben als bar bekommen — dann steckt da Geld vom Automaten drin. Das ist längst vom Konto runter, nimm das Häkchen dort wieder raus."
+    : "Läuft an deinem Konto vorbei und zählt in den Prozenten oben trotzdem voll mit. Was übrig bleibt, wandert nicht von allein in den nächsten Monat.";
+
+  const bargeldBlock = z.hatBargeld ? `
+      <div class="konto-rechnung bargeld-block">
+        <div class="bargeld-titel">Bargeld 👛</div>
+        ${zeile("+", "bar bekommen", z.barEin, "positiv")}
+        ${zeile("−", "bar bezahlt", z.barAus)}
+        ${z.barGespart > 0 ? zeile("−", "bar zurückgelegt", z.barGespart) : ""}
+        <div class="konto-zeile ergebnis ${z.bargeld < 0 ? "negativ" : ""}">
+          <span class="konto-zeichen">=</span>
+          <span class="konto-text">${z.bargeld < 0 ? "Zu viel bar bezahlt" : "Liegt in der Tasche"}</span>
+          <span class="konto-betrag">${euro(z.bargeld)}</span>
+        </div>
+        <p class="bargeld-hinweis">${bargeldSatz}</p>
+      </div>` : "";
+
   document.getElementById("konto").innerHTML = `
     <h2 class="nr-titel">Kontostand</h2>
     <div class="karte konto-karte">
@@ -2772,16 +2878,18 @@ function renderKonto(z, zy) {
 
       <div class="konto-rechnung">
         ${zeile("", z.startFehlt ? "Kontostand zu Beginn (fehlt noch)" : "Kontostand zu Beginn", z.startBalance)}
-        ${zeile("+", "Einnahmen", z.gehalt, "positiv")}
-        ${zeile("−", "Notwendige Ausgaben", z.notwendigReal)}
-        ${zeile("−", "Ausnahmen", z.nichtReal, "nicht")}
-        ${zeile("−", "Gespart", z.gespart)}
+        ${zeile("+", "Einnahmen" + aufsKonto, z.kontoEin, "positiv")}
+        ${zeile("−", "Notwendige Ausgaben" + vomKonto, z.kontoNotwendig)}
+        ${zeile("−", "Ausnahmen" + vomKonto, z.kontoNicht, "nicht")}
+        ${zeile("−", "Gespart" + vomKonto, z.kontoSparen)}
         <div class="konto-zeile ergebnis ${z.imMinus ? "negativ" : ""}">
           <span class="konto-zeichen">=</span>
           <span class="konto-text">${endeLabel}</span>
           <span class="konto-betrag">${euro(z.kontostand)}</span>
         </div>
       </div>
+
+      ${bargeldBlock}
 
       <p class="konto-fussnote"><strong>Vorschau</strong> aufs Monatsende: Hier ist schon abgezogen,
         was erst noch abgebucht wird. Deine Bank zeigt heute eine andere Zahl.</p>
@@ -3693,6 +3801,7 @@ document.addEventListener("change", (e) => {
     if (field === "notwendig")  posten.notwendig  = e.target.checked;
     if (field === "gearbeitet") posten.gearbeitet = e.target.checked;
     if (field === "fuersZiel")  posten.fuersZiel  = e.target.checked;
+    if (field === "bar")        posten.bar        = e.target.checked;
 
     speichern();
     render();
@@ -4076,10 +4185,10 @@ document.addEventListener("submit", (e) => {
 
   const posten = { id: neueId(), label: label || "(ohne Namen)", amount: amount };
 
-  if (kat.schalter) {
-    const feld = form.querySelector("[data-add-schalter]");
-    posten[kat.schalter.feld] = feld ? feld.checked : false;
-  }
+  (kat.schalter || []).forEach(schalter => {
+    const feld = form.querySelector(`[data-add-schalter="${schalter.feld}"]`);
+    posten[schalter.feld] = feld ? feld.checked : false;
+  });
   if (kat.wiederkehrend) {
     const rFeld = form.querySelector("[data-add-rhythmus]");
     posten.rhythmus = (rFeld && INTERVALL[rFeld.value]) ? rFeld.value : "monatlich";
