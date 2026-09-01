@@ -40,18 +40,13 @@
 /* --- Grund-Reset & Grundlayout --- */
 * { box-sizing: border-box; }
 
-/* Die kleinen Rauf-/Runter-Pfeile in Zahlenfeldern abschalten. Beträge tippt
-   man sowieso ein, und die Pfeile klauen nur Platz und laden zum Verklicken
-   ein. Chrome/Safari brauchen die ersten beiden Zeilen, Firefox die dritte. */
-input[type="number"]::-webkit-outer-spin-button,
-input[type="number"]::-webkit-inner-spin-button {
-  -webkit-appearance: none;
-  margin: 0;
-}
-input[type="number"] {
-  -moz-appearance: textfield;
-  appearance: textfield;
-}
+/* Betragsfelder sind bewusst Textfelder und keine Zahlenfelder.
+
+   Ein <input type="number"> wirft in einem deutschen Browser das Komma
+   stillschweigend weg: Aus getippten „1234,56" wird „123456", und die App
+   speichert das Hundertfache, ohne dass irgendwo eine Warnung steht.
+   Als Textfeld kommt der getippte Text unverfälscht an, und betragAusText()
+   in app.js versteht Komma, Punkt und Euro-Zeichen. */
 
 /* Blendet ein Element aus, ohne es aus dem HTML zu entfernen */
 .versteckt { display: none !important; }
@@ -400,8 +395,7 @@ body.modal-offen { overflow: hidden; }
   margin: 8px 0 0 2px;
 }
 
-.posten input[type="text"],
-.posten input[type="number"] {
+.posten input[type="text"] {
   width: 100%;
   border: 1px solid var(--linie);
   border-radius: var(--radius-klein);
@@ -411,7 +405,7 @@ body.modal-offen { overflow: hidden; }
   color: var(--braun);
   background: var(--feld);
 }
-.posten input[type="number"] { text-align: right; }
+.posten .betrag { text-align: right; }
 .posten input:focus {
   outline: none;
   border-color: var(--pink);
@@ -529,7 +523,7 @@ body.modal-offen { overflow: hidden; }
 /* Der ruhende Posten: blass, Betrag durchgestrichen. Die Bedienelemente
    darunter bleiben voll sichtbar — man muss die Pause ja beenden können. */
 .posten-pausiert .posten-zeile { opacity: 0.5; }
-.posten-pausiert .posten-zeile input[type="number"] { text-decoration: line-through; }
+.posten-pausiert .posten-zeile .betrag { text-decoration: line-through; }
 
 /* Löschen-Knopf (das kleine ✕) */
 .del {
@@ -573,7 +567,7 @@ body.modal-offen { overflow: hidden; }
   color: var(--braun);
   background: var(--feld);
 }
-.hinzufuegen input[type="number"] { text-align: right; }
+.hinzufuegen .betrag { text-align: right; }
 .hinzufuegen input:focus {
   outline: none;
   border-color: var(--pink);
@@ -978,37 +972,6 @@ body.bearbeitung-offen .archiv-weg { display: none; }
   margin-top: 5px;
   max-width: 230px;
   line-height: 1.4;
-}
-
-/* Das Häkchen „Dein Gehalt ist da schon drauf".
-
-   Steht direkt unter dem Feld und nicht in einer eigenen Zeile weiter unten:
-   Es gehört zu der Zahl, die man gerade tippt, und wer es dort nicht sieht,
-   sieht es nie. Der ganze Bereich ist anklickbar (deshalb <label>), damit man
-   auf dem Handy nicht das winzige Kästchen treffen muss. */
-.konto-gehalt {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-top: 10px;
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--braun);
-  cursor: pointer;
-}
-/* Die Regel für die Eingabefelder darüber setzt Rahmen, Polster und 150px
-   Breite — an einem Kästchen ergibt das einen Klotz mit Luft drumherum.
-   Deshalb hier alles zurück auf ein schlichtes Häkchen. */
-.konto-gehalt input {
-  width: 18px;
-  height: 18px;
-  padding: 0;
-  border: none;
-  border-radius: 0;
-  background: none;
-  accent-color: var(--pink);
-  flex: none;
-  margin: 0;
 }
 
 .konto-stand { font-size: 30px; font-weight: 900; letter-spacing: -0.5px; }
@@ -2237,7 +2200,7 @@ body.bearbeitung-offen .archiv-weg { display: none; }
   .legende { min-width: 0; width: 100%; }
   /* Nur die Betragsfelder werden schmaler — das Gehalt-Häkchen daneben ist
      kein Eingabefeld und bleibt ein Kästchen. */
-  .konto-block input:not([type="checkbox"]) { width: 130px; }
+  .konto-block input { width: 130px; }
   .affirmation-satz { font-size: 19px; }
   .affirmation-karte { padding: 24px 16px 16px; }
 

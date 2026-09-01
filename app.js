@@ -575,11 +575,32 @@ function betragAusText(text) {
   const sauber = String(text == null ? "" : text)
     .replace(/[−–—]/g, "-")   // typografische Striche zum echten Minus
     .replace(/[€\s]/g, "")
-    .replace(",", ".")
     .trim();
   if (sauber === "") return null;
-  const zahl = Number(sauber);
+
+  /* Steht irgendwo ein Komma, ist es der Dezimaltrenner — dann sind alle
+     Punkte davor Tausenderpunkte und müssen weg. "1.234,56" wird so zu
+     1234.56 statt zu NaN. Ohne Komma bleibt der Punkt, was er ist. */
+  const englisch = sauber.includes(",")
+    ? sauber.replace(/\./g, "").replace(",", ".")
+    : sauber;
+
+  const zahl = Number(englisch);
   return Number.isFinite(zahl) ? runde(zahl) : null;
+}
+
+/* Und zurück: eine Zahl so, wie sie in einem Eingabefeld stehen soll.
+
+   Deutsch, also mit Komma — die Felder sind seit dem Umstieg auf `type="text"`
+   ganz normale Textfelder, und dort erwartet niemand einen englischen Punkt.
+   Ohne Tausendertrennung: Sie sieht hübsch aus, aber sobald man in so einem
+   Feld weitertippt, steht man mitten in einem Punkt, den man nicht gesetzt hat.
+
+   Leer bleibt leer. Eine 0 hineinzuschreiben, wo nichts steht, würde aus
+   „ich weiß es noch nicht" ein „das Konto stand auf null" machen. */
+function alsFeldwert(n) {
+  if (!(typeof n === "number" && Number.isFinite(n))) return "";
+  return String(runde(n)).replace(".", ",");
 }
 
 // Die Beträge einer Postenliste zusammenzählen (ohne Rhythmus-Umlage).
@@ -868,7 +889,8 @@ function istPausiert(posten, monatId) {
 function neuerMonat(id, startguthaben, vorlage) {
   const monat = {
     id: id,
-    /* Was zu Beginn des Monats auf dem Konto lag.
+    /* Was vor dem Gehalt auf dem Konto lag — bevor von diesem Monat
+       irgendetwas passiert ist.
 
        `null` heißt: noch nicht eingetragen. Das ist etwas anderes als 0
        („das Konto stand auf genau null"), und deshalb steht hier auch keine
@@ -879,18 +901,6 @@ function neuerMonat(id, startguthaben, vorlage) {
     startBalance: (typeof startguthaben === "number" && Number.isFinite(startguthaben))
       ? runde(startguthaben)
       : null,
-    /* Steckt in der Zahl oben schon dein Gehalt?
-
-       Wer nachsieht, was auf dem Konto liegt, sieht dort mitten im Monat
-       auch das Gehalt — und dann zählt die Rechnung es doppelt: einmal aus
-       dem Kontostand, einmal aus deinen Einnahmen. Steht hier true, ziehen
-       wir die eingetragenen Einnahmen wieder ab.
-
-       Warum als Häkchen und nicht als fertig verrechnete Zahl: So bleibt
-       deine eigene Eingabe stehen, wie du sie gemacht hast. Trägst du dein
-       Gehalt später nach oder änderst es, zieht der Startwert von selbst
-       mit, statt einmal falsch festzustehen. */
-    startMitGehalt: false,
     /* Was dir zugeflossen ist, ohne dass du etwas dafür getan hast.
 
        Startet in JEDEM Monat leer, auch wenn die Vorlage voll war: Ein
@@ -1006,7 +1016,7 @@ function saubereAffirmationen(liste) {
 
 function leererStand() {
   return {
-    version: 4,
+    version: 5,
     einstellungen: standardEinstellungen(),
     currentMonth: neuerMonat(monatsId(new Date()), null, null),
     archive: [],
@@ -1088,7 +1098,7 @@ function migriere(daten) {
   if (!(Number(daten.version) >= 4)) umstiegNoetig = true;
 
   return {
-    version: 4,
+    version: 5,
     einstellungen: {
       wochenstunden: (stunden > 0 && stunden <= 80) ? stunden : 40,
       notgroschenStart: Math.max(0, Number(roheEinst.notgroschenStart) || 0),
@@ -1159,8 +1169,6 @@ function normalisiereMonat(monat, ersatzId) {
   const sauber = {
     id: typeof roh.id === "string" ? roh.id : ersatzId,
     startBalance: rohAnker !== null ? rohAnker : rohStart,
-    // Steckt in der Zahl oben schon das Gehalt? Siehe neuerMonat().
-    startMitGehalt: roh.startMitGehalt === true,
     /* Stände von vor dieser Karte kennen das Feld nicht. Dann steht hier
        eben eine leere Liste — der Monat ist deshalb nicht kaputt, er hat
        nur noch nichts gezählt. */
@@ -1170,6 +1178,11 @@ function normalisiereMonat(monat, ersatzId) {
      siehe startwerteFestschreiben(). Er steht nur an Monaten, die früher
      einen Anker trugen, und wird beim Umstieg gleich wieder entfernt. */
   if (rohAnker !== null) sauber.ankerAusAltemStand = true;
+  /* Merker für den einmaligen Umstieg vom Häkchen „dein Gehalt ist da schon
+     drauf" auf die Frage nach dem Ersten, siehe gehaltsHaekchenAufloesen().
+     Er steht nur an Monaten, die das Häkchen gesetzt hatten, und wird beim
+     Umstieg gleich wieder entfernt. */
+  if (roh.startMitGehalt === true) sauber.startMitGehalt = true;
 
   KATEGORIEN.forEach(kat => {
     const liste = Array.isArray(roh[kat.key]) ? roh[kat.key] : [];
@@ -1257,9 +1270,9 @@ function speichern() {
    zu seinem Beginn auf dem Konto lag. Du trägst sie ein, sie gilt für
    diesen einen Monat, und kein anderer Monat merkt etwas davon.
 
-   Das Einzige, was dabei zu klären war: Wer mitten im Monat nachsieht,
-   sieht dort auch schon sein Gehalt. Dafür gibt es das Häkchen
-   `startMitGehalt` — siehe neuerMonat() und rechne().
+   Gefragt wird nach dem Stand VOR DEM GEHALT. Das ist der Zeitpunkt, an dem
+   von diesem Monat noch nichts passiert war — und nur von dort aus darf die
+   Kette darunter alles addieren, ohne etwas doppelt zu zählen.
    ------------------------------------------------------------ */
 
 /* Der einmalige Umstieg von der Kette auf eigenständige Monate.
@@ -1328,6 +1341,54 @@ function startwerteFestschreiben() {
       "wie du sie zuletzt gesehen hast."
     );
   }
+
+  speichern();
+}
+
+/* Der einmalige Umstieg vom Häkchen „dein Gehalt ist da schon drauf" auf die
+   Frage nach dem Ersten.
+
+   Läuft genau einmal, direkt nach dem ersten Laden eines älteren Standes.
+   Wo das Häkchen gesetzt war, stand im Feld der Stand von MITTEN im Monat,
+   und die App zog die Konto-Einnahmen davon ab. Genau diese Rechnung wird
+   hier ein letztes Mal ausgeführt und ihr Ergebnis fest ins Feld geschrieben.
+
+   Der Grundsatz dahinter, derselbe wie eine Funktion weiter oben: Ein Update
+   darf Zahlen besser machen, aber niemals heimlich verschieben. Auf dem
+   Bildschirm steht nach dem Umstieg dieselbe Zahl wie vorher — nur bedeutet
+   das Feld darüber jetzt etwas anderes, und ab dem nächsten Eintrag rechnet
+   die App richtig weiter.
+
+   Die Zusammenfassungen im Archiv werden mitgezogen: Sie halten den
+   Kontostand fest, wie er beim Abschließen galt, und der hängt an dieser
+   Zahl. */
+function gehaltsHaekchenAufloesen() {
+  const eintraege = STATE.archive || [];
+  // Auch der zur Seite gelegte Monat gehört dazu, falls beim letzten Mal
+  // mitten in einer Bearbeitung geschlossen wurde.
+  const monate = eintraege.map(e => e.snapshot)
+    .concat([STATE.currentMonth])
+    .concat(STATE.bearbeitung ? [STATE.bearbeitung.zurueck] : []);
+
+  let geaendert = false;
+  monate.forEach(monat => {
+    if (!monat || monat.startMitGehalt !== true) return;
+    /* Nur wo überhaupt eine Zahl steht, gibt es etwas umzurechnen. Fehlt sie,
+       fällt bloß der Merker weg — gerechnet wurde dort ohnehin ab null. */
+    if (typeof monat.startBalance === "number" && Number.isFinite(monat.startBalance)) {
+      monat.startBalance = runde(monat.startBalance - rechne(monat).kontoEin);
+    }
+    delete monat.startMitGehalt;
+    geaendert = true;
+  });
+
+  if (!geaendert) return;
+
+  // Die Zusammenfassungen zeigen sonst weiter den Kontostand von vorher.
+  eintraege.forEach(eintrag => {
+    if (!eintrag || !eintrag.snapshot) return;
+    eintrag.summary = summaryAus(rechne(eintrag.snapshot), zufluss(eintrag.snapshot));
+  });
 
   speichern();
 }
@@ -1525,16 +1586,25 @@ function rechne(monat) {
      und die Karte sagt offen dazu, dass die Zahl noch fehlt — eine stille 0
      sähe aus wie ein leergeräumtes Konto.
 
-     `startMitGehalt` löst das Problem, dass ein Blick aufs Konto mitten im
-     Monat das Gehalt schon enthält: Dann zählte die Rechnung es doppelt,
-     einmal aus dem Kontostand und einmal aus den Einnahmen. Also ziehen wir
-     genau die Einnahmen wieder ab, die auch wirklich dort gelandet sind —
-     Bargeld war nie auf dem Konto und darf hier nicht abgezogen werden. */
+     Gefragt wird nach dem Stand VOR DEM GEHALT, und das ist der ganze Trick
+     der Rechnung darunter: eine Zahl von einem Zeitpunkt, an dem noch nichts
+     von diesem Monat passiert war. Dann darf die Kette alles addieren, was
+     danach kam, ohne etwas doppelt zu zählen.
+
+     Hier stand einmal ein Häkchen „dein Gehalt ist da schon drauf": Man tippte
+     den Stand von heute ein, und die App zog die Einnahmen wieder ab. Das ging
+     genau so lange gut, wie es EINE Einnahme gab. Kam später im Monat noch
+     etwas dazu — Flohmarkt, Rückzahlung, zurückgegebene Schuhe —, zog die App
+     auch das ab, obwohl es zum Zeitpunkt des Ablesens noch gar nicht auf dem
+     Konto lag. Der Startwert rutschte zu tief ins Minus, und die Einnahme
+     kürzte sich aus dem Endergebnis komplett heraus.
+
+     Ein Häkchen kann eben keine Zeitachse ersetzen. Ein Datum, an dem
+     nachweislich noch nichts passiert war, kann es. */
   const eingetragen = monat.startBalance;
   z.startFehlt       = !(typeof eingetragen === "number" && Number.isFinite(eingetragen));
   z.startEingetragen = z.startFehlt ? 0 : runde(eingetragen);
-  z.startMitGehalt   = monat.startMitGehalt === true;
-  z.startBalance     = runde(z.startMitGehalt ? z.startEingetragen - z.kontoEin : z.startEingetragen);
+  z.startBalance     = z.startEingetragen;
   /* Der Kontostand ist eine VORSCHAU aufs Monatsende, keine Momentaufnahme:
      Hier ist schon alles abgezogen, was diesen Monat noch abgebucht wird.
      Deine Banking-App zeigt heute deshalb eine andere Zahl — und genau das
@@ -1719,6 +1789,19 @@ function serieLaenge() {
   return n;
 }
 
+/* Zählt der laufende Monat neben dem Archiv mit?
+
+   Normalerweise ja: Er steht noch nicht im Archiv, also fehlte er sonst.
+
+   Während du aber einen alten Monat aus dem Archiv bearbeitest, liegt genau
+   dieser Monat auf dem Platz des laufenden — und gleichzeitig weiter im
+   Archiv. Ihn dann von beiden Seiten zu zählen, hieße: dein Notgroschen, dein
+   Sparziel und deine Jahresauswertung stehen so lange zu hoch, wie der Monat
+   offen ist. */
+function laufenderZaehltExtra() {
+  return !STATE.bearbeitung;
+}
+
 /* Was in einem Monat in genau einen der beiden Spartöpfe ging.
    `fuersZiel` true = Sparziel, false = Notgroschen. */
 function sparenIn(monat, fuersZiel) {
@@ -1778,7 +1861,7 @@ function notgroschen(z, bisMonat) {
      ist. Bei einem Blatt über einen alten Monat steckt der selbst schon im
      Archiv — ihn nochmal dazuzurechnen wäre doppelt.
      Ohne Ziel gibt es keine Aufteilung: dann ist alles Gesparte Puffer. */
-  const jetzt = bisMonat
+  const jetzt = (bisMonat || !laufenderZaehltExtra())
     ? 0
     : (sparzielAktiv() ? sparenIn(STATE.currentMonth, false) : summe(STATE.currentMonth.sparen));
   const bisher = vorhanden + alt + jetzt;
@@ -1852,7 +1935,8 @@ function sparziel(z) {
 
   const start = Number(roh.start) || 0;
   const alt = STATE.archive.reduce((s, m) => s + gespartAusArchiv(m, true), 0);
-  const bisher = start + alt + sparenIn(STATE.currentMonth, true);
+  const bisher = start + alt +
+    (laufenderZaehltExtra() ? sparenIn(STATE.currentMonth, true) : 0);
   const fehlt = Math.max(0, betrag - bisher);
   const geschafft = fehlt <= 0;
 
@@ -2016,7 +2100,7 @@ function zuflussJahre(bisMonat) {
 
   // Der laufende Monat gehört nur ins Bild, wenn nach dem Stand von heute
   // gefragt ist — sonst steckt der Berichtsmonat ohnehin schon im Archiv.
-  if (!bisMonat) {
+  if (!bisMonat && laufenderZaehltExtra()) {
     const jetzt = zufluss(STATE.currentMonth);
     dazu(STATE.currentMonth.id, jetzt.summe, jetzt.anzahl);
   }
@@ -2493,7 +2577,7 @@ function kategorieHtml(kat, z) {
         <form class="hinzufuegen" data-add="${kat.key}">
           <div class="form-zeile">
             <input type="text" data-add-label placeholder="${kat.platzhalter}" />
-            <input type="number" data-add-amount placeholder="0" step="0.01" inputmode="decimal" />
+            <input type="text" class="betrag" data-add-amount placeholder="0" inputmode="decimal" />
             <button type="submit" class="btn btn-plus" title="hinzufügen">＋</button>
           </div>
           ${extraZeile}
@@ -2532,8 +2616,8 @@ function wochenstundenHtml(z) {
   return `
     <div class="zeit-zeile">
       <label class="mini-label">Wochenstunden
-        <input id="wochenstunden" class="mini-zahl" type="number" min="1" max="80" step="1"
-               value="${STATE.einstellungen.wochenstunden}" />
+        <input id="wochenstunden" class="mini-zahl" type="text" inputmode="decimal"
+               value="${alsFeldwert(STATE.einstellungen.wochenstunden)}" />
       </label>
       <span class="umlage-hinweis">≈ ${euro(z.stundenlohn)} pro Stunde</span>
       <p class="feld-hinweis breit">aus ${euro(z.arbeitsEinkommen)} Arbeitseinkommen</p>
@@ -2655,7 +2739,7 @@ function postenHtml(kat, p, z) {
       <div class="posten-zeile">
         <input type="text" value="${escapeAttr(p.label)}" placeholder="${kat.platzhalter}"
                data-field="label" data-cat="${kat.key}" data-id="${p.id}" />
-        <input type="number" value="${p.amount ?? ""}" step="0.01" inputmode="decimal"
+        <input type="text" class="betrag" value="${alsFeldwert(p.amount)}" inputmode="decimal"
                data-field="amount" data-cat="${kat.key}" data-id="${p.id}" />
         <button class="del" data-del data-cat="${kat.key}" data-id="${p.id}" title="löschen">✕</button>
       </div>
@@ -2786,45 +2870,33 @@ function renderVertraege(z) {
    anzustarren. --- */
 /* Der obere Block der Kontostand-Karte: die eine Zahl, die du selbst weißt.
 
-   Gefragt wird bewusst nach dem Stand von JETZT und nicht nach dem "zu Beginn
-   des Monats" — den müsste man sich zurückrechnen, und niemand tut das.
-   Man sieht in der Banking-App nach und tippt ab, was dort steht.
+   Gefragt wird nach dem Stand VOR dem Gehalt — nach einem Zeitpunkt also, an
+   dem von diesem Monat noch nichts passiert war.
 
-   Genau daraus entsteht aber die eine Falle: Mitten im Monat ist das Gehalt
-   dort schon drauf, und die Rechnung darunter zählt es gleich nochmal aus
-   den Einnahmen. Deshalb steht das Häkchen direkt am Feld, mit dem Satz, der
-   die Umrechnung offenlegt. Ein Klick, und die Zahl stimmt. --- */
+   Hier stand einmal die Frage nach dem Stand von JETZT, mit einem Häkchen
+   daneben („dein Gehalt ist da schon drauf"), das die Einnahmen wieder abzog.
+   Der Gedanke war richtig — man sieht in der Banking-App nach und tippt ab,
+   statt zurückzurechnen. Nur trägt ein Häkchen die Rechnung nicht: Es weiß
+   nicht, WELCHE Einnahmen in der abgelesenen Zahl schon stecken und welche
+   erst später kamen, und es weiß erst recht nicht, welche Ausgaben schon
+   abgebucht waren. Beides muss es aber wissen, sonst rechnet es daneben.
+
+   Der Gehaltseingang ist die Antwort darauf, und zwar eine, die man findet,
+   ohne ein Datum zu kennen: Man scrollt im Verlauf zu der Buchung, an der man
+   ohnehin jeden Monat hängenbleibt, und liest die Zeile darüber ab. Zurück-
+   rechnen muss dafür niemand. --- */
 function startBlockHtml(z) {
-  const wert = z.startFehlt ? "" : z.startEingetragen;
+  const wert = z.startFehlt ? "" : alsFeldwert(z.startEingetragen);
 
-  /* Was das Häkchen aus deiner Zahl macht, steht darunter im Klartext.
-     Ohne Gehalt gibt es nichts abzuziehen — dann verspricht der Satz auch
-     nichts, sondern sagt, worauf er wartet. */
-  let hinweis;
-  if (z.startFehlt) {
-    hinweis = "Solange hier nichts steht, rechnen wir ab null.";
-  } else if (z.startMitGehalt && z.kontoEin > 0) {
-    hinweis = `Dann rechnen wir mit ${euro(z.startBalance)} vor dem Gehalt.`;
-  } else if (z.startMitGehalt && z.barEin > 0) {
-    // Alles bar bekommen: Auf dem Konto liegt davon nichts, also gibt es
-    // auch nichts abzuziehen. Das sagen wir lieber, als still nichts zu tun.
-    hinweis = "Deine Einnahmen sind alle bar — auf dem Konto liegt davon nichts.";
-  } else if (z.startMitGehalt) {
-    hinweis = "Sobald deine Einnahmen eingetragen sind, ziehen wir sie hier ab.";
-  } else {
-    // Eine Zahl, die für sich spricht, braucht keinen Satz darunter.
-    hinweis = "";
-  }
+  /* Ein Satz nur da, wo er etwas zu sagen hat: Fehlt die Zahl, sagt er, womit
+     die App solange rechnet. Eine Zahl, die dasteht, spricht für sich. */
+  const hinweis = z.startFehlt ? "Solange hier nichts steht, rechnen wir ab null." : "";
 
   return `
     <div class="konto-block">
-      <div class="beschriftung">Was liegt gerade auf dem Konto?</div>
-      <input id="start-guthaben" type="number" step="0.01" inputmode="decimal"
+      <div class="beschriftung">Was lag VOR deinem Gehalt auf dem Konto?</div>
+      <input id="start-guthaben" type="text" inputmode="decimal"
              value="${wert}" placeholder="z.B. 1200" />
-      <label class="konto-gehalt">
-        <input type="checkbox" id="start-mit-gehalt" ${z.startMitGehalt ? "checked" : ""} />
-        <span>Dein Gehalt ist da schon drauf</span>
-      </label>
       ${hinweis ? `<div class="feld-hinweis">${hinweis}</div>` : ""}
     </div>`;
 }
@@ -2877,7 +2949,7 @@ function renderKonto(z, zy) {
       ${startBlockHtml(z)}
 
       <div class="konto-rechnung">
-        ${zeile("", z.startFehlt ? "Kontostand zu Beginn (fehlt noch)" : "Kontostand zu Beginn", z.startBalance)}
+        ${zeile("", z.startFehlt ? "Vor dem Gehalt (fehlt noch)" : "Vor dem Gehalt", z.startBalance)}
         ${zeile("+", "Einnahmen" + aufsKonto, z.kontoEin, "positiv")}
         ${zeile("−", "Notwendige Ausgaben" + vomKonto, z.kontoNotwendig)}
         ${zeile("−", "Ausnahmen" + vomKonto, z.kontoNicht, "nicht")}
@@ -2989,18 +3061,35 @@ function donutHtml(z) {
     { label: "Übrig",     wert: Math.max(0, z.uebrig), klasse: "seg-uebrig" },
   ].filter(t => t.wert > 0.005);
 
-  const basis = teile.reduce((s, t) => s + t.wert, 0);
+  const zusammen = teile.reduce((s, t) => s + t.wert, 0);
 
-  if (basis <= 0) {
+  if (zusammen <= 0) {
     return `<p class="leer-hinweis mittig">Trag ein paar Zahlen ein, dann male ich dir das Diagramm.</p>`;
   }
+
+  /* Zwei Nenner, und der Unterschied ist wichtig.
+
+     `basis` ist das, woran gemessen wird: dein Geld. Dieselbe Bezugsgröße wie
+     die Prozentzahl in der Mitte — sonst stünde in der Legende „45% Ausnahmen"
+     und in der Mitte „60%", und beide meinten dasselbe Geld.
+
+     Genau das passierte, sobald mehr rausging als reinkam: „Übrig" fiel auf 0,
+     und die Legende rechnete plötzlich in Prozent deiner AUSGABEN.
+
+     `ringBasis` ist nur fürs Zeichnen da. Gibst du mehr aus als du einnimmst,
+     passen die Stücke nicht mehr in einen Ring — dann werden sie gemeinsam
+     kleiner gezogen, damit der Kreis heil bleibt. An den Prozenten daneben
+     ändert das nichts: Die dürfen über 100 gehen, weil sie dann die Wahrheit
+     sagen. */
+  const basis     = z.gehalt > 0 ? z.gehalt : zusammen;
+  const ringBasis = Math.max(zusammen, basis);
 
   const radius = 54;
   const umfang = 2 * Math.PI * radius;
   let bisher = 0;
 
   const segmente = teile.map(t => {
-    const laenge = (t.wert / basis) * umfang;
+    const laenge = (t.wert / ringBasis) * umfang;
     const kreis = `<circle class="segment ${t.klasse}" cx="70" cy="70" r="${radius}"
         stroke-dasharray="${laenge.toFixed(2)} ${(umfang - laenge).toFixed(2)}"
         stroke-dashoffset="${(-bisher).toFixed(2)}" />`;
@@ -3125,11 +3214,14 @@ function grenzeHtml(z) {
       </div>`;
   }
 
-  /* Der Notgroschen-Vergleich rechnet mit derselben Formel wie die Karte
-     darunter (drei Monatsausgaben), damit die beiden Zahlen zueinander
-     passen und nicht zwei Wahrheiten behaupten. Angezeigt wird nur noch die
-     Differenz: Drei Beträge nebeneinander waren eine Rechenaufgabe. */
-  const pufferDiff = (z.notwendigUmlage - z.notwendigGrenze) * 3;
+  /* Der Notgroschen-Vergleich rechnet mit derselben Stufe wie die Karte
+     darunter, damit die beiden Zahlen zueinander passen und nicht zwei
+     Wahrheiten behaupten. Stehen die drei Monate schon, ist das Ziel dort auf
+     sechs weitergerückt — dann muss dieser Satz auch mit sechs rechnen.
+     Angezeigt wird nur die Differenz: Drei Beträge nebeneinander waren eine
+     Rechenaufgabe. */
+  const stufenMonate = notgroschen(z).dreiGeschafft ? 6 : 3;
+  const pufferDiff = (z.notwendigUmlage - z.notwendigGrenze) * stufenMonate;
 
   return `
     <div class="notwendig-fazit warnung">
@@ -3177,8 +3269,8 @@ function renderNotgroschen(z) {
   const vorhandenFeld = `
     <div class="notgroschen-vorhanden">
       <label class="mini-label">Schon vorhanden
-        <input id="notgroschen-start" class="mini-zahl breit" type="number" step="0.01"
-               inputmode="decimal" value="${STATE.einstellungen.notgroschenStart ?? 0}" />
+        <input id="notgroschen-start" class="mini-zahl breit" type="text"
+               inputmode="decimal" value="${alsFeldwert(STATE.einstellungen.notgroschenStart)}" />
       </label>
       <p class="feld-hinweis breit">Was auf dem Tagesgeldkonto oder unterm Kopfkissen liegt.</p>
     </div>
@@ -3289,8 +3381,8 @@ function renderSparziel(z) {
                value="${escapeAttr(s.label || "")}" />
       </label>
       <label class="mini-label">Was kostet es?
-        <input id="sparziel-betrag" class="mini-zahl" type="number" step="0.01" inputmode="decimal"
-               value="${s.betrag || ""}" />
+        <input id="sparziel-betrag" class="mini-zahl" type="text" inputmode="decimal"
+               value="${alsFeldwert(s.betrag)}" />
       </label>
       <label class="mini-label">Bis wann? <span class="optional">(freiwillig)</span>
         ${terminAuswahl(s.termin || "")}
@@ -3382,8 +3474,8 @@ function renderSparziel(z) {
         <summary>Ziel ändern</summary>
         ${felder(sz)}
         <label class="mini-label breit">Schon dafür zurückgelegt
-          <input id="sparziel-start" class="mini-zahl breit" type="number" step="0.01"
-                 inputmode="decimal" value="${STATE.einstellungen.sparziel.start ?? 0}" />
+          <input id="sparziel-start" class="mini-zahl breit" type="text"
+                 inputmode="decimal" value="${alsFeldwert(STATE.einstellungen.sparziel.start)}" />
         </label>
         <button id="btn-sparziel-weg" class="btn btn-leise">Ziel löschen</button>
       </details>
@@ -3424,7 +3516,7 @@ function renderZufluss() {
     <form class="zufluss-form" data-zufluss-form>
       <input type="text" data-zufluss-label maxlength="60"
              placeholder="z.B. zum Essen eingeladen" />
-      <input type="number" data-zufluss-amount step="0.01" inputmode="decimal"
+      <input type="text" data-zufluss-amount inputmode="decimal"
              placeholder="Wert" />
       <button type="submit" class="btn btn-plus" title="hinzufügen">＋</button>
     </form>
@@ -3796,7 +3888,7 @@ document.addEventListener("change", (e) => {
     const posten = liste.find(p => p.id === id);
     if (!posten) return;
 
-    if (field === "amount")     posten.amount     = e.target.value === "" ? 0 : Number(e.target.value);
+    if (field === "amount")     posten.amount     = betragAusText(e.target.value) ?? 0;
     if (field === "label")      posten.label      = e.target.value;
     if (field === "notwendig")  posten.notwendig  = e.target.checked;
     if (field === "gearbeitet") posten.gearbeitet = e.target.checked;
@@ -3819,18 +3911,10 @@ document.addEventListener("change", (e) => {
     return;
   }
 
-  // Steckt in der Zahl oben schon das Gehalt?
-  if (e.target.id === "start-mit-gehalt") {
-    STATE.currentMonth.startMitGehalt = e.target.checked;
-    speichern();
-    render();
-    return;
-  }
-
   // Wochenstunden (Grundlage der Lebenszeit-Rechnung)
   if (e.target.id === "wochenstunden") {
-    const wert = Number(e.target.value);
-    STATE.einstellungen.wochenstunden = Math.min(80, Math.max(1, isNaN(wert) ? 40 : wert));
+    const wert = betragAusText(e.target.value);
+    STATE.einstellungen.wochenstunden = Math.min(80, Math.max(1, wert === null ? 40 : wert));
     speichern();
     render();
     return;
@@ -3838,8 +3922,7 @@ document.addEventListener("change", (e) => {
 
   // Notgroschen, der schon vor der App da war
   if (e.target.id === "notgroschen-start") {
-    const wert = Number(e.target.value);
-    STATE.einstellungen.notgroschenStart = Math.max(0, isNaN(wert) ? 0 : wert);
+    STATE.einstellungen.notgroschenStart = Math.max(0, betragAusText(e.target.value) || 0);
     speichern();
     render();
     return;
@@ -3852,9 +3935,9 @@ document.addEventListener("change", (e) => {
       e.target.id === "sparziel-termin" || e.target.id === "sparziel-start") {
     const s = STATE.einstellungen.sparziel || leeresSparziel();
     if (e.target.id === "sparziel-label")  s.label  = e.target.value.slice(0, 60);
-    if (e.target.id === "sparziel-betrag") s.betrag = Math.max(0, Number(e.target.value) || 0);
+    if (e.target.id === "sparziel-betrag") s.betrag = Math.max(0, betragAusText(e.target.value) || 0);
     if (e.target.id === "sparziel-termin") s.termin = e.target.value || "";
-    if (e.target.id === "sparziel-start")  s.start  = Math.max(0, Number(e.target.value) || 0);
+    if (e.target.id === "sparziel-start")  s.start  = Math.max(0, betragAusText(e.target.value) || 0);
     STATE.einstellungen.sparziel = sauberesSparziel(s);
     speichern();
     render();
@@ -4150,7 +4233,7 @@ document.addEventListener("submit", (e) => {
     const textFeld = e.target.querySelector("[data-zufluss-label]");
     const wertFeld = e.target.querySelector("[data-zufluss-amount]");
     const label = textFeld.value.trim().slice(0, 60);
-    const wert  = Math.max(0, Number(wertFeld.value) || 0);
+    const wert  = Math.max(0, betragAusText(wertFeld.value) || 0);
 
     /* Ohne Bezeichnung geht nichts rein — anders als bei den Posten, wo ein
        nackter Betrag reicht. Hier ist der Text die eigentliche Sache: „20 €"
@@ -4177,8 +4260,7 @@ document.addEventListener("submit", (e) => {
   if (!kat) return;
 
   const label  = form.querySelector("[data-add-label]").value.trim();
-  const roh    = form.querySelector("[data-add-amount]").value;
-  const amount = roh === "" ? 0 : Number(roh);
+  const amount = betragAusText(form.querySelector("[data-add-amount]").value) ?? 0;
 
   // Leere Einträge (kein Text UND kein Betrag) ignorieren wir.
   if (label === "" && amount === 0) return;
@@ -4586,6 +4668,11 @@ function importDatei(datei) {
       if (!geladen) throw new Error("Keine gültige girl-math-Datei.");
       if (!confirm("Aktuellen Stand mit der geladenen Datei ersetzen?")) return;
       STATE = geladen;
+      /* Dieselben zwei Umstiege wie beim Seitenstart. Ohne sie käme eine alte
+         Sicherung zwar herein, würde aber nie umgerechnet — und zeigte
+         Kontostände aus einer Rechnung, die es nicht mehr gibt. */
+      startwerteFestschreiben();
+      gehaltsHaekchenAufloesen();
       speichern();
       render();
     } catch (err) {
@@ -4601,4 +4688,8 @@ function importDatei(datei) {
 // Zuerst: Stammt der Stand noch aus der Zeit der Kontostand-Kette, bekommt
 // hier jeder Monat einmalig seinen eigenen Startwert — ohne Zahlensprung.
 startwerteFestschreiben();
+// Und dann der zweite Umstieg: aus dem Häkchen „mein Gehalt ist da schon
+// drauf" wird die Zahl vom Ersten. Muss NACH startwerteFestschreiben laufen,
+// denn dort werden die Startwerte der alten Kette überhaupt erst gesetzt.
+gehaltsHaekchenAufloesen();
 render();

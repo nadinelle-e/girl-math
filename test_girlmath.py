@@ -8,7 +8,7 @@ Staende.
 
 Aufruf:  python3 test_girlmath.py
 """
-import subprocess, sys, time
+import json, subprocess, sys, time
 from datetime import date
 from pathlib import Path
 
@@ -122,6 +122,41 @@ def setze(page, selektor, wert):
     page.locator(selektor).dispatch_event("change")
 
 
+MONATE_DE = ["Januar", "Februar", "März", "April", "Mai", "Juni", "Juli",
+             "August", "September", "Oktober", "November", "Dezember"]
+MONATE_KURZ_DE = ["Jan", "Feb", "Mär", "Apr", "Mai", "Jun",
+                  "Jul", "Aug", "Sep", "Okt", "Nov", "Dez"]
+
+
+def id_plus(mid, n):
+    """Monats-ID um n Monate weiterschieben — unabhaengig von der App gerechnet."""
+    jahr, monat = (int(t) for t in mid.split("-"))
+    gesamt = jahr * 12 + (monat - 1) + n
+    return f"{gesamt // 12}-{(gesamt % 12) + 1:02d}"
+
+
+def monat_plus(mid, n):
+    """Dasselbe, aber lesbar: 'Mai 2027'."""
+    jahr, monat = (int(t) for t in id_plus(mid, n).split("-"))
+    return f"{MONATE_DE[monat - 1]} {jahr}"
+
+
+def kurz_plus(mid, n):
+    """Und kurz: 'Mai'."""
+    return MONATE_KURZ_DE[int(id_plus(mid, n).split("-")[1]) - 1]
+
+
+def diesen_monat():
+    """Die Monats-ID von heute — die Tests duerfen nicht am Kalender haengen.
+
+    Vorher stand in den Erwartungen „Juli 2026", weil der Test damals im Juli
+    geschrieben wurde. Ab August schlugen acht Pruefungen fehl, ohne dass an
+    der App etwas kaputt war. Jetzt rechnet der Test mit, wie die App auch.
+    """
+    h = date.today()
+    return f"{h.year}-{h.month:02d}"
+
+
 def neu_starten(page):
     """Leeren Stand herstellen und das Willkommens-Fenster wegklicken."""
     page.evaluate("localStorage.clear()")
@@ -152,11 +187,40 @@ with sync_playwright() as p:
     page.click("#btn-onboarding-fertig")
     pruefe("Modal weg nach Klick", page.locator(".modal-box").count(), 0)
 
-    print("\n=== 2. Zahlenfelder ohne Rauf-/Runter-Pfeile ===")
-    stil = page.evaluate(
-        "getComputedStyle(document.querySelector('input[type=number]'))"
-        ".getPropertyValue('-webkit-appearance')")
-    pruefe("Spinner abgeschaltet", stil, "textfield")
+    print("\n=== 2. Betragsfelder verstehen das deutsche Komma ===")
+    # Hier stand einmal die Pruefung, ob die Rauf-/Runter-Pfeile eines
+    # <input type="number"> abgeschaltet sind. Diese Felder gibt es nicht mehr,
+    # und zwar aus einem harten Grund: Ein Zahlenfeld wirft in einem deutschen
+    # Browser das Komma stillschweigend weg. Getippte „1234,56" kommen als
+    # „123456" an — die App speicherte das Hundertfache, ohne eine Warnung.
+    pruefe("kein einziges Zahlenfeld mehr",
+           page.locator('input[type="number"]').count(), 0)
+
+    form = page.locator('form[data-add="income"]')
+    page.locator('details[data-kat="income"]').evaluate("el => el.open = true")
+    form.locator("[data-add-label]").fill("Gehalt")
+    form.locator("[data-add-amount]").type("1234,56")   # so tippt sie wirklich
+    pruefe("das Komma ueberlebt die Eingabe",
+           form.locator("[data-add-amount]").input_value(), "1234,56")
+    form.locator("button[type=submit]").click()
+    pruefe("und kommt als 1234,56 an, nicht als 123456",
+           page.evaluate("STATE.currentMonth.income[0].amount"), 1234.56)
+    pruefe("im Feld steht sie danach wieder deutsch",
+           page.locator(f'{auf(page, "income")} .posten .betrag').first.input_value(), "1234,56")
+
+    # Auch der Punkt geht — und Tausenderpunkte neben einem Komma ebenso.
+    pruefe("Punkt als Dezimaltrenner", page.evaluate('betragAusText("12.5")'), 12.5)
+    pruefe("Tausenderpunkt neben Komma", page.evaluate('betragAusText("1.234,56")'), 1234.56)
+    pruefe("mit Euro-Zeichen und Leerzeichen", page.evaluate('betragAusText(" 1.234,56 € ")'), 1234.56)
+    pruefe("typografisches Minus", page.evaluate('betragAusText("−300,50")'), -300.5)
+    pruefe("leer bleibt leer", page.evaluate('betragAusText("")'), None)
+
+    # Und der Kontostand liest genauso.
+    setze(page, "#start-guthaben", "1.122,50")
+    pruefe("Kontostand nimmt das deutsche Format",
+           page.evaluate("STATE.currentMonth.startBalance"), 1122.5)
+
+    neu_starten(page)
 
     print("\n=== 3. Ohne Einnahmen kein Urteil, aber sofort ein Einwurf ===")
     add(page, "luxus", "Sushi", 200)
@@ -261,7 +325,7 @@ with sync_playwright() as p:
            page.locator(f'{auf(page, "fixkosten")} .rhythmus-schild').count(), 0)
     pruefe("Kfz zeigt Rhythmus und Monat",
            page.locator(f'{auf(page, "versicherungen")} .rhythmus-schild').inner_text(),
-           "einmal im Jahr · ab Jul")
+           f"einmal im Jahr · ab {kurz_plus(diesen_monat(), 0)}")
     # Achtung: .umlage-hinweis traegt auch der Stundenlohn oben — deshalb
     # gezielt in der Versicherungs-Karte nachsehen.
     pruefe("Umlage-Hinweis 30 EUR/Monat",
@@ -282,11 +346,11 @@ with sync_playwright() as p:
     pruefe("Kontostand", norm(ergebnis.locator(".konto-betrag").inner_text()), "-88,00 €")
     pruefe("Ergebniszeile als negativ markiert",
            page.locator(".konto-zeile.ergebnis.negativ").count(), 1)
-    pruefe("Feld fragt nach dem Stand von jetzt",
+    pruefe("Feld fragt nach dem Stand vor dem Gehalt",
            page.locator(".konto-block .beschriftung").first.inner_text().lower(),
-           "was liegt gerade auf dem konto?")
-    pruefe("und das Gehalt-Haekchen steht daneben",
-           page.locator("#start-mit-gehalt").count(), 1)
+           "was lag vor deinem gehalt auf dem konto?")
+    pruefe("kein Satz unter einer Zahl, die dasteht",
+           page.locator(".konto-block .feld-hinweis").count(), 0)
 
     # Die Aufschluesselung macht die Rechnung nachvollziehbar: sechs Zeilen,
     # und die Summe der fuenf oberen ergibt die sechste. Genau daran haette
@@ -427,7 +491,8 @@ with sync_playwright() as p:
            dl.value.suggested_filename.startswith("girl-math-sicherung-"), True)
     page.wait_for_selector(".archiv-eintrag")
 
-    pruefe("neuer Monat ist August", "August 2026" in page.locator(".monat-zeile").inner_text(), True)
+    pruefe("neuer Monat ist der Folgemonat",
+           monat_plus(diesen_monat(), 1) in page.locator(".monat-zeile").inner_text(), True)
     pruefe("Fixkosten mitgenommen", page.locator(f'{auf(page, "fixkosten")} .posten').count(), 1)
     pruefe("Abos mitgenommen", page.locator(f'{auf(page, "abos")} .posten').count(), 2)
     pruefe("Versicherung mitgenommen", page.locator(f'{auf(page, "versicherungen")} .posten').count(), 1)
@@ -435,7 +500,7 @@ with sync_playwright() as p:
     pruefe("Einnahmen NICHT mitgenommen", page.locator(f'{auf(page, "income")} .posten').count(), 0)
     pruefe("Rhythmus mitgenommen",
            page.locator(f'{auf(page, "versicherungen")} .rhythmus-schild').inner_text(),
-           "einmal im Jahr · ab Jul")
+           f"einmal im Jahr · ab {kurz_plus(diesen_monat(), 0)}")
     zusammenfassung = page.evaluate("JSON.stringify(STATE.archive[0].summary)")
     pruefe("Archiv-Zusammenfassung ist gefuellt", "quoteNicht" in zusammenfassung, True)
     pruefe("Serie laeuft", page.locator(".serie-laeuft").count(), 1)
@@ -460,7 +525,8 @@ with sync_playwright() as p:
     print("\n=== 16. Das Archiv: nur der Monatsname, alles Weitere auf Tipp ===")
     eintrag = page.locator(".archiv-eintrag").first
     pruefe("ein Monat im Archiv", page.locator(".archiv-eintrag").count(), 1)
-    pruefe("und zwar der Juli", eintrag.locator(".archiv-monat").inner_text().strip(), "Juli 2026")
+    pruefe("und zwar der abgeschlossene Monat",
+           eintrag.locator(".archiv-monat").inner_text().strip(), monat_plus(diesen_monat(), 0))
     # Die Zahlenwand von frueher ist weg — sie stand ohnehin alle im Bericht.
     pruefe("keine Zahlen daneben", "€" in eintrag.inner_text(), False)
     pruefe("Knoepfe erst nach dem Antippen",
@@ -474,7 +540,7 @@ with sync_playwright() as p:
     pruefe("am Bildschirm unsichtbar", page.locator("#bericht").is_visible(), False)
     archiv_bericht(page)
     inhalt = page.locator("#bericht").text_content()
-    for teil in ["Monatsbericht", "Juli 2026", "Die Zahlen", "50/30/20",
+    for teil in ["Monatsbericht", monat_plus(diesen_monat(), 0), "Die Zahlen", "50/30/20",
                  "Alle Posten im Einzelnen", "nirgendwo hochgeladen"]:
         pruefe(f"Bericht enthaelt '{teil}'", teil in inhalt, True)
     page.emulate_media(media="print")
@@ -597,7 +663,7 @@ with sync_playwright() as p:
 
     print("\n=== 23. Gesicherter Stand enthaelt alles ===")
     stand = page.evaluate("JSON.parse(JSON.stringify(STATE))")
-    pruefe("Version 4", stand.get("version"), 4)
+    pruefe("Version 5", stand.get("version"), 5)
     pruefe("Wochenstunden gespeichert", stand["einstellungen"]["wochenstunden"], 40)
     pruefe("Notgroschen-Startwert gespeichert", stand["einstellungen"]["notgroschenStart"], 0)
     pruefe("Versicherungen im Monat", "versicherungen" in stand["currentMonth"], True)
@@ -790,19 +856,6 @@ with sync_playwright() as p:
 
     # Ankunft: 1800 fehlen, 200 pro Monat -> 9 Monate
     heute = page.evaluate("STATE.currentMonth.id")
-    MONATE_DE = ["Januar", "Februar", "März", "April", "Mai", "Juni", "Juli",
-                 "August", "September", "Oktober", "November", "Dezember"]
-
-    def id_plus(mid, n):
-        """Monats-ID um n Monate weiterschieben — unabhaengig von der App gerechnet."""
-        jahr, monat = (int(t) for t in mid.split("-"))
-        gesamt = jahr * 12 + (monat - 1) + n
-        return f"{gesamt // 12}-{(gesamt % 12) + 1:02d}"
-
-    def monat_plus(mid, n):
-        """Dasselbe, aber lesbar: 'Mai 2027'."""
-        jahr, monat = (int(t) for t in id_plus(mid, n).split("-"))
-        return f"{MONATE_DE[monat - 1]} {jahr}"
 
     pruefe("Ankunft in 9 Monaten",
            monat_plus(heute, 9) in page.locator(".sparziel-text").inner_text(), True)
@@ -1185,11 +1238,13 @@ with sync_playwright() as p:
            norm(gym.locator(".pause-schild").inner_text()).split("\n")[0],
            "⏸ pausiert bis")
     pruefe("Pause laeuft bis zum laufenden Monat",
-           gym.locator("[data-pause-bis]").input_value(), "2026-07")
+           gym.locator("[data-pause-bis]").input_value(), diesen_monat())
     pruefe("Auswahl ohne Jahreszahl",
-           gym.locator("[data-pause-bis] option").first.inner_text(), "Jul")
+           gym.locator("[data-pause-bis] option").first.inner_text(),
+           kurz_plus(diesen_monat(), 0))
     pruefe("Auswahl endet im Dezember",
-           gym.locator("[data-pause-bis] option").count(), 6)
+           gym.locator("[data-pause-bis] option").count(),
+           13 - int(diesen_monat().split("-")[1]))
     pruefe("nach der Pause: 1% Ausnahmen",
            page.locator(".verdikt .prozent").inner_text().split("%")[0], "1")
     pruefe("nach der Pause: Kontostand 1.180",
@@ -1204,16 +1259,19 @@ with sync_playwright() as p:
     # die 40 € hoeher. Ein eigener Kasten darunter sagte dasselbe ein drittes Mal.
     pruefe("kein extra Kasten fuer die Pause", page.locator(".konto-pause").count(), 0)
 
-    # Pause verlaengern: bis September, dann ueberlebt sie einen Monatswechsel.
-    gym.locator("[data-pause-bis]").select_option("2026-09")
-    pruefe("Pause bis September",
-           gym.locator("[data-pause-bis]").input_value(), "2026-09")
+    # Pause bis in den Folgemonat verlaengern — dann ueberlebt sie den Wechsel.
+    # Der Monat wird ausgerechnet und nicht eingetippt: Sonst haengt der Test
+    # daran, wann er laeuft, und faellt beim naechsten Monatswechsel um.
+    naechster = id_plus(diesen_monat(), 1)
+    gym.locator("[data-pause-bis]").select_option(naechster)
+    pruefe("Pause bis in den Folgemonat",
+           gym.locator("[data-pause-bis]").input_value(), naechster)
 
     with page.expect_download(timeout=15000):
         page.click("#btn-monat-abschliessen")
     page.wait_for_selector(".archiv-eintrag")
     gym = posten_von("abos", "Gym")
-    pruefe("Pause wandert in den August mit", gym.locator(".pause-schild").count(), 1)
+    pruefe("Pause wandert in den neuen Monat mit", gym.locator(".pause-schild").count(), 1)
 
     # … und endet dann von allein. Zwei Monatswechsel weiter ist Oktober.
     with page.expect_download(timeout=15000):
@@ -1374,25 +1432,29 @@ with sync_playwright() as p:
     pruefe("Monat 2 bleibt davon voellig unberuehrt", start_von(), 2000)
     pruefe("und sein Ende auch", page.evaluate("rechneAktuell().kontostand"), 2300)
 
-    print("\n=== 38b. Das Haekchen: mein Gehalt ist da schon drauf ===")
-    # Wer mitten im Monat aufs Konto sieht, sieht dort auch sein Gehalt. Ohne
-    # das Haekchen zaehlte die Rechnung es doppelt.
+    print("\n=== 38b. Der Kontostand vor dem Gehalt: eine Zahl, kein Haekchen ===")
+    # Hier stand einmal ein Haekchen „dein Gehalt ist da schon drauf": Man tippte
+    # den Stand von HEUTE ein, und die App zog die Einnahmen wieder ab. Das ging
+    # so lange gut, wie es EINE Einnahme gab — kam spaeter im Monat noch etwas
+    # dazu, zog die App auch das ab, obwohl es beim Ablesen noch gar nicht auf
+    # dem Konto lag. Jetzt fragt das Feld nach dem Stand vor dem Gehalt, und
+    # die Zahl gilt so, wie sie dasteht.
+    pruefe("kein Haekchen mehr an der Karte", page.locator("#start-mit-gehalt").count(), 0)
+    pruefe("das Feld fragt nach dem Stand vor dem Gehalt",
+           "vor deinem gehalt" in page.locator(".konto-block .beschriftung").first.inner_text().lower(), True)
+
     setze(page, "#start-guthaben", 2000)
-    page.locator("#start-mit-gehalt").check()
-    pruefe("das Gehalt wird wieder abgezogen", start_von(), 1000)
-    pruefe("und der Satz darunter sagt es",
-           "1.000,00" in norm(page.locator(".konto-block .feld-hinweis").inner_text()), True)
-    # 1000 + 1000 − 700 = 1300
-    pruefe("Kontostand ohne Doppelzaehlung",
-           page.evaluate("rechneAktuell().kontostand"), 1300)
+    pruefe("ihre Zahl ist der Startwert, unveraendert", start_von(), 2000)
 
-    # Das Haekchen rechnet live mit: Aendert sich das Gehalt, zieht der
-    # Startwert nach, statt einmal falsch festzustehen.
-    add(page, "income", "Bonus", 500, haken=True)
-    pruefe("mehr Einnahmen, weniger Startwert", start_von(), 500)
-
-    page.locator("#start-mit-gehalt").uncheck()
-    pruefe("Haekchen weg, ihre Zahl gilt wieder", start_von(), 2000)
+    # DER KERN: eine zweite Einnahme, die spaeter im Monat kam. Sie darf den
+    # Startwert nicht anfassen und muss vorne UND hinten voll mitzaehlen.
+    add(page, "income", "Flohmarkt", 500, haken=False)
+    pruefe("spaetere Einnahme laesst den Startwert in Ruhe", start_von(), 2000)
+    # 2000 + 1000 Gehalt + 500 Flohmarkt − 700 Miete = 2800
+    pruefe("und landet voll im Kontostand",
+           page.evaluate("rechneAktuell().kontostand"), 2800)
+    pruefe("die Zeile zeigt beide Einnahmen zusammen",
+           page.evaluate("rechneAktuell().kontoEin"), 1500)
 
     # Feld leeren heisst „ich weiss es nicht" — und nicht „das Konto stand auf null".
     setze(page, "#start-guthaben", "")
@@ -1588,14 +1650,12 @@ with sync_playwright() as p:
     pruefe("er sagt dazu, dass die Prozente mitzaehlen",
            "Prozenten oben trotzdem voll mit" in block, True)
 
-    # Das Haekchen „mein Gehalt ist da schon drauf" darf nur Konto-Geld
-    # abziehen: 1000 − 2000 = −1000, und nicht −1200 wegen des Trinkgelds.
-    page.locator("#start-mit-gehalt").check()
-    pruefe("nur die Konto-Einnahmen werden abgezogen",
-           page.evaluate("rechneAktuell().startBalance"), -1000)
-    pruefe("und der Kontostand bleibt stimmig",
-           page.evaluate("rechneAktuell().kontostand"), 200)
-    page.locator("#start-mit-gehalt").uncheck()
+    # Bares aendert am Startwert gar nichts mehr: Der ist die Zahl von vor dem
+    # Gehalt, und die kennt weder Gehalt noch Trinkgeld.
+    pruefe("der Startwert bleibt ihre eigene Zahl",
+           page.evaluate("rechneAktuell().startBalance"), 1000)
+    pruefe("bar Bekommenes bleibt aus der Konto-Kette raus",
+           page.evaluate("rechneAktuell().kontoEin"), 2000)
 
     # Mehr bar bezahlt als bar bekommen? Dann steckt Automatengeld drin, und
     # die Karte sagt das, statt eine ratlose Minuszahl hinzustellen.
@@ -1632,6 +1692,168 @@ with sync_playwright() as p:
            page.evaluate("rechneAktuell().kontostand"), 1100)
     pruefe("kein Bargeld-Block, wo kein Bargeld ist",
            page.locator(".bargeld-block").count(), 0)
+
+    print("\n=== 43. Ein bearbeiteter Archiv-Monat zaehlt nicht doppelt ===")
+    # Waehrend ein alter Monat aus dem Archiv offen ist, liegt er an ZWEI
+    # Stellen: im Archiv und auf dem Platz des laufenden Monats. Notgroschen,
+    # Sparziel und Jahresauswertung haben ihn von beiden Seiten gezaehlt —
+    # und standen so lange zu hoch, wie er offen war.
+    neu_starten(page)
+    # Das Ziel steht von Anfang an, damit die Zusammenfassung beim Abschliessen
+    # beide Spartoepfe getrennt festhaelt — und beide gepruefte werden koennen.
+    page.evaluate("STATE.einstellungen.sparziel = "
+                  "{label: 'Reise', betrag: 5000, termin: '', start: 0};"
+                  "speichern(); render();")
+    add(page, "income", "Gehalt", 2000, haken=True)
+    add(page, "fixkosten", "Miete", 500, rhythmus="monatlich")
+    add(page, "sparen", "Notgroschen", 300, haken=False)    # in den Puffer
+    add(page, "sparen", "Fuer Lissabon", 200, haken=True)   # aufs Ziel
+    zufluss_add(page, "Oma hat was zugesteckt", 40)
+    setze(page, "#start-guthaben", 1000)
+
+    with page.expect_download(timeout=15000):
+        page.click("#btn-monat-abschliessen")
+    page.wait_for_selector(".archiv-eintrag")
+
+    pruefe("nach dem Abschluss stehen 300 im Puffer",
+           page.evaluate("notgroschen(rechneAktuell()).bisher"), 300)
+    pruefe("200 auf dem Ziel",
+           page.evaluate("rechneAktuell().sparziel.bisher"), 200)
+    pruefe("und 40 in der Jahresauswertung",
+           page.evaluate("zuflussJahre()[0].summe"), 40)
+
+    eintrag = page.locator(".archiv-eintrag").first
+    eintrag.locator(".archiv-monat").click()
+    eintrag.locator("[data-archiv-bearbeiten]").click()
+
+    # DER KERN: Der Monat liegt jetzt im Archiv UND vorne. Vorher zaehlte ihn
+    # jede dieser drei Zahlen doppelt — 600, 400 und 80 statt 300, 200 und 40.
+    pruefe("beim Bearbeiten bleibt der Puffer bei 300",
+           page.evaluate("notgroschen(rechneAktuell()).bisher"), 300)
+    pruefe("das Ziel bei 200",
+           page.evaluate("rechneAktuell().sparziel.bisher"), 200)
+    pruefe("und die Jahresauswertung bei 40",
+           page.evaluate("zuflussJahre()[0].summe"), 40)
+
+    page.click("#btn-bearbeitung-fertig")
+    pruefe("und nach dem Fertig steht wieder alles am Platz",
+           page.evaluate("notgroschen(rechneAktuell()).bisher"), 300)
+
+    print("\n=== 44. Der Umstieg vom Haekchen auf die Zahl vor dem Gehalt ===")
+    # Ein Stand aus der Zeit des Haekchens: Im Feld stand der Kontostand von
+    # MITTEN im Monat, und die App zog die Einnahmen davon ab. Nach dem Update
+    # muss auf dem Bildschirm dieselbe Zahl stehen wie vorher — nur eben als
+    # feste Zahl im Feld, nicht als Rechnung aus einem Haekchen.
+    page.evaluate("d => localStorage.setItem('girlmath.v1', JSON.stringify(d))", {
+        "version": 4,
+        "einstellungen": {"wochenstunden": 40},
+        "currentMonth": {
+            "id": diesen_monat(), "startBalance": 1122, "startMitGehalt": True,
+            "income": [{"id": "u1", "label": "Gehalt", "amount": 1200, "gearbeitet": True},
+                       {"id": "u2", "label": "Flohmarkt", "amount": 54, "gearbeitet": False}],
+            "fixkosten": [{"id": "u3", "label": "Miete", "amount": 700, "rhythmus": "monatlich"}],
+            "abos": [], "versicherungen": [], "lebensmittel": [],
+            "luxus": [], "konsum": [], "sparen": [], "zufluesse": [],
+        },
+        "archive": [],
+        "onboardingGesehen": True,
+    })
+    page.reload()
+    page.wait_for_selector(".verdikt")
+
+    # Vorher rechnete die App: 1122 − 1254 = −132 als Startwert, Ende 422.
+    pruefe("das Haekchen ist aus dem Stand verschwunden",
+           page.evaluate("STATE.currentMonth.startMitGehalt"), None)
+    pruefe("die Rechnung von damals steht jetzt fest im Feld",
+           page.evaluate("STATE.currentMonth.startBalance"), -132)
+    pruefe("und die Zahl auf dem Schirm ist dieselbe wie vorher",
+           page.evaluate("rechneAktuell().kontostand"), 422)
+    pruefe("Fassung ist hochgezogen", page.evaluate("STATE.version"), 5)
+
+    # Ab jetzt rechnet sie richtig weiter: eine neue Einnahme schlaegt voll
+    # durch, statt sich aus dem Ergebnis herauszukuerzen.
+    add(page, "income", "Rueckzahlung", 100, haken=False)
+    pruefe("eine neue Einnahme laesst den Startwert in Ruhe",
+           page.evaluate("rechneAktuell().startBalance"), -132)
+    pruefe("und landet voll im Kontostand",
+           page.evaluate("rechneAktuell().kontostand"), 522)
+
+    print("\n=== 45. Das Kreisdiagramm misst an derselben Zahl wie seine Mitte ===")
+    # Gibt sie mehr aus als rein kam, faellt „Uebrig" auf 0. Die Legende
+    # rechnete dann in Prozent der AUSGABEN, die Mitte weiter in Prozent des
+    # Geldes — zwei Nenner in einem Bild.
+    neu_starten(page)
+    add(page, "income", "Gehalt", 1000, haken=True)
+    add(page, "fixkosten", "Miete", 600, rhythmus="monatlich")
+    add(page, "luxus", "Shopping", 600)
+
+    mitte = page.locator(".donut-zahl").text_content()
+    werte = [w.text_content() for w in page.locator(".legende-wert").all()]
+    namen = [n.text_content() for n in page.locator(".legende-text").all()]
+    legende = dict(zip(namen, werte))
+    print("  Mitte:", mitte, "| Legende:", legende)
+    pruefe("die Mitte zeigt 60% Ausnahmen", mitte, "60%")
+    pruefe("und die Legende sagt dasselbe", legende.get("Ausnahmen"), "60%")
+    pruefe("Notwendig ebenfalls am Geld gemessen", legende.get("Notwendig"), "60%")
+    pruefe("kein Uebrig, wo nichts uebrig ist", "Übrig" in legende, False)
+
+    # Im Normalfall bleibt alles wie vorher: die Teile ergeben zusammen 100%.
+    setze(page, f'{auf(page, "luxus")} .posten .betrag', "100")
+    pruefe("unter dem Strich wieder 10% Ausnahmen",
+           page.locator(".donut-zahl").text_content(), "10%")
+    werte = [w.text_content() for w in page.locator(".legende-wert").all()]
+    pruefe("und die Legende ergibt zusammen 100%",
+           sum(int(w.rstrip("%")) for w in werte), 100)
+
+    print("\n=== 46. Der Notgroschen-Satz rechnet mit der Stufe, die gilt ===")
+    # „Dein Notgroschen-Ziel laege X niedriger" rechnete immer mit drei
+    # Monatsausgaben — auch wenn die Karte darunter laengst auf sechs stand.
+    neu_starten(page)
+    add(page, "income", "Gehalt", 1000, haken=True)
+    add(page, "fixkosten", "Miete", 600, rhythmus="monatlich")   # 60%, also 10 Punkte drueber
+    pruefe("Stufe 3, Satz rechnet mit 3 (100 x 3)",
+           "300,00" in norm(page.locator(".notwendig-fazit.warnung p").inner_text()), True)
+
+    # Puffer auffuellen, bis die drei Monate stehen: Ziel ist 1800.
+    setze(page, "#notgroschen-start", "2000")
+    pruefe("die Karte ist jetzt auf Stufe 6",
+           "6 Monatsausgaben" in page.locator(".notgroschen-kopf").inner_text(), True)
+    pruefe("und der Satz rechnet mit 6 (100 x 6)",
+           "600,00" in norm(page.locator(".notwendig-fazit.warnung p").inner_text()), True)
+
+    print("\n=== 47. Eine geladene Sicherung wird genauso umgerechnet wie ein alter Stand ===")
+    # migriere() merkt sich zwar „alter Stand, muss umgerechnet werden", aber
+    # die Umrechnung lief nur beim Seitenstart — nach einem Import also nie.
+    # Eine geladene Sicherung zeigte dann Kontostaende aus einer Rechnung,
+    # die es nicht mehr gibt.
+    neu_starten(page)
+    sicherung = SHOTS / "alte-sicherung.json"
+    sicherung.write_text(json.dumps({
+        "version": 4,
+        "einstellungen": {"wochenstunden": 40},
+        "currentMonth": {
+            "id": diesen_monat(), "startBalance": 1122, "startMitGehalt": True,
+            "income": [{"id": "i1", "label": "Gehalt", "amount": 1200, "gearbeitet": True},
+                       {"id": "i2", "label": "Flohmarkt", "amount": 54, "gearbeitet": False}],
+            "fixkosten": [{"id": "i3", "label": "Miete", "amount": 700, "rhythmus": "monatlich"}],
+            "abos": [], "versicherungen": [], "lebensmittel": [],
+            "luxus": [], "konsum": [], "sparen": [], "zufluesse": [],
+        },
+        "archive": [],
+        "onboardingGesehen": True,
+    }), encoding="utf-8")
+
+    page.locator("#import-datei").set_input_files(str(sicherung))
+    page.wait_for_function("() => STATE.currentMonth.income.length === 2")
+
+    pruefe("die Posten sind da", page.evaluate("STATE.currentMonth.income.length"), 2)
+    pruefe("das Haekchen wurde beim Laden aufgeloest",
+           page.evaluate("STATE.currentMonth.startMitGehalt"), None)
+    pruefe("und in die feste Zahl umgerechnet",
+           page.evaluate("STATE.currentMonth.startBalance"), -132)
+    pruefe("der Kontostand steht wie in der alten Fassung",
+           page.evaluate("rechneAktuell().kontostand"), 422)
+    pruefe("Fassung mitgezogen", page.evaluate("STATE.version"), 5)
 
     browser.close()
 
