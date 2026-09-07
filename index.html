@@ -73,14 +73,14 @@
 
     Warum: Browser legen Dateien für eine Weile beiseite, statt sie jedes Mal
     neu zu holen. Nach einem Update sähe man deshalb bis zu zehn Minuten lang
-    noch die alte Fassung. Für den Browser ist "styles.css?v=21" aber eine
+    noch die alte Fassung. Für den Browser ist "styles.css?v=23" aber eine
     andere Adresse als "styles.css?v=19" — also holt er sie sofort frisch.
 
     ➜ WICHTIG: Bei jeder Änderung an styles.css oder app.js die Zahl an BEIDEN
       Stellen um eins hochzählen (unten beim <script> steht dieselbe). Vergisst
       man es, ist nichts kaputt, es dauert nur wieder bis zu zehn Minuten.
   -->
-  <link rel="stylesheet" href="styles.css?v=21" />
+  <link rel="stylesheet" href="styles.css?v=23" />
 </head>
 <body>
   <!-- Die Leiste, die beim Scrollen oben kleben bleibt: Kontostand, Ausnahmen-
@@ -144,15 +144,11 @@
          Wird von app.js gefüllt (renderNotwendig). -->
     <section id="notwendig"></section>
 
-    <!-- Notgroschen: 3 Monatsausgaben als Puffer, mit Fortschritt.
-         Wird von app.js gefüllt (renderNotgroschen). -->
-    <section id="notgroschen"></section>
-
-    <!-- Dein Sparziel: die eine Sache, auf die du zusparst, mit Ankunftsmonat
-         und dem Vergleich, wie viel früher es ginge. Steht bewusst UNTER dem
-         Notgroschen — erst der Puffer, dann die schönen Dinge.
-         Wird von app.js gefüllt (renderSparziel). -->
-    <section id="sparziel"></section>
+    <!-- Gespart: eine Summe, und die Sparziele, an denen sie sich misst. Hier
+         standen einmal zwei Karten (Notgroschen und Sparziel) mit getrennten
+         Töpfen; den selbst gerechneten Notgroschen gibt es nicht mehr.
+         Wird von app.js gefüllt (renderSparen). -->
+    <section id="sparen"></section>
 
     <!-- Wohlstand, der in mein Leben fließt: alles, was dir ohne Anlass und
          ohne Gegenleistung zugefallen ist. Zählt bewusst NEBEN der großen
@@ -213,6 +209,6 @@
 
   <!-- Die Logik ganz am Ende laden, damit die Bereiche oben schon existieren. -->
   <!-- Die Zahl hier muss dieselbe sein wie oben beim Stylesheet. -->
-  <script src="app.js?v=21"></script>
+  <script src="app.js?v=23"></script>
 </body>
 </html>

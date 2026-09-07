@@ -790,6 +790,8 @@ body.modal-offen { overflow: hidden; }
 .fuell-notwendig { background: var(--mauve); }
 .fuell-nicht     { background: var(--pink); }
 .fuell-sparen    { background: var(--gruen); }
+/* Die Marken auf der Gespart-Karte. */
+.fuell-ziel      { background: var(--gold); }
 /* Der Zeit-Balken im Gehaltszyklus. Sandfarben, weil verstrichene Zeit
    weder gut noch schlecht ist — sie ist einfach vergangen. */
 .fuell-zeit      { background: var(--sand); }
@@ -1471,132 +1473,84 @@ body.bearbeitung-offen .archiv-weg { display: none; }
 .notwendig-haken .fazit-titel         { color: var(--pink); }
 
 /* ============================================================
-   Notgroschen
+   Gespart — eine Summe, und die Marken, an denen sie sich misst.
+
+   Hier standen einmal zwei Blöcke untereinander (Notgroschen und Sparziel)
+   mit je eigenem Kopf, eigenem Balken und eigenem Startwert-Feld. Sie sind
+   zu einer Karte zusammengelegt: die Zahl oben, darunter eine Zeile je Marke.
    ============================================================ */
-.notgroschen-kopf {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 14px;
-}
-.notgroschen-kopf .rechts { text-align: right; }
-.notgroschen-ziel { font-size: 24px; font-weight: 900; letter-spacing: -0.5px; }
-.notgroschen-ist  { font-size: 24px; font-weight: 900; color: var(--gruen); letter-spacing: -0.5px; }
+.spar-karte { border-top: 3px solid var(--gold); }
 
-.balken-spur.gross { height: 18px; }
-.notgroschen-quote {
-  text-align: right;
+.spar-summe {
+  font-size: 34px;
+  font-weight: 900;
+  letter-spacing: -1px;
+  color: var(--gruen);
+  line-height: 1.1;
+}
+.spar-unter {
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 700;
   color: var(--braun-weich);
-  margin-top: 6px;
+  margin-top: 4px;
 }
-.notgroschen-text { font-size: 13px; line-height: 1.55; margin: 12px 0 0; }
-.notgroschen-text.gut { color: var(--gruen); font-weight: 700; }
 
-/* Das Feld für einen Notgroschen, den es schon vor der App gab */
-.notgroschen-vorhanden {
+.spar-marken { margin-top: 18px; }
+
+/* Eine Marke. Der Abstand nach unten trennt sie von der nächsten, ohne
+   dass dafür eine Linie nötig wäre — bei fünf Zielen wäre das ein Gitter. */
+.spar-marke + .spar-marke { margin-top: 18px; }
+
+.spar-marke-kopf {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px 12px;
-  margin-top: 14px;
-  padding-top: 12px;
-  border-top: 1px dashed var(--linie);
-}
-.mini-zahl.breit { width: 110px; }
-
-/* ============================================================
-   Sparziel
-
-   Bewusst in Gold statt im Grün des Notgroschens: Die beiden Karten
-   stehen untereinander und rechnen beide mit Gespartem — sie dürfen
-   auf einen Blick nicht dasselbe sein.
-   ============================================================ */
-.sparziel-karte { border-top: 3px solid var(--gold); }
-.sparziel-karte.leer { border-top-color: var(--linie); }
-
-.sparziel-kopf {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-start;
   justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 14px;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 6px;
 }
-.sparziel-kopf .rechts { text-align: right; }
-.sparziel-summe { font-size: 24px; font-weight: 900; letter-spacing: -0.5px; }
-.sparziel-ist   { font-size: 24px; font-weight: 900; color: var(--gold); letter-spacing: -0.5px; }
-
-.fuell-ziel { background: var(--gold); }
-
-.sparziel-text { font-size: 13px; line-height: 1.55; margin: 12px 0 0; }
-.sparziel-text.gut { color: var(--gruen); font-weight: 700; }
-
-/* Die Umleitungs-Rechnung — der eigentliche Punkt der Karte, deshalb
-   als einziger Block hier farbig hinterlegt. */
-.sparziel-umleitung {
-  margin-top: 12px;
-  padding: 12px 14px;
-  background: var(--gold-weich);
-  border-radius: var(--radius-klein);
-}
-.sparziel-umleitung p { margin: 0; font-size: 13px; line-height: 1.55; }
-
-.sparziel-termin { font-size: 13px; line-height: 1.55; margin: 12px 0 0; }
-.sparziel-termin.gut  { color: var(--gruen); font-weight: 700; }
-.sparziel-termin.warn { color: var(--rot); font-weight: 700; }
-
-/* Der Notgroschen-Vorrang. Steht abgesetzt unten: kein Verbot, aber
-   auch nichts, worüber man hinwegliest. */
-.sparziel-vorrang {
-  margin: 14px 0 0;
-  padding-top: 12px;
-  border-top: 1px dashed var(--linie);
-  font-size: 12px;
-  line-height: 1.55;
-  color: var(--braun-weich);
-}
-
-.sparziel-felder {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-end;
-  gap: 10px 14px;
-  margin-top: 12px;
-}
-/* Die breiten Felder (Name, „schon zurückgelegt") bekommen ihre Beschriftung
-   DARÜBER statt daneben. Nebeneinander bräche der Text um und ließe das Feld
-   in einer eigenen Zeile hängen. */
-.sparziel-felder .mini-label.breit,
-.sparziel-aendern > .mini-label.breit {
-  flex-basis: 100%;
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  gap: 5px;
-}
-.sparziel-aendern > .mini-label.breit { margin-top: 12px; }
-.sparziel-felder input[type="text"] {
-  width: 100%;
-  padding: 9px 12px;
-  border: 1px solid var(--linie);
-  border-radius: var(--radius-klein);
-  background: var(--feld);
-  color: var(--braun);
-  font: inherit;
+.spar-marke-name {
   font-size: 14px;
+  font-weight: 800;
+  color: var(--braun);
 }
-.sparziel-felder input[type="text"]:focus {
-  outline: none;
-  border-color: var(--gold);
+.spar-marke-betrag {
+  font-size: 14px;
+  font-weight: 900;
+  color: var(--braun-weich);
+  flex: none;
 }
-.optional { font-weight: 400; color: var(--braun-weich); }
+.spar-marke-satz {
+  font-size: 12.5px;
+  line-height: 1.5;
+  margin: 6px 0 0;
+  color: var(--braun-weich);
+}
+/* Was steht, steht: grün, und der Satz darf es auch sagen. */
+.spar-marke-steht .spar-marke-satz { color: var(--gruen); font-weight: 700; }
 
-.sparziel-aendern { margin-top: 16px; }
-.sparziel-aendern > summary {
+.spar-marke-termin { font-size: 12.5px; line-height: 1.5; margin: 4px 0 0; }
+.spar-marke-termin.gut  { color: var(--gruen); font-weight: 700; }
+.spar-marke-termin.warn { color: var(--rot); font-weight: 700; }
+
+.spar-leer {
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--braun-weich);
+  margin: 0;
+}
+
+/* Was die Ausnahmen dieses Monats an der nächsten Marke verschieben. */
+.spar-umleitung {
+  margin-top: 18px;
+  padding: 12px 14px;
+  border-radius: var(--radius-klein);
+  background: var(--pink-weich);
+}
+.spar-umleitung p { margin: 0; font-size: 13px; line-height: 1.55; }
+
+/* --- Die Verwaltung: Ziele anlegen, umbenennen, löschen --- */
+.spar-verwalten { margin-top: 18px; }
+.spar-verwalten > summary {
   cursor: pointer;
   font-size: 12px;
   font-weight: 800;
@@ -1604,7 +1558,48 @@ body.bearbeitung-offen .archiv-weg { display: none; }
   padding-top: 12px;
   border-top: 1px dashed var(--linie);
 }
-.sparziel-aendern > summary::-webkit-details-marker { display: none; }
+.spar-verwalten > summary::-webkit-details-marker { display: none; }
+
+/* Eine Zeile der Verwaltung: Name, Betrag und ✕ nebeneinander, der
+   Wunschmonat darunter. Auf schmalen Schirmen ist für vier Felder in einer
+   Reihe kein Platz, und der Termin ist das, was am seltensten gesetzt wird. */
+.ziel-zeile {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 14px;
+}
+.ziel-zeile input[type="text"] {
+  flex: 1;
+  min-width: 120px;
+  border: 1px solid var(--linie);
+  border-radius: var(--radius-klein);
+  padding: 9px 11px;
+  font-size: 14px;
+  font-family: inherit;
+  color: var(--braun);
+  background: var(--feld);
+}
+.ziel-zeile input.mini-zahl { flex: none; width: 90px; text-align: right; }
+.ziel-zeile input:focus {
+  outline: none;
+  border-color: var(--pink);
+  box-shadow: 0 0 0 3px rgba(255, 45, 120, 0.15);
+}
+.ziel-zeile .del { flex: none; }
+.ziel-termin {
+  flex-basis: 100%;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+}
+
+.spar-verwalten > .mini-label.breit {
+  display: block;
+  width: 100%;
+  margin-top: 16px;
+}
 
 /* Ein zurückhaltender Knopf für das, was man selten und mit Bedacht tut. */
 .btn-leise {

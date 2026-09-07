@@ -76,7 +76,6 @@ const SCHALTER_GEARBEITET = { feld: "gearbeitet", text: "dafür gearbeitet?" };
 
 /* `nurBeiSparziel` blendet dieses eine Häkchen aus, solange gar kein Ziel
    gesetzt ist. Eine Frage nach etwas, das es nicht gibt, wäre nur ein Rätsel. */
-const SCHALTER_FUERS_ZIEL = { feld: "fuersZiel", text: "fürs Sparziel?", nurBeiSparziel: true };
 
 /* Das Bargeld-Häkchen hängt an JEDER Kategorie und stellt überall dieselbe
    Frage: Läuft dieses Geld übers Konto — oder daran vorbei?
@@ -102,17 +101,17 @@ const KATEGORIEN = [
   { key: "lebensmittel",   titel: "5 · Einkauf: Lebensmittel 🥑", typ: "notwendig", schalter: [SCHALTER_BAR_RAUS], platzhalter: "z.B. Wocheneinkauf" },
   { key: "luxus",          titel: "6 · Einkauf: Ausnahmen 🍣",    typ: "nicht",     schalter: [SCHALTER_BAR_RAUS], platzhalter: "z.B. Sushi" },
   { key: "konsum",         titel: "7 · Große Ausnahmen 🛍️",        typ: "nicht",     schalter: [SCHALTER_BAR_RAUS], platzhalter: "z.B. Klamotten" },
-  { key: "sparen",         titel: "8 · Sparen 💌",                 typ: "sparen",    schalter: [SCHALTER_FUERS_ZIEL, SCHALTER_BAR_WEG], platzhalter: "z.B. Rücklage" },
+  { key: "sparen",         titel: "8 · Sparen 💌",                 typ: "sparen",    schalter: [SCHALTER_BAR_WEG], platzhalter: "z.B. Rücklage" },
 ];
 
-/* Welche Häkchen dieser Kategorie sind gerade überhaupt zu sehen?
+/* Welche Häkchen dieser Kategorie sind zu sehen?
 
-   Nur „fürs Sparziel?" hat eine Bedingung: Ohne Ziel wäre es eine Frage nach
-   etwas, das es nicht gibt. Die Prüfung steht hier an einer Stelle, weil die
-   Häkchen an ZWEI Orten gezeichnet werden — an jedem Posten und im Formular
-   zum Hinzufügen. Stünde sie doppelt, liefen die beiden irgendwann auseinander. */
+   Hier stand einmal eine Sonderregel für „fürs Sparziel?" — das Häkchen, mit
+   dem Gespartes in einen von zwei Töpfen fiel. Es gibt nur noch einen Topf,
+   und damit ist auch die Regel weg: Jede Kategorie zeigt schlicht ihre
+   eigenen Häkchen. */
 function schalterVon(kat) {
-  return (kat.schalter || []).filter(s => !s.nurBeiSparziel || sparzielAktiv());
+  return kat.schalter || [];
 }
 
 /* Trägt diese Kategorie ein bestimmtes Häkchen? Gefragt wird nach dem Feld,
@@ -951,31 +950,71 @@ let STATE = laden();
 
    `betrag` 0 heißt: es gibt gerade kein Ziel. Dann bleibt die Karte leer
    und der Schalter an den Sparposten verschwindet. */
-function leeresSparziel() {
+/* --- DEIN SPARBEREICH: ein Topf, beliebig viele Marken darauf ---
+
+   Hier standen einmal ZWEI getrennte Töpfe: der Notgroschen und das Sparziel,
+   jeder mit eigenem Startwert, und an jedem Sparposten ein Häkchen, das
+   entschied, in welchen von beiden er fällt.
+
+   Das ging an der Wirklichkeit vorbei. Wer spart, hat ein Sparkonto — kein
+   zweites daneben. Das Geld liegt einmal da, und wofür es reicht, ist eine
+   Frage, die man dem Kontostand stellt, nicht dem Geld selbst.
+
+   Deshalb jetzt: EIN Topf (`start` plus alles Zurückgelegte) und beliebig
+   viele MARKEN darauf. Jede Marke misst sich an derselben Summe. Liegen 1240 €
+   da, ist der Urlaub für 900 € bezahlt und die Ausbildung für 2400 € zur
+   Hälfte — beides gleichzeitig, weil es dasselbe Geld ist. */
+function leererSparbereich() {
   return {
-    label: "",     // wie es heißt ("Reise nach Lissabon")
-    betrag: 0,     // was es kostet
-    termin: "",    // Wunschmonat als "JJJJ-MM", leer = ohne festen Termin
-    start: 0,      // was du dafür schon zurückgelegt hattest, bevor die App davon wusste
+    start: 0,    // was schon zurückgelegt war, bevor die App davon wusste
+    ziele: [],   // die Marken, an denen sich der Topf misst
   };
 }
 
-/* Ein gespeichertes Sparziel auf saubere Werte bringen. */
-function sauberesSparziel(roh) {
-  const s = (roh && typeof roh === "object") ? roh : {};
-  const termin = typeof s.termin === "string" && /^\d{4}-\d{2}$/.test(s.termin) ? s.termin : "";
+/* Ein einzelnes Ziel auf saubere Werte bringen. */
+function sauberesZiel(roh) {
+  const z = (roh && typeof roh === "object") ? roh : {};
   return {
-    label:  typeof s.label === "string" ? s.label.slice(0, 60) : "",
-    betrag: Math.max(0, Number(s.betrag) || 0),
-    termin: termin,
-    start:  Math.max(0, Number(s.start) || 0),
+    id:     z.id ? String(z.id) : neueId(),
+    label:  typeof z.label === "string" ? z.label.slice(0, 60) : "",
+    betrag: Math.max(0, Number(z.betrag) || 0),
+    termin: typeof z.termin === "string" && /^\d{4}-\d{2}$/.test(z.termin) ? z.termin : "",
+  };
+}
+
+/* Der gespeicherte Sparbereich, auf saubere Werte gebracht.
+
+   Ältere Stände kennen ihn nicht: Dort liegen `notgroschenStart` und ein
+   einzelnes `sparziel` mit eigenem `start`. Beide Startwerte beschreiben
+   dasselbe — Geld, das vor der App schon zurückgelegt war — und werden
+   deshalb addiert. Das Ziel wandert als erste Marke herüber. So springt
+   keine Zahl, und niemand muss etwas neu eintippen. */
+function saubererSparbereich(roheEinst) {
+  const roh = (roheEinst.sparen && typeof roheEinst.sparen === "object")
+    ? roheEinst.sparen : null;
+
+  if (roh) {
+    return {
+      start: Math.max(0, Number(roh.start) || 0),
+      ziele: (Array.isArray(roh.ziele) ? roh.ziele : []).map(sauberesZiel),
+    };
+  }
+
+  const altesZiel = (roheEinst.sparziel && typeof roheEinst.sparziel === "object")
+    ? roheEinst.sparziel : {};
+  const ziele = [];
+  if (Math.max(0, Number(altesZiel.betrag) || 0) > 0) ziele.push(sauberesZiel(altesZiel));
+
+  return {
+    start: Math.max(0, Number(roheEinst.notgroschenStart) || 0) +
+           Math.max(0, Number(altesZiel.start) || 0),
+    ziele: ziele,
   };
 }
 
 function standardEinstellungen() {
   return {
     wochenstunden: 40,      // für die Lebenszeit-Umrechnung
-    notgroschenStart: 0,    // was du schon zurückgelegt hast, außerhalb der App
     /* Welche EINE Kategorie gerade offen ist ("abos") — oder "" für alle zu.
 
        Vorher stand hier eine Liste der zugeklappten Karten, und damit waren
@@ -988,7 +1027,7 @@ function standardEinstellungen() {
        statt einer Einladung. */
     offeneKategorie: "income",
     eigeneAffirmationen: [],  // nur deine selbst getippten; die 111 stehen im Programm
-    sparziel: leeresSparziel(), // dein eines Ziel, auf das du zusparst
+    sparen: leererSparbereich(), // ein Topf, deine Marken darauf
     zyklusStart: "",        // "" = noch nie gedrückt, sonst "2026-07-25"
   };
 }
@@ -1016,7 +1055,7 @@ function saubereAffirmationen(liste) {
 
 function leererStand() {
   return {
-    version: 5,
+    version: 6,
     einstellungen: standardEinstellungen(),
     currentMonth: neuerMonat(monatsId(new Date()), null, null),
     archive: [],
@@ -1098,10 +1137,10 @@ function migriere(daten) {
   if (!(Number(daten.version) >= 4)) umstiegNoetig = true;
 
   return {
-    version: 5,
+    version: 6,
     einstellungen: {
       wochenstunden: (stunden > 0 && stunden <= 80) ? stunden : 40,
-      notgroschenStart: Math.max(0, Number(roheEinst.notgroschenStart) || 0),
+
       /* Nur einen Kategorie-Schlüssel durchlassen, den es wirklich gibt.
 
          Das alte Feld `zugeklappt` (eine Liste) wird nicht übernommen: Aus
@@ -1119,8 +1158,10 @@ function migriere(daten) {
          aktuellen und die Liste würde bei jeder Änderung länger statt richtig.
          Ein neuer Feldname zieht die Grenze sauber, ohne raten zu müssen. */
       eigeneAffirmationen: saubereAffirmationen(roheEinst.eigeneAffirmationen),
-      // Ältere Stände kennen kein Sparziel — dann steht hier eben keines.
-      sparziel: sauberesSparziel(roheEinst.sparziel),
+      /* Ein Topf und deine Marken darauf. Ältere Stände kennen stattdessen
+         `notgroschenStart` und ein einzelnes `sparziel` — beides wird beim
+         Laden zusammengeführt, siehe saubererSparbereich(). */
+      sparen: saubererSparbereich(roheEinst),
       /* … und keinen gestarteten Zyklus. Ein `zahltag` aus älteren Ständen
          wird bewusst nicht umgerechnet: Der Zyklus startet jetzt auf Ansage,
          und ein einziger Knopfdruck ist ehrlicher als ein Datum, das die App
@@ -1405,8 +1446,6 @@ function rechne(monat) {
     gehalt: 0,            // ALLES, was reinkommt — auch Bürgergeld, Geschenke, Verkäufe
     arbeitsEinkommen: 0,  // nur das, wofür du wirklich Stunden gearbeitet hast
     gespart: 0,           // alles Zurückgelegte zusammen
-    gespartZiel: 0,       // … davon fürs Sparziel
-    gespartPuffer: 0,     // … davon für den Notgroschen
     notwendigUmlage: 0, nichtUmlage: 0,   // auf den Monat verteilt
     notwendigReal: 0,   nichtReal: 0,     // was wirklich abgeht
     notwendigSelbst: 0,                   // … davon nur durch DEIN Häkchen notwendig
@@ -1454,14 +1493,11 @@ function rechne(monat) {
         if (posten.bar) z.barEin += betrag;
         return;
       }
-      /* Gespartes zählt einmal in die Gesamtsumme (für die Sparquote) und
-         zusätzlich in genau einen der beiden Töpfe. Ohne Häkchen geht es an
-         den Notgroschen — das ist die Stellung, die alle bisherigen Einträge
-         haben, und deshalb ändert sich für einen alten Stand nichts. */
+      /* Gespartes ist eine Summe. Hier fiel es einmal je nach Häkchen in
+         einen von zwei Töpfen — die gibt es nicht mehr, und damit auch die
+         Frage nicht, welcher davon gemeint war. */
       if (kat.typ === "sparen") {
         z.gespart += betrag;
-        if (posten.fuersZiel) z.gespartZiel += betrag;
-        else                  z.gespartPuffer += betrag;
         if (posten.bar) z.barGespart += betrag;
         return;
       }
@@ -1662,11 +1698,10 @@ function rechne(monat) {
   z.notwendige.sort((a, b) => b.betrag - a.betrag);
   z.vertraege.sort((a, b) => b.proJahr - a.proJahr);
 
-  /* Das Sparziel hängt hier mit dran, damit jede Anzeige es ohne eigene
+  /* Das Ersparte hängt hier mit dran, damit jede Anzeige es ohne eigene
      Rechnerei hat. Es muss ganz am Ende stehen: Es braucht die fertigen
-     Summen oben (Ausnahmen für die Umleitung, notwendige Kosten für den
-     Notgroschen-Vorrang). */
-  z.sparziel = sparziel(z);
+     Summen oben — die Ausnahmen für die Umleitung). */
+  z.sparen = ersparnis(z);
 
   return z;
 }
@@ -1732,7 +1767,7 @@ function spruchDaten(z) {
     summe:   z.nichtUmlage,
     jahr:    z.nichtUmlage * 12,
     gespart: z.gespart,
-    puffer:  notgroschen(z).bisher,
+    puffer:  z.sparen.bisher,
     ueberRegel: z.ueberRegel,
     // Stückzahl über alle Sorten: dreimal Sushi zählt als drei, nicht als eins.
     // Muss zur "Ausnahme Nummer 7"-Zählung beim Eintippen passen.
@@ -1802,214 +1837,179 @@ function laufenderZaehltExtra() {
   return !STATE.bearbeitung;
 }
 
-/* Was in einem Monat in genau einen der beiden Spartöpfe ging.
-   `fuersZiel` true = Sparziel, false = Notgroschen. */
-function sparenIn(monat, fuersZiel) {
-  const liste = (monat && Array.isArray(monat.sparen)) ? monat.sparen : [];
-  return liste
-    .filter(p => !!p.fuersZiel === fuersZiel)
-    .reduce((s, p) => s + (Number(p.amount) || 0), 0);
-}
-
-/* Gibt es überhaupt ein Sparziel? Ohne eines gehört alles Gesparte dem
-   Notgroschen — auch das, was früher mal fürs Ziel weggelegt wurde. Sonst
-   läge nach dem Löschen eines Ziels Geld herum, das zu keinem Topf mehr
-   zählt und in keinem Balken auftaucht. */
-function sparzielAktiv() {
-  return (Number((STATE.einstellungen.sparziel || {}).betrag) || 0) > 0;
+/* Was in einem Monat zurückgelegt wurde. Eine Summe — hier gab es einmal
+   zwei, je nach Häkchen am Posten. */
+function gespartIn(monat) {
+  return summe((monat && monat.sparen) || []);
 }
 
 /* Dasselbe für einen abgeschlossenen Monat aus dem Archiv.
 
-   Der Fallback ist wichtig: Monate, die vor dem Sparziel abgeschlossen
-   wurden, kennen nur `gespart`. Alles darin war damals Notgroschen, also
-   wird es auch heute als Notgroschen gezählt — sonst würde ein alter
-   Stand rückwirkend seinen Puffer verlieren. */
-function gespartAusArchiv(eintrag, fuersZiel) {
-  const s = (eintrag && eintrag.summary) || {};
-  if (fuersZiel) return Number(s.gespartZiel) || 0;
-  // Ohne aktives Ziel fällt auch das damalige Ziel-Sparen an den Notgroschen.
-  if (!sparzielAktiv()) return Number(s.gespart) || 0;
-  return Number(s.gespartPuffer ?? s.gespart) || 0;
-}
-
-/* Der Notgroschen: drei Monatsausgaben als Puffer. Die App kennt deine
-   notwendigen Monatskosten schon, also rechnet sie dir das Ziel selbst
-   aus. Zusammengezählt wird alles, was du je zurückgelegt hast — die
-   abgeschlossenen Monate plus der laufende.
-
-   Nicht mitgezählt wird, was du fürs Sparziel weglegst. Das Geld für die
-   Reise ist kein Puffer: Wenn die Waschmaschine kaputtgeht, ist entweder
-   die Reise weg oder du im Dispo. Beides zusammen in einen Balken zu
-   werfen würde dir eine Sicherheit vorrechnen, die es nicht gibt. */
-/* `bisMonat` zieht eine Zeitgrenze: Gezählt wird nur, was bis einschließlich
-   diesem Monat zurückgelegt wurde. Gebraucht wird das vom Bericht eines
-   abgeschlossenen Monats — auf dem Juli-Blatt stünde sonst der Stand von
-   heute, also eine Zahl aus der Zukunft. Der Vergleich funktioniert auf den
-   Monats-IDs direkt, weil "2026-07" < "2026-11" auch als Text stimmt. */
-function notgroschen(z, bisMonat) {
-  const dreiMonate  = z.notwendigUmlage * 3;
-  const sechsMonate = z.notwendigUmlage * 6;
-
-  const archiv = bisMonat
-    ? STATE.archive.filter(m => String(m.id) <= bisMonat)
-    : STATE.archive;
-  const alt = archiv.reduce((s, m) => s + gespartAusArchiv(m, false), 0);
-  // Was schon vor der App auf der hohen Kante lag, zählt selbstverständlich mit.
-  const vorhanden = Number(STATE.einstellungen.notgroschenStart) || 0;
-  /* Der laufende Monat zählt nur mit, wenn nach dem Stand von HEUTE gefragt
-     ist. Bei einem Blatt über einen alten Monat steckt der selbst schon im
-     Archiv — ihn nochmal dazuzurechnen wäre doppelt.
-     Ohne Ziel gibt es keine Aufteilung: dann ist alles Gesparte Puffer. */
-  const jetzt = (bisMonat || !laufenderZaehltExtra())
-    ? 0
-    : (sparzielAktiv() ? sparenIn(STATE.currentMonth, false) : summe(STATE.currentMonth.sparen));
-  const bisher = vorhanden + alt + jetzt;
-
-  /* Der Notgroschen läuft in zwei Stufen. Sobald drei Monate stehen, rückt
-     das angezeigte Ziel auf sechs Monate weiter — sonst bliebe der Balken für
-     immer auf 100% stehen und du hättest nichts mehr, worauf du zuläufst. */
-  const dreiGeschafft  = dreiMonate > 0 && bisher >= dreiMonate;
-  const sechsGeschafft = sechsMonate > 0 && bisher >= sechsMonate;
-  const ziel = dreiGeschafft ? sechsMonate : dreiMonate;
-
-  return {
-    ziel: ziel,
-    stufe: dreiGeschafft ? "6 Monatsausgaben" : "3 Monatsausgaben",
-    dreiMonate: dreiMonate,
-    sechsMonate: sechsMonate,
-    dreiGeschafft: dreiGeschafft,
-    sechsGeschafft: sechsGeschafft,
-    bisher: bisher,
-    quote: ziel > 0 ? Math.min(100, (bisher / ziel) * 100) : 0,
-    fehlt: Math.max(0, ziel - bisher),
-  };
+   Gelesen wird `gespart` — die Summe, die es in jeder Zusammenfassung gibt,
+   auch in den ältesten. Die Felder `gespartPuffer` und `gespartZiel` aus der
+   Zeit der zwei Töpfe stehen dort zwar noch, sind aber nur Teilmengen davon
+   und würden alte Monate um genau das kürzen, was im anderen Topf lag. */
+function gespartAusArchiv(eintrag) {
+  return Number(((eintrag && eintrag.summary) || {}).gespart) || 0;
 }
 
 /* ------------------------------------------------------------
-   DAS SPARZIEL — die eine Sache, auf die du zusparst.
+   DEIN ERSPARTES — eine Zahl, und die Marken, an denen sie sich misst.
 
-   Der Unterschied zum Notgroschen: Dessen Höhe rechnet die App aus
-   deinen Fixkosten aus, hier sagst DU, was es kostet. Eine Reise kostet
-   nun mal, was sie kostet.
+   Hier standen einmal zwei Rechnungen nebeneinander: `notgroschen()` und
+   `sparziel()`, jede mit eigenem Topf, eigenem Startwert und eigenem Balken.
+   Ein Häkchen am Sparposten entschied, welcher Topf ihn bekam.
 
-   Die Frage ist deshalb auch nicht „schaffst du eine Vorgabe", sondern
-   „wann bist du da". Und darauf gibt es zwei Antworten:
+   Das beschrieb ein Leben, das niemand führt. Wer spart, hat ein Sparkonto.
+   Die Frage ist nicht, in welchen Topf ein Euro fällt, sondern wofür das
+   Ersparte reicht — und darauf gibt es mehrere Antworten gleichzeitig.
 
-     ANKUNFT      — wann du ankommst, wenn du weitermachst wie bisher
-     UMLEITUNG    — wann du ankommst, wenn die Hälfte deiner Ausnahmen
-                    stattdessen hierher geht
+   Deshalb: eine Summe, und beliebig viele Marken darauf, die du selbst setzt.
+   Jede misst sich an derselben Zahl. Liegen 1240 € da, ist der Urlaub für
+   900 € bezahlt und die Ausbildung für 2400 € zur Hälfte — kein Widerspruch,
+   sondern dasselbe Geld aus zwei Blickwinkeln.
 
-   Der Abstand zwischen beiden Daten ist die eigentliche Aussage der
-   ganzen Karte. Er macht aus „ich gebe zu viel für Sushi aus" ein
-   „das Sushi kostet mich drei Monate Lissabon".
+   Hier rechnete die App außerdem eine Marke selbst aus: die Rücklage, drei
+   Monatsausgaben aus den eigenen Fixkosten. Sie ist raus. Wer spart, weiß
+   selbst, wofür — und eine Marke, die man nicht gesetzt hat, steht auf der
+   Karte im Weg.
+
+   `bisMonat` zieht eine Zeitgrenze: Gezählt wird nur, was bis einschließlich
+   diesem Monat zurückgelegt wurde. Gebraucht wird das vom Bericht eines
+   abgeschlossenen Monats — auf dem Juli-Blatt stünde sonst der Stand von
+   heute, also eine Zahl aus der Zukunft. Der Vergleich funktioniert auf den
+   Monats-IDs direkt, weil "2026-07" < "2026-11" auch als Text stimmt.
    ------------------------------------------------------------ */
 
-/* Deine echte monatliche Sparrate fürs Ziel.
+/* Deine monatliche Sparrate.
 
    Gemittelt wird über alle abgeschlossenen Monate ZURÜCK BIS ZU DEM, in dem
-   du zuletzt etwas fürs Ziel weggelegt hast — die Nullen dazwischen zählen
-   mit. Wer jeden zweiten Monat 200 € spart, spart im Schnitt 100 €, und
-   genau das muss dastehen. Würden wir nur die Monate mit Betrag mitteln,
-   käme eine Ankunft heraus, die es nie geben wird.
+   du zuletzt etwas weggelegt hast — die Nullen dazwischen zählen mit. Wer
+   jeden zweiten Monat 200 € spart, spart im Schnitt 100 €, und genau das muss
+   dastehen. Würden wir nur die Monate mit Betrag mitteln, käme eine Ankunft
+   heraus, die es nie geben wird.
 
-   Gibt es noch keinen abgeschlossenen Monat mit Ziel-Sparen, nehmen wir den
+   Gibt es noch keinen abgeschlossenen Monat mit Sparen, nehmen wir den
    laufenden: Am Anfang ist er die einzige Auskunft, die es gibt. */
-function zielRate() {
-  const werte = STATE.archive.map(m => gespartAusArchiv(m, true)); // neueste zuerst
+function sparRate() {
+  const werte = STATE.archive.map(gespartAusArchiv);   // neueste zuerst
   let aeltesterMitBetrag = -1;
   werte.forEach((w, i) => { if (w > 0) aeltesterMitBetrag = i; });
 
-  if (aeltesterMitBetrag < 0) return sparenIn(STATE.currentMonth, true);
+  if (aeltesterMitBetrag < 0) return gespartIn(STATE.currentMonth);
 
   const fenster = werte.slice(0, aeltesterMitBetrag + 1);
   return fenster.reduce((a, b) => a + b, 0) / fenster.length;
 }
 
-function sparziel(z) {
-  const roh = STATE.einstellungen.sparziel || leeresSparziel();
-  const betrag = Number(roh.betrag) || 0;
+function ersparnis(z, bisMonat) {
+  const bereich = STATE.einstellungen.sparen || leererSparbereich();
 
-  // Kein Betrag, kein Ziel. Dann bleibt die Karte eine Einladung.
-  if (betrag <= 0) return { aktiv: false, label: roh.label || "", termin: roh.termin || "" };
+  // Was schon vor der App auf der hohen Kante lag, zählt selbstverständlich mit.
+  const vorhanden = Number(bereich.start) || 0;
+  const archiv = bisMonat
+    ? STATE.archive.filter(m => String(m.id) <= bisMonat)
+    : STATE.archive;
+  const alt = archiv.reduce((s, m) => s + gespartAusArchiv(m), 0);
+  /* Der laufende Monat zählt nur mit, wenn nach dem Stand von HEUTE gefragt
+     ist. Bei einem Blatt über einen alten Monat steckt der selbst schon im
+     Archiv — ihn nochmal dazuzurechnen wäre doppelt. Dasselbe gilt, solange
+     ein Archiv-Monat zum Bearbeiten offen liegt. */
+  const jetzt = (bisMonat || !laufenderZaehltExtra()) ? 0 : gespartIn(STATE.currentMonth);
+  const bisher = runde(vorhanden + alt + jetzt);
 
-  const start = Number(roh.start) || 0;
-  const alt = STATE.archive.reduce((s, m) => s + gespartAusArchiv(m, true), 0);
-  const bisher = start + alt +
-    (laufenderZaehltExtra() ? sparenIn(STATE.currentMonth, true) : 0);
-  const fehlt = Math.max(0, betrag - bisher);
-  const geschafft = fehlt <= 0;
-
-  const rate = zielRate();
+  const rate = sparRate();
   const heute = STATE.currentMonth.id;
 
-  // Wie viele Monate noch, bei welcher Rate? Ohne Rate gibt es keine Ankunft,
-  // und dann sagen wir das auch so, statt ein Datum zu erfinden.
-  const ankunftBei = (r) => {
-    if (geschafft) return heute;
-    if (!(r > 0)) return null;
-    return monatPlus(heute, Math.ceil(fehlt / r));
+  /* Aus einer Marke wird eine Zeile auf der Karte: wie weit reicht das Geld
+     dafür, was fehlt, und wann du da bist, wenn du weitermachst wie bisher.
+
+     Ohne Rate gibt es keine Ankunft, und dann sagen wir das auch so, statt
+     ein Datum zu erfinden. */
+  const marke = (label, betrag, extra) => {
+    const fehlt = Math.max(0, runde(betrag - bisher));
+    const geschafft = fehlt <= 0;
+    return {
+      label: label,
+      betrag: betrag,
+      fehlt: fehlt,
+      geschafft: geschafft,
+      quote: betrag > 0 ? Math.min(100, (bisher / betrag) * 100) : 0,
+      ankunft: geschafft ? heute : (rate > 0 ? monatPlus(heute, Math.ceil(fehlt / rate)) : null),
+      ...extra,
+    };
   };
 
-  /* Die Umleitung: die HÄLFTE deiner Ausnahmen. Nicht alles — „gib nie
-     wieder Geld für dich aus" ist kein Vorschlag, den irgendwer annimmt.
-     Die Hälfte ist eine Zahl, bei der man kurz nachdenkt statt abzuwinken. */
+  /* Deine Marken. Eine ohne Betrag ist noch keine — sie stünde als
+     Zeile da, die zu 0 € geschafft ist, und das ist keine Auskunft. */
+  const ziele = (bereich.ziele || [])
+    .filter(zi => (Number(zi.betrag) || 0) > 0)
+    .map(zi => {
+      const m = marke(zi.label || "(ohne Namen)", Number(zi.betrag) || 0, {
+        id: zi.id,
+        termin: zi.termin || "",
+      });
+      /* Der Wunschtermin, falls einer gesetzt ist. Daraus wird die Rate, die
+         du bräuchtest — die ehrlichste Zahl der ganzen Karte. */
+      const monateBisTermin = m.termin ? monateBis(heute, m.termin) : null;
+      m.terminVorbei = monateBisTermin !== null && monateBisTermin < 0;
+      m.noetigeRate = (monateBisTermin !== null && monateBisTermin > 0)
+        ? (m.fehlt / monateBisTermin)
+        : null;
+      m.terminSchaffbar = m.noetigeRate === null ? null : (rate >= m.noetigeRate);
+      return m;
+    });
+
+  /* Die Umleitung: die HÄLFTE deiner Ausnahmen. Nicht alles — „gib nie wieder
+     Geld für dich aus" ist kein Vorschlag, den irgendwer annimmt. Die Hälfte
+     ist eine Zahl, bei der man kurz nachdenkt statt abzuwinken.
+
+     Sie hängt an der nächstliegenden offenen Marke: Was zuerst dran ist,
+     bewegt sich am sichtbarsten. */
   const umleitbar = z.nichtUmlage / 2;
-  const ankunft = ankunftBei(rate);
-  const ankunftUmgeleitet = ankunftBei(rate + umleitbar);
-  const gewinn = (ankunft && ankunftUmgeleitet) ? monateBis(ankunftUmgeleitet, ankunft) : 0;
+  const naechste = ziele.filter(m => !m.geschafft)
+    .sort((a, b) => a.fehlt - b.fehlt)[0] || null;
 
-  /* Der Wunschtermin, falls du einen gesetzt hast. Daraus wird die Rate,
-     die du bräuchtest — die ehrlichste Zahl der ganzen Karte. */
-  const termin = roh.termin || "";
-  const monateBisTermin = termin ? monateBis(heute, termin) : null;
-  const terminVorbei = monateBisTermin !== null && monateBisTermin < 0;
-  const noetigeRate = (monateBisTermin !== null && monateBisTermin > 0)
-    ? fehlt / monateBisTermin
-    : null;
-
-  const n = notgroschen(z);
+  let gewinn = 0;
+  let ankunftUmgeleitet = null;
+  if (naechste && rate + umleitbar > 0) {
+    ankunftUmgeleitet = monatPlus(heute, Math.ceil(naechste.fehlt / (rate + umleitbar)));
+    if (naechste.ankunft) gewinn = monateBis(ankunftUmgeleitet, naechste.ankunft);
+  }
 
   return {
-    aktiv: true,
-    label: roh.label || "",
-    betrag: betrag,
     bisher: bisher,
-    fehlt: fehlt,
-    geschafft: geschafft,
-    quote: Math.min(100, (bisher / betrag) * 100),
+    start: vorhanden,
     rate: rate,
-    ankunft: ankunft,
+    ziele: ziele,
+    // Was als Zeile auf der Karte steht. Gleichbedeutend mit `ziele` — der
+    // Name bleibt, weil die Karte über Marken redet, nicht über Ziele.
+    marken: ziele,
+    naechste: naechste,
     umleitbar: umleitbar,
     ankunftUmgeleitet: ankunftUmgeleitet,
     // Nur ein echter Vorsprung ist eine Aussage wert. Ein halber Monat nicht.
     gewinn: gewinn >= 1 ? gewinn : 0,
-    termin: termin,
-    terminVorbei: terminVorbei,
-    monateBisTermin: monateBisTermin,
-    noetigeRate: noetigeRate,
-    // Schaffst du den Wunschtermin mit dem, was du gerade tust?
-    terminSchaffbar: noetigeRate === null ? null : (rate >= noetigeRate),
-    /* Der Notgroschen hat Vorrang, und die App sagt das — ohne etwas zu
-       sperren. Es ist deine Entscheidung, aber nicht in Unkenntnis. */
-    pufferFehlt: !n.dreiGeschafft && n.ziel > 0,
-    pufferRest: n.fehlt,
   };
 }
 
-/* Was dieser Betrag am Sparziel anrichtet — der dritte Maßstab neben
+/* Was dieser Betrag am nächsten Sparziel anrichtet — der dritte Maßstab neben
    Arbeitszeit und Miete. Anders als die beiden zeigt er nicht, was der Kauf
    gekostet hat, sondern was er verschiebt.
 
-   Zwei Fassungen, und die erste ist die schärfere: Wenn eine Sparrate
-   existiert, wird der Betrag in Wartezeit umgerechnet. Ohne Rate bleibt
-   der Anteil am Ziel — immer noch besser als nichts. */
-function zielMassstab(betrag, sz) {
-  if (!sz || !sz.aktiv || sz.geschafft || !(betrag > 0)) return "";
-  const name = sz.label || "dein Ziel";
+   Gemessen wird an der nächstliegenden offenen Marke.
 
-  if (sz.rate > 0) {
-    const monate = betrag / sz.rate;
+   Zwei Fassungen, und die erste ist die schärfere: Wenn eine Sparrate
+   existiert, wird der Betrag in Wartezeit umgerechnet. Ohne Rate bleibt der
+   Anteil am Ziel — immer noch besser als nichts. */
+function zielMassstab(betrag, sp) {
+  if (!sp || !(betrag > 0)) return "";
+  const ziel = (sp.ziele || []).filter(m => !m.geschafft).sort((a, b) => a.fehlt - b.fehlt)[0];
+  if (!ziel) return "";
+  const name = ziel.label || "dein Ziel";
+
+  if (sp.rate > 0) {
+    const monate = betrag / sp.rate;
     if (monate >= 1) {
       const gerundet = Math.round(monate);
       return gerundet === 1 ? `1 Monat später: ${name}` : `${gerundet} Monate später: ${name}`;
@@ -2018,7 +2018,7 @@ function zielMassstab(betrag, sz) {
     if (wochen >= 1) return wochen === 1 ? `1 Woche später: ${name}` : `${wochen} Wochen später: ${name}`;
   }
 
-  const anteil = betrag / sz.betrag;
+  const anteil = betrag / ziel.betrag;
   if (anteil < 0.02) return "";
   return Math.round(anteil * 100) + "% von: " + name;
 }
@@ -2125,9 +2125,9 @@ function zuflussJahre(bisMonat) {
 let affirmationOffset = 0;
 let affirmationenOffen = false;
 
-/* Und dasselbe für „Ziel ändern". Ohne diesen Merker klappt der Bereich bei
-   jedem getippten Buchstaben zu, denn jede Änderung zeichnet die Karte neu. */
-let sparzielAendernOffen = false;
+/* Und dasselbe für die Spar-Verwaltung. Ohne diesen Merker klappt der Bereich
+   bei jedem getippten Buchstaben zu, denn jede Änderung zeichnet die Karte neu. */
+let sparVerwaltenOffen = false;
 
 /* Welcher Archiv-Monat zeigt gerade seine beiden Knöpfe (PDF, bearbeiten)?
 
@@ -2199,8 +2199,7 @@ function render() {
   // Steht direkt unter dem Balken „Notwendig 63%" und beantwortet die Frage,
   // die dieser Balken aufwirft: woraus besteht das, und was kostet es mich?
   renderNotwendig(z);
-  renderNotgroschen(z);
-  renderSparziel(z);
+  renderSparen(z);
   // Bekommt bewusst kein `z`: Diese Karte hängt an keiner Zahl der großen
   // Rechnung, und das soll man schon hier sehen.
   renderZufluss();
@@ -2721,7 +2720,7 @@ function postenHtml(kat, p, z) {
     if (zp) meta.push(`<span class="zeit-schild">⏱ ${zp}</span>`);
 
     // Und daneben, sobald ein Sparziel steht: was dieser Posten dort verschiebt.
-    const zs = zielMassstab(betrag / intervall, z.sparziel);
+    const zs = zielMassstab(betrag / intervall, z.sparen);
     if (zs) meta.push(`<span class="ziel-schild">🎯 ${zs}</span>`);
   }
 
@@ -3214,21 +3213,14 @@ function grenzeHtml(z) {
       </div>`;
   }
 
-  /* Der Notgroschen-Vergleich rechnet mit derselben Stufe wie die Karte
-     darunter, damit die beiden Zahlen zueinander passen und nicht zwei
-     Wahrheiten behaupten. Stehen die drei Monate schon, ist das Ziel dort auf
-     sechs weitergerückt — dann muss dieser Satz auch mit sechs rechnen.
-     Angezeigt wird nur die Differenz: Drei Beträge nebeneinander waren eine
-     Rechenaufgabe. */
-  const stufenMonate = notgroschen(z).dreiGeschafft ? 6 : 3;
-  const pufferDiff = (z.notwendigUmlage - z.notwendigGrenze) * stufenMonate;
-
+  /* Hier stand ein zweiter Satz: „und dein Notgroschen-Ziel läge X niedriger".
+     Den Notgroschen rechnet die App nicht mehr aus, also gibt es auch kein
+     Ziel mehr, das niedriger läge. Übrig bleibt der Satz, um den es geht. */
   return `
     <div class="notwendig-fazit warnung">
       <div class="fazit-titel">${punkte} ${punkte === 1 ? "Punkt" : "Punkte"} über der Grenze</div>
       <div class="fazit-zahl">${euro(z.ueberNotwendig)} im Monat<small>${euro(z.ueberNotwendig * 12)} im Jahr</small></div>
-      <p>Bei 50% wäre das Geld frei. Und dein Notgroschen-Ziel läge
-        ${euro(pufferDiff)} niedriger.</p>
+      <p>Bei 50% wäre das Geld frei.</p>
     </div>
   `;
 }
@@ -3261,86 +3253,21 @@ function haekchenHtml(z) {
   `;
 }
 
-/* --- 11h. Notgroschen: die wichtigste Zahl, die dir keiner sagt --- */
-function renderNotgroschen(z) {
-  const ziel = document.getElementById("notgroschen");
+/* --- 11h. Gespart: eine Zahl, und wofür sie reicht ---
 
-  // Das Feld für vorhandenes Guthaben, das in beiden Fällen unten steht.
-  const vorhandenFeld = `
-    <div class="notgroschen-vorhanden">
-      <label class="mini-label">Schon vorhanden
-        <input id="notgroschen-start" class="mini-zahl breit" type="text"
-               inputmode="decimal" value="${alsFeldwert(STATE.einstellungen.notgroschenStart)}" />
-      </label>
-      <p class="feld-hinweis breit">Was auf dem Tagesgeldkonto oder unterm Kopfkissen liegt.</p>
-    </div>
-  `;
+   Hier standen einmal ZWEI Karten untereinander: der Notgroschen und das
+   Sparziel. Zwei Balken, zwei Startwerte, zwei „bisher zusammen" — und an
+   jedem Sparposten ein Häkchen, das entschied, welche der beiden ihn bekam.
 
-  // Ohne notwendige Ausgaben lässt sich noch kein Puffer-Ziel rechnen. Das
-  // Feld für vorhandenes Guthaben zeigen wir trotzdem, sonst könntest du es
-  // ausgerechnet am Anfang nicht eintragen.
-  if (z.notwendigUmlage <= 0) {
-    const n = notgroschen(z);
-    ziel.innerHTML = `
-      <h2 class="nr-titel">Dein Notgroschen</h2>
-      <div class="karte notgroschen-karte">
-        <div class="notgroschen-kopf">
-          <div class="rechts">
-            <div class="beschriftung">Bisher zusammen</div>
-            <div class="notgroschen-ist">${euro(n.bisher)}</div>
-          </div>
-        </div>
-        <p class="notgroschen-text">Sobald deine Fixkosten eingetragen sind, rechne ich dir aus,
-          wie viel Puffer du brauchst: drei Monatsausgaben.</p>
-        ${vorhandenFeld}
-      </div>
-    `;
-    return;
-  }
+   Zwei Karten für ein Sparkonto sind eine Karte zu viel. Wer 1240 € liegen
+   hat, hat nicht 800 € Notgroschen und 440 € Reisekasse; er hat 1240 €.
+   Wofür die reichen, ist eine Frage an die Zahl, nicht an ihre Herkunft — und
+   sie hat mehrere Antworten gleichzeitig.
 
-  const n = notgroschen(z);
+   Also: die Summe oben, groß. Darunter eine Zeile pro Marke, jede an derselben
+   Summe gemessen. Die erste rechnet die App selbst aus deinen Fixkosten, die
+   anderen setzt du. --- */
 
-  // Drei Stufen: unterwegs zu 3 Monaten, unterwegs zu 6 Monaten, fertig.
-  let text;
-  if (n.sechsGeschafft) {
-    text = `<p class="notgroschen-text gut">Sechs Monate Puffer stehen. Was du ab jetzt
-      zurücklegst, darf für dich arbeiten gehen.</p>`;
-  } else if (n.dreiGeschafft) {
-    text = `<p class="notgroschen-text gut">Drei Monate Puffer stehen, und das schaffen die
-      meisten nie. Bis sechs fehlen dir <strong>${euro(n.fehlt)}</strong>.</p>`;
-  } else {
-    text = `<p class="notgroschen-text">Dir fehlen noch <strong>${euro(n.fehlt)}</strong>.
-      Damit kannst du kündigen, ausziehen oder Nein sagen, ohne vorher zu rechnen.</p>`;
-  }
-
-  ziel.innerHTML = `
-    <h2 class="nr-titel">Dein Notgroschen</h2>
-    <div class="karte notgroschen-karte">
-      <div class="notgroschen-kopf">
-        <div>
-          <div class="beschriftung">Ziel: ${n.stufe}</div>
-          <div class="notgroschen-ziel">${euro(n.ziel)}</div>
-        </div>
-        <div class="rechts">
-          <div class="beschriftung">Bisher zusammen</div>
-          <div class="notgroschen-ist">${euro(n.bisher)}</div>
-        </div>
-      </div>
-      <div class="balken-spur gross">
-        <div class="balken-fuellung fuell-sparen" style="width:${n.quote}%"></div>
-      </div>
-      <div class="notgroschen-quote">${Math.round(n.quote)}% geschafft</div>
-      ${text}
-      ${vorhandenFeld}
-    </div>
-  `;
-}
-
-/* --- 11h2. Dein Sparziel ---
-
-   Steht bewusst UNTER dem Notgroschen. Die Reihenfolge auf dem Bildschirm
-   ist selbst die Aussage: erst der Puffer, dann die schönen Dinge. Verboten
-   wird nichts, aber die Rangfolge steht nicht zur Debatte. --- */
 /* Die Auswahlliste für den Wunschmonat.
 
    Bewusst KEIN `<input type="month">`: Safari auf dem Mac kennt das Feld nicht
@@ -3353,132 +3280,135 @@ function renderNotgroschen(z) {
    gespeicherter Termin kommt vorne dazu, falls er inzwischen in der
    Vergangenheit liegt — sonst würde die Auswahl ihn stillschweigend
    verschlucken und auf „kein Termin" zurückspringen. */
-function terminAuswahl(aktuell) {
+function terminAuswahl(id, aktuell) {
   const heute = STATE.currentMonth.id;
   const monate = [];
   if (aktuell && monateBis(heute, aktuell) < 0) monate.push(aktuell);
   for (let i = 0; i <= 60; i++) monate.push(monatPlus(heute, i));
 
-  const optionen = monate.map(id =>
-    `<option value="${id}"${id === aktuell ? " selected" : ""}>${monatLesbar(id)}</option>`
+  const optionen = monate.map(m =>
+    `<option value="${m}"${m === aktuell ? " selected" : ""}>${monatLesbar(m)}</option>`
   ).join("");
 
-  return `<select id="sparziel-termin" class="mini-auswahl">
+  return `<select class="mini-auswahl" data-ziel-feld="termin" data-ziel="${escapeAttr(id)}">
     <option value=""${aktuell ? "" : " selected"}>kein Termin</option>
     ${optionen}
   </select>`;
 }
 
-function renderSparziel(z) {
-  const ziel = document.getElementById("sparziel");
-  const sz = z.sparziel;
+/* Eine Marke als Zeile: Name, Zielbetrag, Balken, und der Satz darunter.
 
-  // Die Eingabefelder — in beiden Zuständen dieselben, nur unterschiedlich gefüllt.
-  const felder = (s) => `
-    <div class="sparziel-felder">
-      <label class="mini-label breit">Wofür sparst du?
-        <input id="sparziel-label" type="text" maxlength="60" placeholder="z.B. Reise nach Lissabon"
-               value="${escapeAttr(s.label || "")}" />
-      </label>
-      <label class="mini-label">Was kostet es?
-        <input id="sparziel-betrag" class="mini-zahl" type="text" inputmode="decimal"
-               value="${alsFeldwert(s.betrag)}" />
-      </label>
-      <label class="mini-label">Bis wann? <span class="optional">(freiwillig)</span>
-        ${terminAuswahl(s.termin || "")}
-      </label>
-    </div>
-  `;
-
-  // Zustand A: noch kein Ziel. Dann ist die Karte eine Einladung, kein Bericht.
-  if (!sz.aktiv) {
-    ziel.innerHTML = `
-      <h2 class="nr-titel">Dein Sparziel</h2>
-      <div class="karte sparziel-karte leer">
-        ${felder(sz)}
-      </div>
-    `;
-    return;
-  }
-
-  const name = escapeAttr(sz.label || "dein Ziel");
-
-  // Der Kernsatz: wann bist du da?
-  let ankunftText;
-  if (sz.geschafft) {
-    ankunftText = `<p class="sparziel-text gut"><strong>Steht.</strong> ${euro(sz.bisher)} liegen bereit.
-      Mehr braucht ${name} nicht.</p>`;
-  } else if (!sz.ankunft) {
-    ankunftText = `<p class="sparziel-text">Du legst dafür gerade nichts weg. So kommt der Monat
-      nie, in dem es losgeht.</p>`;
+   Der Satz ist der eigentliche Inhalt. Ein Balken sagt „69%", aber nicht, was
+   das für den nächsten Monat heißt. */
+function markeHtml(m, sp) {
+  let satz;
+  if (m.geschafft) {
+    satz = "Steht. Das Geld dafür liegt bereit.";
+  } else if (!m.ankunft) {
+    satz = `Es fehlen ${euro(m.fehlt)}. Du legst gerade nichts weg, so kommt der Monat nie.`;
   } else {
-    ankunftText = `<p class="sparziel-text">Du legst im Schnitt <strong>${euro(sz.rate)}</strong> im Monat
-      dafür weg. So wie bisher bist du im <strong>${monatLesbar(sz.ankunft)}</strong> da.</p>`;
+    satz = `Es fehlen ${euro(m.fehlt)} — so wie bisher bist du im ${monatLesbar(m.ankunft)} da.`;
   }
 
-  /* Der eigentliche Punkt der Karte: was die Ausnahmen kosten.
-     Nur wenn es wirklich etwas umzuleiten gibt und der Vorsprung
-     mindestens einen ganzen Monat beträgt. */
-  const umleitung = (!sz.geschafft && sz.gewinn > 0) ? `
-    <div class="sparziel-umleitung">
-      <p>Deine Ausnahmen diesen Monat: <strong>${euro(z.nichtUmlage)}</strong>.
-        Die Hälfte davon stattdessen hierher, und du bist
-        <strong>${sz.gewinn === 1 ? "einen Monat" : sz.gewinn + " Monate"} früher</strong> da:
-        <strong>${monatLesbar(sz.ankunftUmgeleitet)}</strong>.</p>
-    </div>` : "";
-
-  // Der Wunschtermin, falls gesetzt: die Rate, die du dafür bräuchtest.
-  let terminText = "";
-  if (sz.termin && !sz.geschafft) {
-    if (sz.terminVorbei) {
-      terminText = `<p class="sparziel-termin warn">${monatLesbar(sz.termin)} ist vorbei,
-        es fehlen ${euro(sz.fehlt)}.</p>`;
-    } else if (sz.terminSchaffbar) {
-      terminText = `<p class="sparziel-termin gut">Für ${monatLesbar(sz.termin)} brauchst du
-        ${euro(sz.noetigeRate)} im Monat. Das passt.</p>`;
+  /* Der Wunschtermin, falls einer gesetzt ist. Er steht als eigener Satz
+     darunter, weil er etwas anderes misst als die Ankunft: nicht „wann komme
+     ich an", sondern „reicht das, was ich tue, für meinen eigenen Termin". */
+  let terminSatz = "";
+  if (m.termin && !m.geschafft) {
+    if (m.terminVorbei) {
+      terminSatz = `<p class="spar-marke-termin warn">${monatLesbar(m.termin)} ist vorbei.</p>`;
+    } else if (m.terminSchaffbar) {
+      terminSatz = `<p class="spar-marke-termin gut">Für ${monatLesbar(m.termin)} brauchst du
+        ${euro(m.noetigeRate)} im Monat. Das passt.</p>`;
     } else {
-      terminText = `<p class="sparziel-termin warn">Für ${monatLesbar(sz.termin)} bräuchtest du
-        <strong>${euro(sz.noetigeRate)}</strong> im Monat. Du legst ${euro(sz.rate)} weg.</p>`;
+      terminSatz = `<p class="spar-marke-termin warn">Für ${monatLesbar(m.termin)} bräuchtest du
+        <strong>${euro(m.noetigeRate)}</strong> im Monat. Du legst ${euro(sp.rate)} weg.</p>`;
     }
   }
 
-  /* Der Notgroschen-Vorrang. Kein Verbot, keine Sperre, ein Satz.
-     Er steht ganz unten, damit er das Letzte ist, was hängen bleibt. */
-  const vorrang = sz.pufferFehlt ? `
-    <p class="sparziel-vorrang">Bis dein Notgroschen steht, fehlen ${euro(sz.pufferRest)}.
-      Dieses Geld hier ist kein Puffer.</p>` : "";
+  return `
+    <div class="spar-marke ${m.geschafft ? "spar-marke-steht" : ""}">
+      <div class="spar-marke-kopf">
+        <span class="spar-marke-name">${escapeAttr(m.label)}</span>
+        <span class="spar-marke-betrag">${euro(m.betrag)}</span>
+      </div>
+      <div class="balken-spur">
+        <div class="balken-fuellung fuell-ziel" style="width:${m.quote}%"></div>
+      </div>
+      <p class="spar-marke-satz">${Math.round(m.quote)}% · ${satz}</p>
+      ${terminSatz}
+    </div>`;
+}
+
+/* Die Verwaltung: ein Ziel pro Zeile, dazu das Feld für Erspartes von früher.
+
+   Steht in einem <details>, weil man sie einmal ausfüllt und danach jahrelang
+   nicht mehr anfasst. Offen bleibt sie über das Neuzeichnen hinweg — sonst
+   klappte sie bei jedem getippten Buchstaben zu. */
+function sparVerwaltungHtml(sp) {
+  const ziele = (STATE.einstellungen.sparen.ziele || []).map(zi => `
+    <div class="ziel-zeile" data-ziel-block="${escapeAttr(zi.id)}">
+      <input type="text" maxlength="60" placeholder="z.B. Yoga-Ausbildung"
+             data-ziel-feld="label" data-ziel="${escapeAttr(zi.id)}"
+             value="${escapeAttr(zi.label)}" />
+      <input type="text" class="mini-zahl" inputmode="decimal" placeholder="0"
+             data-ziel-feld="betrag" data-ziel="${escapeAttr(zi.id)}"
+             value="${alsFeldwert(zi.betrag)}" />
+      <button type="button" class="del" data-ziel-weg="${escapeAttr(zi.id)}"
+              title="Ziel löschen">✕</button>
+      <label class="mini-label ziel-termin">bis
+        ${terminAuswahl(zi.id, zi.termin || "")}
+      </label>
+    </div>`).join("");
+
+  return `
+    <details class="spar-verwalten" ${sparVerwaltenOffen ? "open" : ""}>
+      <summary>Ziele und Erspartes von früher</summary>
+      ${ziele}
+      <button type="button" id="btn-ziel-neu" class="btn btn-leise">+ Ziel hinzufügen</button>
+      <label class="mini-label breit">Schon zurückgelegt, bevor die App davon wusste
+        <input id="spar-start" class="mini-zahl breit" type="text" inputmode="decimal"
+               value="${alsFeldwert(sp.start)}" />
+      </label>
+      <p class="feld-hinweis breit">Was auf dem Tagesgeldkonto oder unterm Kopfkissen liegt.</p>
+    </details>`;
+}
+
+function renderSparen(z) {
+  const ziel = document.getElementById("sparen");
+  const sp = z.sparen;
+
+  /* Noch gar nichts da: keine Marke, kein Cent. Dann ist die Karte eine
+     Einladung und kein Bericht über eine Null. */
+  const leer = sp.marken.length === 0;
+
+  const markenBlock = leer
+    ? `<p class="spar-leer">Trag unten ein Ziel ein, dann sage ich dir, wie weit dein
+         Erspartes dafür reicht und wann du da bist.</p>`
+    : sp.marken.map(m => markeHtml(m, sp)).join("");
+
+  /* Die Umleitung: was die Ausnahmen dieses Monats an der nächsten Marke
+     verschieben. Nur wenn es wirklich etwas umzuleiten gibt und der Vorsprung
+     mindestens einen ganzen Monat beträgt. */
+  const umleitung = (sp.gewinn > 0 && sp.naechste) ? `
+    <div class="spar-umleitung">
+      <p>Deine Ausnahmen diesen Monat: <strong>${euro(z.nichtUmlage)}</strong>.
+        Die Hälfte davon stattdessen hierher, und
+        <strong>${escapeAttr(sp.naechste.label)}</strong> steht
+        <strong>${sp.gewinn === 1 ? "einen Monat" : sp.gewinn + " Monate"} früher</strong>:
+        ${monatLesbar(sp.ankunftUmgeleitet)}.</p>
+    </div>` : "";
 
   ziel.innerHTML = `
-    <h2 class="nr-titel">Dein Sparziel</h2>
-    <div class="karte sparziel-karte">
-      <div class="sparziel-kopf">
-        <div>
-          <div class="beschriftung">${name}</div>
-          <div class="sparziel-summe">${euro(sz.betrag)}</div>
-        </div>
-        <div class="rechts">
-          <div class="beschriftung">Bisher zusammen</div>
-          <div class="sparziel-ist">${euro(sz.bisher)}</div>
-        </div>
-      </div>
-      <div class="balken-spur gross">
-        <div class="balken-fuellung fuell-ziel" style="width:${sz.quote}%"></div>
-      </div>
-      <div class="notgroschen-quote">${Math.round(sz.quote)}% geschafft${
-        sz.geschafft ? "" : ` · noch ${euro(sz.fehlt)}`}</div>
-      ${ankunftText}
+    <h2 class="nr-titel">Gespart</h2>
+    <div class="karte spar-karte">
+      <div class="spar-summe">${euro(sp.bisher)}</div>
+      <div class="spar-unter">liegt zusammen auf der hohen Kante${
+        sp.rate > 0 ? ` · ${euro(sp.rate)} im Monat` : ""}</div>
+
+      <div class="spar-marken">${markenBlock}</div>
       ${umleitung}
-      ${terminText}
-      ${vorrang}
-      <details class="sparziel-aendern" ${sparzielAendernOffen ? "open" : ""}>
-        <summary>Ziel ändern</summary>
-        ${felder(sz)}
-        <label class="mini-label breit">Schon dafür zurückgelegt
-          <input id="sparziel-start" class="mini-zahl breit" type="text"
-                 inputmode="decimal" value="${alsFeldwert(STATE.einstellungen.sparziel.start)}" />
-        </label>
-        <button id="btn-sparziel-weg" class="btn btn-leise">Ziel löschen</button>
-      </details>
+      ${sparVerwaltungHtml(sp)}
     </div>
   `;
 }
@@ -3801,17 +3731,21 @@ function zeigeReaktion(text) {
    Fall 2 und 3 nehmen `massstab`, nicht direkt die Arbeitsstunden —
    sonst schwiege die App bei jeder, die kein Erwerbseinkommen hat. */
 function reaktionsText(z, posten) {
-  /* Steht ein Sparziel, hat es Vorfahrt vor allen anderen Einwürfen — aber
-     nur, wenn der Kauf es um mindestens einen ganzen Monat verschiebt.
+  /* Steht ein eigenes Sparziel, hat es Vorfahrt vor allen anderen Einwürfen —
+     aber nur, wenn der Kauf es um mindestens einen ganzen Monat verschiebt.
 
      Warum vor dem Prozent-Satz: „du bist bei 34%" ist eine Kennzahl, über die
      man hinweglesen kann. „Lissabon rückt zwei Monate nach hinten" ist ein
      Termin, den sie sich selbst gesetzt hat. Das lässt sich nicht wegdiskutieren.
-     Greift die Bedingung nicht, läuft die alte Kette unverändert weiter. */
-  const sz = z.sparziel;
-  if (sz && sz.aktiv && !sz.geschafft && sz.rate > 0 && posten.amount > 0) {
-    const monate = Math.round(posten.amount / sz.rate);
-    const name = escapeAttr(sz.label || "Dein Ziel");
+
+     Gemeint ist die nächstliegende Marke. Greift die Bedingung nicht, läuft
+     die alte Kette unverändert weiter. */
+  const sp = z.sparen;
+  const naechstesZiel = sp ? (sp.ziele || []).filter(m => !m.geschafft)
+                                             .sort((a, b) => a.fehlt - b.fehlt)[0] : null;
+  if (naechstesZiel && sp.rate > 0 && posten.amount > 0) {
+    const monate = Math.round(posten.amount / sp.rate);
+    const name = escapeAttr(naechstesZiel.label || "Dein Ziel");
     if (monate === 1) {
       return `${name} rückt damit <strong>einen Monat nach hinten</strong>.
         Ich hab das Datum schon umgeschrieben.`;
@@ -3920,25 +3854,24 @@ document.addEventListener("change", (e) => {
     return;
   }
 
-  // Notgroschen, der schon vor der App da war
-  if (e.target.id === "notgroschen-start") {
-    STATE.einstellungen.notgroschenStart = Math.max(0, betragAusText(e.target.value) || 0);
+  // Was schon zurückgelegt war, bevor die App davon wusste.
+  if (e.target.id === "spar-start") {
+    STATE.einstellungen.sparen.start = Math.max(0, betragAusText(e.target.value) || 0);
     speichern();
     render();
     return;
   }
 
-  /* Die vier Felder des Sparziels. Sie stehen in der Karte an zwei Stellen
-     (leerer Zustand und „Ziel ändern"), tragen aber dieselben IDs — es ist
-     immer nur eine davon im Dokument. */
-  if (e.target.id === "sparziel-label" || e.target.id === "sparziel-betrag" ||
-      e.target.id === "sparziel-termin" || e.target.id === "sparziel-start") {
-    const s = STATE.einstellungen.sparziel || leeresSparziel();
-    if (e.target.id === "sparziel-label")  s.label  = e.target.value.slice(0, 60);
-    if (e.target.id === "sparziel-betrag") s.betrag = Math.max(0, betragAusText(e.target.value) || 0);
-    if (e.target.id === "sparziel-termin") s.termin = e.target.value || "";
-    if (e.target.id === "sparziel-start")  s.start  = Math.max(0, betragAusText(e.target.value) || 0);
-    STATE.einstellungen.sparziel = sauberesSparziel(s);
+  /* Ein Feld an einer deiner Marken. Welche gemeint ist, steht am Feld selbst —
+     die Zeilen tragen dieselben Feldnamen, aber jede ihre eigene Ziel-ID. */
+  const zielFeld = e.target.closest("[data-ziel-feld]");
+  if (zielFeld) {
+    const { zielFeld: feld, ziel: id } = zielFeld.dataset;
+    const zi = (STATE.einstellungen.sparen.ziele || []).find(x => x.id === id);
+    if (!zi) return;
+    if (feld === "label")  zi.label  = e.target.value.slice(0, 60);
+    if (feld === "betrag") zi.betrag = Math.max(0, betragAusText(e.target.value) || 0);
+    if (feld === "termin") zi.termin = e.target.value || "";
     speichern();
     render();
     return;
@@ -3963,8 +3896,8 @@ document.addEventListener("toggle", (e) => {
     return;
   }
 
-  if (e.target.classList && e.target.classList.contains("sparziel-aendern")) {
-    sparzielAendernOffen = e.target.open;
+  if (e.target.classList && e.target.classList.contains("spar-verwalten")) {
+    sparVerwaltenOffen = e.target.open;
     return;
   }
 
@@ -4019,6 +3952,13 @@ document.addEventListener("click", (e) => {
       });
     }
   }
+
+  /* Die Spar-Verwaltung auf- oder zugeklappt. Der Merker wird HIER gesetzt und
+     nicht erst im „toggle"-Ereignis: Das kommt asynchron, und ein render()
+     dazwischen — ein getippter Buchstabe genügt — läse noch den alten Wert und
+     klappte den Bereich unter dem Finger wieder zu. */
+  const sparKopf = e.target.closest(".spar-verwalten > summary");
+  if (sparKopf) sparVerwaltenOffen = !sparKopf.parentElement.open;
 
   const box = e.target.closest("[data-posten]");
   const neuOffen = box ? box.dataset.posten : null;
@@ -4145,18 +4085,27 @@ document.addEventListener("click", (e) => {
     return;
   }
 
-  /* Das Sparziel löschen. Nachgefragt wird, weil auch die Häkchen an den
-     Sparposten ihren Sinn verlieren — das Geld bleibt, aber es zählt ab
-     dann wieder zum Notgroschen. */
-  if (e.target.closest("#btn-sparziel-weg")) {
-    const s = STATE.einstellungen.sparziel || leeresSparziel();
-    const name = s.label || "dein Sparziel";
-    if (!confirm(`„${name}" löschen?\n\nDein Gespartes bleibt erhalten und zählt ab dann wieder zum Notgroschen.`)) return;
-    STATE.einstellungen.sparziel = leeresSparziel();
-    /* Die Häkchen im laufenden Monat mit zurücksetzen. Ließe man sie stehen,
-       wären beim nächsten Ziel plötzlich alte Sparposten dafür angerechnet,
-       die mit ihm nie etwas zu tun hatten. */
-    (STATE.currentMonth.sparen || []).forEach(p => { p.fuersZiel = false; });
+  // Eine neue, leere Marke. Name und Betrag tippst du direkt in die Zeile.
+  if (e.target.closest("#btn-ziel-neu")) {
+    STATE.einstellungen.sparen.ziele.push(sauberesZiel({}));
+    sparVerwaltenOffen = true;   // sonst klappt der Bereich beim Neuzeichnen zu
+    speichern();
+    render();
+    return;
+  }
+
+  /* Eine Marke löschen. Am Geld ändert das nichts — es liegt weiter im einen
+     Topf, nur misst sich nichts mehr daran. Genau das sagt die Rückfrage,
+     damit niemand fürchtet, sein Erspartes zu verlieren. */
+  const zielWeg = e.target.closest("[data-ziel-weg]");
+  if (zielWeg) {
+    const id = zielWeg.dataset.zielWeg;
+    const zi = (STATE.einstellungen.sparen.ziele || []).find(x => x.id === id);
+    const name = (zi && zi.label) || "dieses Ziel";
+    if (!confirm(`„${name}" löschen?\n\nDein Gespartes bleibt, wo es ist. Nur die Marke verschwindet.`)) return;
+    STATE.einstellungen.sparen.ziele =
+      (STATE.einstellungen.sparen.ziele || []).filter(x => x.id !== id);
+    sparVerwaltenOffen = true;
     speichern();
     render();
     return;
@@ -4312,10 +4261,6 @@ function summaryAus(z, zu) {
     notwendig: z.notwendigUmlage,
     nicht: z.nichtUmlage,
     gespart: z.gespart,
-    // Getrennt festhalten, damit Notgroschen und Sparziel jeder ihre
-    // eigene Geschichte behalten. `gespart` bleibt die Summe aus beiden.
-    gespartPuffer: z.gespartPuffer,
-    gespartZiel: z.gespartZiel,
     kontostand: z.kontostand,
     quoteNicht: z.quoteNicht,
     quoteNotwendig: z.quoteNotwendig,
@@ -4538,12 +4483,13 @@ function renderBericht(z, monat) {
   // Der Notgroschen-Stand am Ende dieses Monats, sofern Fixkosten da sind.
   let puffer = "";
   if (z.notwendigUmlage > 0) {
-    const n = notgroschen(z, monat.id);
-    puffer = `<h2 class="bericht-titel">Notgroschen</h2>
+    const sp = ersparnis(z, monat.id);
+    puffer = `<h2 class="bericht-titel">Gespart</h2>
       <table class="bericht-tabelle">
-        ${zeile("Ziel (" + n.stufe + ")", n.ziel)}
-        ${zeile("bisher zusammen", n.bisher)}
-        <tr class="summe"><th>Stand</th><td>${Math.round(n.quote)}%</td></tr>
+        ${zeile("zusammen zurückgelegt", sp.bisher)}
+        ${sp.marken.map(m =>
+          `<tr><th>${escapeAttr(m.label)}</th>
+               <td>${euro(m.betrag)} · ${Math.round(m.quote)}%</td></tr>`).join("")}
       </table>`;
   }
 

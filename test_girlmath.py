@@ -413,9 +413,10 @@ with sync_playwright() as p:
     pruefe("die Zahl steht gross da, das Jahr klein darunter",
            norm(page.locator(".notwendig-fazit .fazit-zahl").inner_text()).replace("\n", " | "),
            "188,00 € im Monat | 2.256,00 € im Jahr")
-    # Der Doppelschlag: hohe Fixkosten heben das Notgroschen-Ziel mit an.
-    # Gezeigt wird nur die Differenz (3 x 188), nicht die ganze Rechnung.
-    pruefe("nennt den Notgroschen-Aufschlag", "564,00 € niedriger" in fazit, True)
+    # Hier stand einmal ein zweiter Halbsatz ueber den Notgroschen. Den rechnet
+    # die App nicht mehr aus, also darf er auch nicht mehr dastehen.
+    pruefe("kein Wort mehr vom Notgroschen", "Notgroschen" in fazit, False)
+    pruefe("nur der Satz, um den es geht", "Bei 50% wäre das Geld frei." in fazit, True)
     # Der Block darf nie wieder zum Aufsatz werden: Titel, Zahl, EIN Satz.
     pruefe("genau ein Fliesstext-Absatz", page.locator(".notwendig-fazit p").count(), 1)
     pruefe("und der bleibt kurz",
@@ -432,19 +433,13 @@ with sync_playwright() as p:
     pruefe("sagt, dass sich am Geld nichts aendert",
            "Am Geld ändert das nichts" in haken, True)
 
-    print("\n=== 12. Notgroschen mit Stufen ===")
-    # notwendig 1188 -> 3 Monate = 3564, 6 Monate = 7128
-    pruefe("3-Monats-Ziel zuerst",
-           page.locator(".notgroschen-kopf .beschriftung").first.inner_text().lower(),
-           "ziel: 3 monatsausgaben")
-    pruefe("Zielbetrag", page.locator(".notgroschen-ziel").inner_text(), "3.564,00 €")
-    setze(page, "#notgroschen-start", 4000)   # 3 Monate uebersprungen
-    pruefe("Ziel rueckt auf 6 Monate",
-           page.locator(".notgroschen-kopf .beschriftung").first.inner_text().lower(),
-           "ziel: 6 monatsausgaben")
-    pruefe("Zielbetrag 6 Monate", page.locator(".notgroschen-ziel").inner_text(), "7.128,00 €")
-    pruefe("Balken nicht bei 100%", page.locator(".notgroschen-quote").inner_text(), "59% geschafft")
-    setze(page, "#notgroschen-start", 0)
+    print("\n=== 12. Keine Marke, die die App sich selbst ausdenkt ===")
+    # Hier rechnete die App eine Ruecklage aus den Fixkosten aus — drei
+    # Monatsausgaben, spaeter sechs. Sie ist raus: Gemessen wird nur noch an
+    # dem, was sie selbst als Ziel eingetragen hat.
+    pruefe("ohne eigenes Ziel steht keine Marke da", page.locator(".spar-marke").count(), 0)
+    pruefe("stattdessen die Einladung", page.locator(".spar-leer").count(), 1)
+    pruefe("die Summe steht trotzdem", norm(page.locator(".spar-summe").inner_text()), "200,00 €")
 
     print("\n=== 13. Kreisdiagramm ===")
     pruefe("vier Segmente", page.locator(".donut .segment").count(), 4)
@@ -663,9 +658,9 @@ with sync_playwright() as p:
 
     print("\n=== 23. Gesicherter Stand enthaelt alles ===")
     stand = page.evaluate("JSON.parse(JSON.stringify(STATE))")
-    pruefe("Version 5", stand.get("version"), 5)
+    pruefe("Version 6", stand.get("version"), 6)
     pruefe("Wochenstunden gespeichert", stand["einstellungen"]["wochenstunden"], 40)
-    pruefe("Notgroschen-Startwert gespeichert", stand["einstellungen"]["notgroschenStart"], 0)
+    pruefe("Spar-Startwert gespeichert", stand["einstellungen"]["sparen"]["start"], 0)
     pruefe("Versicherungen im Monat", "versicherungen" in stand["currentMonth"], True)
     pruefe("Einnahme merkt sich 'gearbeitet'",
            all("gearbeitet" in p for p in stand["currentMonth"]["income"]), True)
@@ -817,97 +812,95 @@ with sync_playwright() as p:
 
     page.screenshot(path=f"{SHOTS}/06-affirmationen.png", full_page=True)
 
-    print("\n=== 27. Sparziel: Ankunft, Umleitung, Trennung vom Notgroschen ===")
+    print("\n=== 27. Gespart: eine Summe, mehrere Marken darauf ===")
     neu_starten(page)
 
-    # Ohne Ziel gibt es weder Haekchen an den Sparposten noch eine Rechnung.
-    pruefe("ohne Ziel steht die Einladung da", page.locator(".sparziel-karte.leer").count(), 1)
+    # Ohne Fixkosten und ohne eigenes Ziel gibt es noch keine Marke — dann ist
+    # die Karte eine Einladung statt eines Berichts ueber eine Null.
+    pruefe("erst die Einladung", page.locator(".spar-leer").count(), 1)
     add(page, "sparen", "Ruecklage", 100)
-    pruefe("ohne Ziel kein Ziel-Haekchen am Posten",
+    # Das Haekchen „fuers Sparziel?" gibt es nicht mehr: es gibt nur einen Topf.
+    pruefe("kein Topf-Haekchen am Posten",
            page.locator(f'{auf(page, "sparen")} .posten [data-field="fuersZiel"]').count(), 0)
-    pruefe("ohne Ziel kein Ziel-Haekchen im Formular",
+    pruefe("und keines im Formular",
            page.locator(f'{auf(page, "sparen")} [data-add-schalter="fuersZiel"]').count(), 0)
+    pruefe("die Summe steht trotzdem da", norm(page.locator(".spar-summe").inner_text()), "100,00 €")
 
     add(page, "income", "Gehalt", 2000, haken=True)
     add(page, "fixkosten", "Miete", 800)
-    # Notgroschen-Ziel = 3 x 800 = 2400, bisher 100
-    pruefe("Gespartes zaehlt ohne Ziel voll zum Notgroschen",
-           norm(page.locator(".notgroschen-ist").inner_text()), "100,00 €")
+    # Fixkosten allein erzeugen keine Marke mehr — die Karte wartet auf ihr Ziel.
+    pruefe("Fixkosten allein erzeugen keine Marke", page.locator(".spar-marke").count(), 0)
 
-    # Ziel anlegen: 2000 EUR, ohne Termin
-    setze(page, "#sparziel-label", "Lissabon")
-    setze(page, "#sparziel-betrag", 2000)
-    pruefe("Ziel steht mit Namen",
-           page.locator(".sparziel-kopf .beschriftung").first.inner_text(), "Lissabon")
-    pruefe("Zielbetrag", norm(page.locator(".sparziel-summe").inner_text()), "2.000,00 €")
-    pruefe("noch nichts dafuer zurueckgelegt", norm(page.locator(".sparziel-ist").inner_text()), "0,00 €")
-    pruefe("jetzt gibt es das Haekchen am Posten",
-           page.locator(f'{auf(page, "sparen")} .posten [data-field="fuersZiel"]').count(), 1)
+    # Ein Ziel: 2000 EUR, ohne Termin.
+    page.click(".spar-verwalten > summary")
+    page.click("#btn-ziel-neu")
+    zeile = page.locator(".ziel-zeile").first
+    setze(page, '.ziel-zeile [data-ziel-feld="label"]', "Lissabon")
+    setze(page, '.ziel-zeile [data-ziel-feld="betrag"]', 2000)
+    pruefe("eine Marke steht jetzt da", page.locator(".spar-marke").count(), 1)
 
-    # 200 EUR fuers Ziel weglegen — der Posten wandert damit aus dem Notgroschen raus.
+    # Jeder Sparposten zaehlt in dieselbe Summe, ganz gleich wie er heisst.
     add(page, "sparen", "Reisekasse", 200)
-    oeffne(page.locator(f'{auf(page, "sparen")} .posten:has(input[value="Reisekasse"])'))
-    page.locator(f'{auf(page, "sparen")} .posten:has(input[value="Reisekasse"]) [data-field="fuersZiel"]').click()
-    pruefe("Ziel-Sparen zaehlt zum Ziel", norm(page.locator(".sparziel-ist").inner_text()), "200,00 €")
-    pruefe("und NICHT mehr zum Notgroschen",
-           norm(page.locator(".notgroschen-ist").inner_text()), "100,00 €")
-    pruefe("Fortschritt 200 von 2000", page.locator(".sparziel-karte .notgroschen-quote").inner_text(),
-           "10% geschafft · noch 1.800,00 €")
+    pruefe("die eine Summe zaehlt beides", norm(page.locator(".spar-summe").inner_text()), "300,00 €")
+    marken = [norm(m.inner_text()).replace("\n", " ") for m in page.locator(".spar-marke").all()]
+    print("  Marken:", marken)
+    pruefe("Lissabon misst an den 300", "15%" in marken[0], True)
 
-    # Ankunft: 1800 fehlen, 200 pro Monat -> 9 Monate
+    # Ankunft: 1700 fehlen bis Lissabon, 300 pro Monat -> 6 Monate
     heute = page.evaluate("STATE.currentMonth.id")
-
-    pruefe("Ankunft in 9 Monaten",
-           monat_plus(heute, 9) in page.locator(".sparziel-text").inner_text(), True)
-    pruefe("Sparrate wird genannt",
-           "200,00" in norm(page.locator(".sparziel-text").inner_text()), True)
+    pruefe("Ankunft in 6 Monaten", monat_plus(heute, 6) in marken[0], True)
+    pruefe("Sparrate steht im Kopf",
+           "300,00" in norm(page.locator(".spar-unter").inner_text()), True)
 
     # Ausnahme: 300 EUR Sushi. Umleitbar ist die Haelfte (150).
-    # 1800 / (200 + 150) = 5,14 -> 6 Monate, also 3 Monate frueher.
+    # Lissabon fehlen 1700: 1700 / (300 + 150) = 3,8 -> 4 Monate, 2 frueher.
     add(page, "luxus", "Sushi", 300)
-    pruefe("Umleitungs-Rechnung erscheint", page.locator(".sparziel-umleitung").count(), 1)
-    umleitung = norm(page.locator(".sparziel-umleitung").inner_text())
-    pruefe("3 Monate frueher", "3 Monate früher" in umleitung, True)
-    pruefe("mit dem Ankunftsmonat", monat_plus(heute, 6) in umleitung, True)
+    pruefe("Umleitungs-Rechnung erscheint", page.locator(".spar-umleitung").count(), 1)
+    umleitung = norm(page.locator(".spar-umleitung").inner_text())
+    print("  Umleitung:", umleitung.replace("\n", " "))
+    pruefe("sie nennt die naechste Marke", "Lissabon" in umleitung, True)
+    pruefe("2 Monate frueher", "2 Monate früher" in umleitung, True)
+    pruefe("mit dem Ankunftsmonat", monat_plus(heute, 4) in umleitung, True)
 
-    # Das Ziel-Schild am Posten: 300 / 200 = 1,5 -> gerundet 2 Monate
+    # Das Ziel-Schild am Posten: 300 / 300 = 1 Monat
     pruefe("Ziel-Schild am Ausnahme-Posten",
            page.locator(f'{auf(page, "luxus")} .ziel-schild').inner_text().strip(),
-           "🎯 2 Monate später: Lissabon")
+           "🎯 1 Monat später: Lissabon")
 
-    # Der Notgroschen-Vorrang steht da, solange der Puffer nicht steht.
-    pruefe("Notgroschen-Vorrang wird gesagt", page.locator(".sparziel-vorrang").count(), 1)
-
-    # Wunschtermin, der nicht zu schaffen ist: naechster Monat, 1800 EUR offen.
-    # Das "toggle"-Ereignis meldet sich erst im naechsten Frame — ein Mensch
-    # braucht laenger zum Tippen, der Automat nicht. Deshalb hier kurz warten.
-    page.click(".sparziel-aendern > summary")
-    page.wait_for_timeout(100)
-    # Eine Auswahlliste, kein <input type="month"> — das kennt Safari am Mac nicht.
-    pruefe("Termin ist eine Auswahlliste",
-           page.locator("select#sparziel-termin").count(), 1)
-    page.locator("#sparziel-termin").select_option(id_plus(heute, 1))
-    pruefe("„Ziel ändern\" bleibt beim Tippen offen",
-           page.locator(".sparziel-aendern[open]").count(), 1)
+    # Wunschtermin, der nicht zu schaffen ist: naechster Monat, 1700 EUR offen.
+    page.locator('.ziel-zeile [data-ziel-feld="termin"]').select_option(id_plus(heute, 1))
+    pruefe("die Verwaltung bleibt beim Tippen offen",
+           page.locator(".spar-verwalten[open]").count(), 1)
     pruefe("zu knapper Termin wird als solcher benannt",
-           page.locator(".sparziel-termin.warn").count(), 1)
+           page.locator(".spar-marke-termin.warn").count(), 1)
     pruefe("und nennt die noetige Rate",
-           "1.800,00" in norm(page.locator(".sparziel-termin").inner_text()), True)
+           "1.700,00" in norm(page.locator(".spar-marke-termin").inner_text()), True)
 
-    page.screenshot(path=f"{SHOTS}/07-sparziel.png", full_page=True)
+    page.screenshot(path=f"{SHOTS}/07-gespart.png", full_page=True)
 
-    # Sofort-Einwurf: ein Kauf verschiebt das Ziel.
+    # Sofort-Einwurf: ein Kauf verschiebt das naechste eigene Ziel.
     add(page, "luxus", "Jacke", 400)
     pruefe("Einwurf nennt das Ziel",
            "Lissabon" in page.locator("#toast").inner_text(), True)
 
-    # Ziel loeschen: das Gesparte faellt zurueck an den Notgroschen.
-    page.click("#btn-sparziel-weg")
-    pruefe("Karte ist wieder die Einladung", page.locator(".sparziel-karte.leer").count(), 1)
-    pruefe("Gespartes gehoert wieder dem Notgroschen",
-           norm(page.locator(".notgroschen-ist").inner_text()), "300,00 €")
-    pruefe("und die Ziel-Haekchen sind weg",
-           page.locator(f'{auf(page, "sparen")} [data-field="fuersZiel"]').count(), 0)
+    # Ein zweites Ziel daneben — beide gleichzeitig, aus demselben Geld.
+    page.click("#btn-ziel-neu")
+    zweite = page.locator(".ziel-zeile").nth(1)
+    zweite.locator('[data-ziel-feld="label"]').fill("Urlaub")
+    zweite.locator('[data-ziel-feld="label"]').dispatch_event("change")
+    page.locator(".ziel-zeile").nth(1).locator('[data-ziel-feld="betrag"]').fill("250")
+    page.locator(".ziel-zeile").nth(1).locator('[data-ziel-feld="betrag"]').dispatch_event("change")
+    pruefe("zwei Marken auf einer Summe", page.locator(".spar-marke").count(), 2)
+    pruefe("der Urlaub ist aus denselben 300 bezahlt",
+           page.locator(".spar-marke-steht").count(), 1)
+    pruefe("und Lissabon bleibt offen, ohne dass Geld verschoben wurde",
+           norm(page.locator(".spar-summe").inner_text()), "300,00 €")
+
+    # Eine Marke loeschen: am Geld aendert das nichts.
+    page.locator("[data-ziel-weg]").nth(1).click()
+    pruefe("die Marke ist weg", page.locator(".spar-marke").count(), 1)
+    pruefe("das Geld liegt unveraendert da",
+           norm(page.locator(".spar-summe").inner_text()), "300,00 €")
 
     print("\n=== 28. Jedes Haekchen startet leer ===")
     neu_starten(page)
@@ -930,46 +923,61 @@ with sync_playwright() as p:
     page.locator(f'{auf(page, "income")} .posten [data-field="gearbeitet"]').click()
     pruefe("nach dem Antippen rechnet sie ihn", page.locator("#wochenstunden").count(), 1)
 
-    print("\n=== 29. Sparziel: alte Staende und der Monatswechsel ===")
+    print("\n=== 29. Alte Staende: zwei Toepfe werden einer ===")
     neu_starten(page)
-    # Ein Stand aus der Zeit vor dem Sparziel: kennt weder das Feld noch die
-    # getrennten Summen im Archiv. Er darf weder abstuerzen noch Puffer verlieren.
+    # Ein Stand aus der Zeit der zwei Toepfe: getrennte Startwerte, ein
+    # einzelnes Sparziel, und im Archiv die aufgeteilten Summen. Beide
+    # Startwerte beschreiben dasselbe Geld und werden zusammengelegt — sonst
+    # verlöre sie beim Update genau das, was im anderen Topf lag.
     page.evaluate("""
       localStorage.setItem("girlmath.v1", JSON.stringify({
-        version: 3,
-        einstellungen: { wochenstunden: 40, notgroschenStart: 0, zugeklappt: [] },
+        version: 5,
+        einstellungen: {
+          wochenstunden: 40,
+          notgroschenStart: 400,
+          sparziel: { label: "Führerschein", betrag: 3000, termin: "", start: 100 },
+        },
         currentMonth: { id: "2026-03", startBalance: 0,
           income: [{ id: "a", label: "Gehalt", amount: 2000, gearbeitet: true }],
           fixkosten: [{ id: "b", label: "Miete", amount: 800, rhythmus: "monatlich", faellig: 3 }],
-          sparen: [{ id: "c", label: "Rücklage", amount: 150 }] },
-        archive: [{ id: "2026-02", summary: { gespart: 250, quoteNicht: 10, regelErreicht: true }, snapshot: {} }],
+          sparen: [{ id: "c", label: "Rücklage", amount: 150, fuersZiel: false },
+                   { id: "d", label: "Reisekasse", amount: 50, fuersZiel: true }] },
+        archive: [{ id: "2026-02",
+                    summary: { gespart: 250, gespartPuffer: 200, gespartZiel: 50,
+                               quoteNicht: 10, regelErreicht: true },
+                    snapshot: {} }],
         onboardingGesehen: true
       }));
     """)
     page.reload()
-    pruefe("alter Stand laedt ohne Ziel", page.locator(".sparziel-karte.leer").count(), 1)
-    pruefe("alter Puffer bleibt vollstaendig",
-           norm(page.locator(".notgroschen-ist").inner_text()), "400,00 €")
+    page.wait_for_selector(".spar-karte")
 
-    # Jetzt ein Ziel setzen: das alte Gesparte bleibt beim Notgroschen,
-    # weil es damals nie fuer ein Ziel markiert war.
-    setze(page, "#sparziel-label", "Führerschein")
-    setze(page, "#sparziel-betrag", 3000)
-    pruefe("altes Gespartes bleibt Puffer",
-           norm(page.locator(".notgroschen-ist").inner_text()), "400,00 €")
-    pruefe("das Ziel startet bei null", norm(page.locator(".sparziel-ist").inner_text()), "0,00 €")
+    # 400 Notgroschen-Start + 100 Ziel-Start + 250 aus dem Archiv + 200 diesen Monat
+    pruefe("beide Startwerte sind zusammengelegt",
+           page.evaluate("STATE.einstellungen.sparen.start"), 500)
+    pruefe("kein Rest der alten Felder",
+           page.evaluate("STATE.einstellungen.notgroschenStart === undefined && "
+                         "STATE.einstellungen.sparziel === undefined"), True)
+    pruefe("kein Cent verschwindet", norm(page.locator(".spar-summe").inner_text()), "950,00 €")
+    pruefe("das alte Ziel ist die erste Marke",
+           page.evaluate("STATE.einstellungen.sparen.ziele[0].label"), "Führerschein")
+    pruefe("mit seinem Betrag", page.evaluate("STATE.einstellungen.sparen.ziele[0].betrag"), 3000)
 
-    # Monatswechsel: die getrennten Summen landen im Archiv und werden weitergezaehlt.
-    oeffne(page.locator(f'{auf(page, "sparen")} .posten:has(input[value="Rücklage"])'))
-    page.locator(f'{auf(page, "sparen")} .posten:has(input[value="Rücklage"]) [data-field="fuersZiel"]').click()
-    pruefe("umgehaengt aufs Ziel", norm(page.locator(".sparziel-ist").inner_text()), "150,00 €")
-    page.click("#btn-monat-abschliessen")
-    pruefe("nach dem Abschluss zaehlt das Ziel weiter",
-           norm(page.locator(".sparziel-ist").inner_text()), "150,00 €")
-    pruefe("und der Puffer auch",
-           norm(page.locator(".notgroschen-ist").inner_text()), "250,00 €")
-    pruefe("Archiv haelt beide Summen getrennt",
-           page.evaluate("STATE.archive[0].summary.gespartZiel"), 150)
+    # Das Häkchen an den Sparposten faellt beim Laden weg — es gibt nichts
+    # mehr zu entscheiden, beide Posten zaehlen in dieselbe Summe.
+    pruefe("das Topf-Haekchen ist aus den Posten verschwunden",
+           page.evaluate("STATE.currentMonth.sparen.every(p => p.fuersZiel === undefined)"), True)
+
+    # Monatswechsel: die eine Summe landet im Archiv und zaehlt weiter.
+    with page.expect_download(timeout=15000):
+        page.click("#btn-monat-abschliessen")
+    page.wait_for_selector(".archiv-eintrag")
+    pruefe("nach dem Abschluss steht alles noch da",
+           norm(page.locator(".spar-summe").inner_text()), "950,00 €")
+    pruefe("das Archiv haelt die Summe",
+           page.evaluate("STATE.archive[0].summary.gespart"), 200)
+    pruefe("und keine Teilsummen mehr",
+           page.evaluate("STATE.archive[0].summary.gespartZiel === undefined"), True)
 
     print("\n=== 30. Wohlstand, der in mein Leben fliesst ===")
 
@@ -1146,15 +1154,14 @@ with sync_playwright() as p:
            page.evaluate('ZAEHL_SPRUECHE[3](4, {label:"Sushi", amount:18})'),
            "4 Ausnahmen. Du weißt, dass ich das aufschreibe, ja?")
 
-    # Und im Sparziel: ein Monat gegen mehrere.
+    # Und am naechsten Sparziel: ein Monat gegen mehrere.
+    SP = '{rate:100, ziele:[{label:"Lissabon", betrag:2000, fehlt:1800, geschafft:false}]}'
     pruefe("ein Monat spaeter",
-           page.evaluate("""zielMassstab(100, {aktiv:true, geschafft:false, rate:100,
-                             betrag:2000, label:"Lissabon"})"""),
-           "1 Monat später: Lissabon")
+           page.evaluate(f"zielMassstab(100, {SP})"), "1 Monat später: Lissabon")
     pruefe("mehrere Monate spaeter",
-           page.evaluate("""zielMassstab(300, {aktiv:true, geschafft:false, rate:100,
-                             betrag:2000, label:"Lissabon"})"""),
-           "3 Monate später: Lissabon")
+           page.evaluate(f"zielMassstab(300, {SP})"), "3 Monate später: Lissabon")
+    pruefe("ohne Ziel schweigt der Massstab",
+           page.evaluate('zielMassstab(300, {rate:100, ziele:[]})'), "")
 
     print("\n=== 33. Der Vergleich bleibt deutsch, egal wie die Rechnung heisst ===")
     # Du tippst den Namen selbst ein, und deutsche Grammatik haengt am
@@ -1539,15 +1546,15 @@ with sync_playwright() as p:
         page.click("#btn-monat-abschliessen")
     page.wait_for_selector(".archiv-eintrag")
 
-    puffer_vorher = norm(page.locator(".notgroschen-ist").inner_text())
+    puffer_vorher = norm(page.locator(".spar-summe").inner_text())
     serie_vorher = page.locator(".serie-laeuft").count()
-    pruefe("der Monat hat 200 in den Puffer gelegt", puffer_vorher, "200,00 €")
+    pruefe("der Monat hat 200 zurueckgelegt", puffer_vorher, "200,00 €")
 
     page.locator(".archiv-eintrag").first.locator(".archiv-weg").click()
     pruefe("Monat verschwindet aus der Liste", page.locator(".archiv-eintrag").count(), 0)
     pruefe("aber nicht aus den Daten", page.evaluate("STATE.archive.length"), 1)
-    pruefe("der Notgroschen behaelt sein Geld",
-           norm(page.locator(".notgroschen-ist").inner_text()), puffer_vorher)
+    pruefe("das Ersparte behaelt sein Geld",
+           norm(page.locator(".spar-summe").inner_text()), puffer_vorher)
     pruefe("und die Serie laeuft weiter", page.locator(".serie-laeuft").count(), serie_vorher)
     pruefe("die Rueckhol-Zeile sagt, wie viele weg sind",
            "1 Monat ausgeblendet" in page.locator(".archiv-zeigen").inner_text(), True)
@@ -1701,13 +1708,13 @@ with sync_playwright() as p:
     neu_starten(page)
     # Das Ziel steht von Anfang an, damit die Zusammenfassung beim Abschliessen
     # beide Spartoepfe getrennt festhaelt — und beide gepruefte werden koennen.
-    page.evaluate("STATE.einstellungen.sparziel = "
-                  "{label: 'Reise', betrag: 5000, termin: '', start: 0};"
+    page.evaluate("STATE.einstellungen.sparen.ziele = "
+                  "[{id: 'z1', label: 'Reise', betrag: 5000, termin: ''}];"
                   "speichern(); render();")
     add(page, "income", "Gehalt", 2000, haken=True)
     add(page, "fixkosten", "Miete", 500, rhythmus="monatlich")
-    add(page, "sparen", "Notgroschen", 300, haken=False)    # in den Puffer
-    add(page, "sparen", "Fuer Lissabon", 200, haken=True)   # aufs Ziel
+    add(page, "sparen", "Ruecklage", 300)
+    add(page, "sparen", "Fuer Lissabon", 200)
     zufluss_add(page, "Oma hat was zugesteckt", 40)
     setze(page, "#start-guthaben", 1000)
 
@@ -1715,10 +1722,8 @@ with sync_playwright() as p:
         page.click("#btn-monat-abschliessen")
     page.wait_for_selector(".archiv-eintrag")
 
-    pruefe("nach dem Abschluss stehen 300 im Puffer",
-           page.evaluate("notgroschen(rechneAktuell()).bisher"), 300)
-    pruefe("200 auf dem Ziel",
-           page.evaluate("rechneAktuell().sparziel.bisher"), 200)
+    pruefe("nach dem Abschluss liegen 500 im Topf",
+           page.evaluate("rechneAktuell().sparen.bisher"), 500)
     pruefe("und 40 in der Jahresauswertung",
            page.evaluate("zuflussJahre()[0].summe"), 40)
 
@@ -1727,17 +1732,15 @@ with sync_playwright() as p:
     eintrag.locator("[data-archiv-bearbeiten]").click()
 
     # DER KERN: Der Monat liegt jetzt im Archiv UND vorne. Vorher zaehlte ihn
-    # jede dieser drei Zahlen doppelt — 600, 400 und 80 statt 300, 200 und 40.
-    pruefe("beim Bearbeiten bleibt der Puffer bei 300",
-           page.evaluate("notgroschen(rechneAktuell()).bisher"), 300)
-    pruefe("das Ziel bei 200",
-           page.evaluate("rechneAktuell().sparziel.bisher"), 200)
+    # jede dieser Zahlen doppelt — 1000 und 80 statt 500 und 40.
+    pruefe("beim Bearbeiten bleibt der Topf bei 500",
+           page.evaluate("rechneAktuell().sparen.bisher"), 500)
     pruefe("und die Jahresauswertung bei 40",
            page.evaluate("zuflussJahre()[0].summe"), 40)
 
     page.click("#btn-bearbeitung-fertig")
     pruefe("und nach dem Fertig steht wieder alles am Platz",
-           page.evaluate("notgroschen(rechneAktuell()).bisher"), 300)
+           page.evaluate("rechneAktuell().sparen.bisher"), 500)
 
     print("\n=== 44. Der Umstieg vom Haekchen auf die Zahl vor dem Gehalt ===")
     # Ein Stand aus der Zeit des Haekchens: Im Feld stand der Kontostand von
@@ -1768,7 +1771,7 @@ with sync_playwright() as p:
            page.evaluate("STATE.currentMonth.startBalance"), -132)
     pruefe("und die Zahl auf dem Schirm ist dieselbe wie vorher",
            page.evaluate("rechneAktuell().kontostand"), 422)
-    pruefe("Fassung ist hochgezogen", page.evaluate("STATE.version"), 5)
+    pruefe("Fassung ist hochgezogen", page.evaluate("STATE.version"), 6)
 
     # Ab jetzt rechnet sie richtig weiter: eine neue Einnahme schlaegt voll
     # durch, statt sich aus dem Ergebnis herauszukuerzen.
@@ -1805,21 +1808,16 @@ with sync_playwright() as p:
     pruefe("und die Legende ergibt zusammen 100%",
            sum(int(w.rstrip("%")) for w in werte), 100)
 
-    print("\n=== 46. Der Notgroschen-Satz rechnet mit der Stufe, die gilt ===")
-    # „Dein Notgroschen-Ziel laege X niedriger" rechnete immer mit drei
-    # Monatsausgaben — auch wenn die Karte darunter laengst auf sechs stand.
+    print("\n=== 46. Der Notwendig-Blick redet nicht mehr vom Notgroschen ===")
+    # Hier stand ein zweiter Halbsatz: „und dein Notgroschen-Ziel laege X
+    # niedriger". Den Notgroschen rechnet die App nicht mehr aus.
     neu_starten(page)
     add(page, "income", "Gehalt", 1000, haken=True)
     add(page, "fixkosten", "Miete", 600, rhythmus="monatlich")   # 60%, also 10 Punkte drueber
-    pruefe("Stufe 3, Satz rechnet mit 3 (100 x 3)",
-           "300,00" in norm(page.locator(".notwendig-fazit.warnung p").inner_text()), True)
-
-    # Puffer auffuellen, bis die drei Monate stehen: Ziel ist 1800.
-    setze(page, "#notgroschen-start", "2000")
-    pruefe("die Karte ist jetzt auf Stufe 6",
-           "6 Monatsausgaben" in page.locator(".notgroschen-kopf").inner_text(), True)
-    pruefe("und der Satz rechnet mit 6 (100 x 6)",
-           "600,00" in norm(page.locator(".notwendig-fazit.warnung p").inner_text()), True)
+    satz = norm(page.locator(".notwendig-fazit.warnung p").inner_text())
+    print("  Fazit-Satz:", satz)
+    pruefe("kein Notgroschen im Satz", "Notgroschen" in satz, False)
+    pruefe("nur der Satz, um den es geht", satz, "Bei 50% wäre das Geld frei.")
 
     print("\n=== 47. Eine geladene Sicherung wird genauso umgerechnet wie ein alter Stand ===")
     # migriere() merkt sich zwar „alter Stand, muss umgerechnet werden", aber
@@ -1853,7 +1851,7 @@ with sync_playwright() as p:
            page.evaluate("STATE.currentMonth.startBalance"), -132)
     pruefe("der Kontostand steht wie in der alten Fassung",
            page.evaluate("rechneAktuell().kontostand"), 422)
-    pruefe("Fassung mitgezogen", page.evaluate("STATE.version"), 5)
+    pruefe("Fassung mitgezogen", page.evaluate("STATE.version"), 6)
 
     browser.close()
 
