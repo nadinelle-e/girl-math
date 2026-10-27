@@ -25,6 +25,17 @@
                       notwendig = musst du ausgeben (Miete, Essen)
                       nicht     = eine „Ausnahme" (Sushi, Klamotten)
                       sparen    = zur Seite gelegt (wird positiv bewertet)
+                      wahl      = du entscheidest per Häkchen: notwendig
+                                  oder Ausnahme (Einmaliges)
+                      abhebung  = vom Konto in die Tasche (Automat) — zählt
+                                  in keinem Prozent, nur in Konto und Bargeld
+                      geschaeft = Betriebsausgabe (nur selbstständig) —
+                                  mindert den Gewinn, ist kein privates Geld
+                      steuer    = ans Finanzamt gezahlt (nur selbstständig) —
+                                  leert den Topf fürs Finanzamt
+
+     nurSelbststaendig  true = nur im Modus „selbstständig" sichtbar und
+                        gerechnet
 
      schalter       Die Häkchen an jedem Posten dieser Kategorie. Eine LISTE,
                     weil manche Kategorie zwei davon trägt. Jedes Häkchen ist:
@@ -92,16 +103,63 @@ const SCHALTER_BAR_REIN   = { feld: "bar", text: "bar bekommen?" };
 const SCHALTER_BAR_RAUS   = { feld: "bar", text: "bar bezahlt?" };
 const SCHALTER_BAR_WEG    = { feld: "bar", text: "bar zurückgelegt?" };
 
+/* Wofür ist das Gesparte? Jeder Sparen-Eintrag trägt eine Art. Gezählt wird
+   weiter EIN Topf — die Ziele messen sich an der Gesamtsumme —, die Spar-Karte
+   zeigt nur zusätzlich, wie er sich aufteilt. Ältere Einträge ohne Art
+   zählen als Rücklage. */
+const SPAR_ARTEN = [
+  { wert: "ruecklage",  text: "Rücklage" },
+  { wert: "investment", text: "Investment" },
+  { wert: "sparziel",   text: "Sparziel" },
+];
+const sparArt = (wert) => (SPAR_ARTEN.some(a => a.wert === wert) ? wert : "ruecklage");
+
+// Die Auswahl der Art, im Formular und am Posten.
+function sparArtAuswahl(aktuell, attribute) {
+  const optionen = SPAR_ARTEN.map(a =>
+    `<option value="${a.wert}" ${a.wert === sparArt(aktuell) ? "selected" : ""}>${a.text}</option>`).join("");
+  return `<select class="mini-auswahl" ${attribute}>${optionen}</select>`;
+}
+
+/* Selbstständig: eine Rechnung ist geschrieben, das Geld aber noch nicht da.
+   Eine offene Einnahme zählt nirgends mit, weder im Kontostand noch in den
+   Prozenten — sie steht nur als „Noch offen" in der Kontostand-Karte.
+   Angestellte sehen das Häkchen nicht. */
+const SCHALTER_OFFEN      = { feld: "offen", text: "noch offen?", nurSelbststaendig: true };
+
 const KATEGORIEN = [
-  { key: "income",         titel: "1 · Einnahmen 💰",              typ: "positiv",   zeitfeld: true, schalter: [SCHALTER_GEARBEITET, SCHALTER_BAR_REIN], altHaken: ["gearbeitet"], platzhalter: "z.B. Gehalt",
+  { key: "income",         titel: "1 · Einnahmen 💰",              typ: "positiv",   zeitfeld: true, schalter: [SCHALTER_GEARBEITET, SCHALTER_BAR_REIN, SCHALTER_OFFEN], altHaken: ["gearbeitet"], platzhalter: "z.B. Gehalt",
     hinweis: "Auch Bürgergeld, Unterhalt, Kindergeld oder Geschenke." },
   { key: "fixkosten",      titel: "2 · Fixkosten 🏠",              typ: "notwendig", wiederkehrend: true, schalter: [SCHALTER_BAR_RAUS], platzhalter: "z.B. Miete" },
   { key: "abos",           titel: "3 · Abos 📺",                   typ: "abo",       wiederkehrend: true, schalter: [SCHALTER_NOTWENDIG, SCHALTER_BAR_RAUS], vertrag: true, platzhalter: "z.B. Netflix" },
-  { key: "versicherungen", titel: "4 · Versicherungen 🛡️",         typ: "abo",       wiederkehrend: true, schalter: [SCHALTER_NOTWENDIG, SCHALTER_BAR_RAUS], altHaken: ["notwendig"], vertrag: true, platzhalter: "z.B. Haftpflicht" },
-  { key: "lebensmittel",   titel: "5 · Einkauf: Lebensmittel 🥑", typ: "notwendig", schalter: [SCHALTER_BAR_RAUS], platzhalter: "z.B. Wocheneinkauf" },
+  { key: "versicherungen", titel: "4 · Versicherungen 🛡️",         typ: "abo",       wiederkehrend: true, schalter: [SCHALTER_NOTWENDIG, SCHALTER_BAR_RAUS], altHaken: ["notwendig"], vertrag: true, platzhalter: "z.B. Haftpflicht",
+    hinweisSelbststaendig: "Als Selbstständige zahlst du Krankenkasse und Altersvorsorge selbst." },
+  /* Der Schlüssel heißt weiter „lebensmittel", damit gespeicherte Einträge
+     bleiben, wo sie sind. Gemeint ist inzwischen alles, was man zum Leben
+     braucht — auch Putzmittel und Drogerie. Was im selben Einkauf mitkam,
+     aber nicht nötig war, gehört nach „6 · Einkauf: Ausnahmen". */
+  { key: "lebensmittel",   titel: "5 · Einkauf: Alltag 🛒",        typ: "notwendig", schalter: [SCHALTER_BAR_RAUS], platzhalter: "z.B. Putzmittel",
+    hinweis: "Alles, was du brauchst: Lebensmittel, Putzmittel, Drogerie." },
   { key: "luxus",          titel: "6 · Einkauf: Ausnahmen 🍣",    typ: "nicht",     schalter: [SCHALTER_BAR_RAUS], platzhalter: "z.B. Sushi" },
   { key: "konsum",         titel: "7 · Große Ausnahmen 🛍️",        typ: "nicht",     schalter: [SCHALTER_BAR_RAUS], platzhalter: "z.B. Klamotten" },
-  { key: "sparen",         titel: "8 · Sparen 💌",                 typ: "sparen",    schalter: [SCHALTER_BAR_WEG], platzhalter: "z.B. Rücklage" },
+  /* Was wichtig war, aber nur einmal vorkommt: die Domain, die Mitgliedschaft
+     für einen Monat. Du teilst selbst zu — mit Häkchen notwendig, ohne eine
+     Ausnahme. Dieselbe Frage wie bei den Abos, nur ohne Rhythmus. */
+  { key: "einmalig",       titel: "8 · Einmalig 📌",               typ: "wahl",      schalter: [SCHALTER_NOTWENDIG, SCHALTER_BAR_RAUS], platzhalter: "z.B. Domain",
+    hinweis: "Wichtig, aber nur einmal. Mit Häkchen zählt es als notwendig, ohne als Ausnahme." },
+  { key: "sparen",         titel: "9 · Sparen 💌",                 typ: "sparen",    schalter: [SCHALTER_BAR_WEG], auswahl: "art", platzhalter: "z.B. ETF" },
+  /* Geld vom Automaten wechselt nur den Ort: vom Konto in die Tasche. Es ist
+     weder Einnahme noch Ausgabe und taucht deshalb in keinem Prozent auf.
+     Gezählt wird erst, was du damit bar bezahlst. */
+  { key: "abgehoben",      titel: "10 · Bargeld abgehoben 🏧",     typ: "abhebung",  platzhalter: "z.B. Automat",
+    hinweis: "Geld vom Konto in die Tasche. Gezählt wird erst, was du damit bar bezahlst." },
+  /* Die beiden nächsten gibt es nur im Modus „selbstständig" (siehe
+     `nurSelbststaendig` und aktiveKategorien()). Angestellte sehen sie nicht,
+     und für sie rechnet die App genau wie vorher. */
+  { key: "geschaeftlich",  titel: "11 · Geschäftlich 💼",          typ: "geschaeft", nurSelbststaendig: true, schalter: [SCHALTER_BAR_RAUS], platzhalter: "z.B. Software",
+    hinweis: "Software, Material, Fortbildung. Mindert deinen Gewinn und damit die Steuer." },
+  { key: "steuerBezahlt",  titel: "12 · Steuer bezahlt 🧾",        typ: "steuer",    nurSelbststaendig: true, platzhalter: "z.B. Vorauszahlung",
+    hinweis: "Geht vom Konto und aus dem Topf fürs Finanzamt ab. Zählt nicht als Ausgabe." },
 ];
 
 /* Welche Häkchen dieser Kategorie sind zu sehen?
@@ -110,8 +168,22 @@ const KATEGORIEN = [
    dem Gespartes in einen von zwei Töpfen fiel. Es gibt nur noch einen Topf,
    und damit ist auch die Regel weg: Jede Kategorie zeigt schlicht ihre
    eigenen Häkchen. */
+/* Arbeitest du selbstständig? Dann gibt es Steuer-Rücklage, geschäftliche
+   Ausgaben und den Topf fürs Finanzamt. Sonst bleibt alles wie gehabt. */
+function istSelbststaendig() {
+  return STATE.einstellungen.modus === "selbststaendig";
+}
+
+/* Die Kategorien, die im aktuellen Modus zählen und zu sehen sind.
+   Wer von „selbstständig" zurück auf „angestellt" stellt, verliert dabei
+   nichts: Die Einträge bleiben gespeichert und sind beim Zurückschalten
+   wieder da. Sie zählen nur so lange nicht mit. */
+function aktiveKategorien() {
+  return KATEGORIEN.filter(kat => !kat.nurSelbststaendig || istSelbststaendig());
+}
+
 function schalterVon(kat) {
-  return kat.schalter || [];
+  return (kat.schalter || []).filter(s => !s.nurSelbststaendig || istSelbststaendig());
 }
 
 /* Trägt diese Kategorie ein bestimmtes Häkchen? Gefragt wird nach dem Feld,
@@ -297,7 +369,7 @@ const VERDIKTE = [
         `Mehr raus als rein. ${d.top.label} allein: ${euro(d.top.betrag)}. Das Geld dafür existiert nicht. Stört dich offenbar nicht.`,
       d => d.miete &&
         `${d.miete} für nichts, was bleibt. Sag mir bitte, dass da ein Fehler drin ist.`,
-      d => `Insolvenz-Vibes 💀💀 ${euro(d.summe)} raus bei ${euro(d.gehalt)} rein. Du gibst Geld aus, das noch nicht erfunden wurde.`,
+      d => `Insolvenz-Vibes 💀💀 ${euro(d.ausgegeben)} raus bei ${euro(d.gehalt)} rein. Du gibst Geld aus, das noch nicht erfunden wurde.`,
       d => `Mehr ausgegeben als verdient. An der Stelle hör ich mit den Witzen auf.`,
       d => `Mehr ausgegeben als verdient. Ich hab keinen Spruch mehr, ich hab nur noch Fragen.`,
     ],
@@ -908,6 +980,13 @@ function neuerMonat(id, startguthaben, vorlage) {
        und ihm genau das nehmen, was ihn besonders macht. */
     zufluesse: [],
   };
+  /* Offene Rechnungen wandern mit: Das Geld ist ja noch nicht da, und im
+     nächsten Monat soll man es abhaken können, wenn es ankommt. */
+  // Erst nach der Vorlage fragen: Beim allerersten Start gibt es noch keinen STATE.
+  const offeneRechnungen = (vorlage && Array.isArray(vorlage.income) && istSelbststaendig())
+    ? vorlage.income.filter(p => p.offen === true).map(p => ({ ...p, id: neueId() }))
+    : [];
+
   KATEGORIEN.forEach(kat => {
     const uebernehmen = kat.wiederkehrend && vorlage && Array.isArray(vorlage[kat.key]);
     monat[kat.key] = uebernehmen
@@ -921,6 +1000,7 @@ function neuerMonat(id, startguthaben, vorlage) {
         })
       : [];
   });
+  monat.income = monat.income.concat(offeneRechnungen);
   return monat;
 }
 
@@ -1029,6 +1109,12 @@ function standardEinstellungen() {
     eigeneAffirmationen: [],  // nur deine selbst getippten; die 111 stehen im Programm
     sparen: leererSparbereich(), // ein Topf, deine Marken darauf
     zyklusStart: "",        // "" = noch nie gedrückt, sonst "2026-07-25"
+    /* Angestellt oder selbstständig. Selbstständig schaltet die Steuer-
+       Rücklage und die geschäftlichen Ausgaben frei. */
+    modus: "angestellt",
+    steuerProzent: 30,          // Rücklage für die Einkommensteuer, Faustregel
+    kleinunternehmerin: false,  // false = Umsatzsteuer wird herausgerechnet
+    ustSatz: 19,                // 19 oder 7
   };
 }
 
@@ -1167,6 +1253,12 @@ function migriere(daten) {
          und ein einziger Knopfdruck ist ehrlicher als ein Datum, das die App
          aus einer alten Einstellung zurückrechnet. */
       zyklusStart: saubererZyklusStart(roheEinst.zyklusStart),
+      // Alles, was nicht ausdrücklich „selbstständig" ist, ist angestellt —
+      // so rechnen ältere Stände genau wie vorher.
+      modus: roheEinst.modus === "selbststaendig" ? "selbststaendig" : "angestellt",
+      steuerProzent: saubereProzent(roheEinst.steuerProzent, 30),
+      kleinunternehmerin: roheEinst.kleinunternehmerin === true,
+      ustSatz: Number(roheEinst.ustSatz) === 7 ? 7 : 19,
     },
     currentMonth: laufender,
     archive: archive,
@@ -1180,6 +1272,12 @@ function migriere(daten) {
        älteren Ständen steht hier nichts, und dann schweigt sie lieber. */
     letzterAbschluss: typeof daten.letzterAbschluss === "string" ? daten.letzterAbschluss : "",
   };
+}
+
+// Ein Prozentwert zwischen 0 und 100, sonst der Standard.
+function saubereProzent(wert, standard) {
+  const n = Number(wert);
+  return (Number.isFinite(n) && n >= 0 && n <= 100) ? n : standard;
 }
 
 // Einen Monat auf Vollständigkeit bringen: alle Kategorien vorhanden,
@@ -1269,6 +1367,7 @@ function normalisierePosten(roh, kat, monatId) {
     const feld = schalter.feld;
     posten[feld] = typeof p[feld] === "boolean" ? p[feld] : altJa.includes(feld);
   });
+  if (kat.auswahl === "art") posten.art = sparArt(p.art);
   if (kat.wiederkehrend) {
     posten.rhythmus = INTERVALL[p.rhythmus] ? p.rhythmus : "monatlich";
     const f = Number(p.faellig);
@@ -1448,10 +1547,13 @@ function rechne(monat) {
     gespart: 0,           // alles Zurückgelegte zusammen
     notwendigUmlage: 0, nichtUmlage: 0,   // auf den Monat verteilt
     notwendigReal: 0,   nichtReal: 0,     // was wirklich abgeht
-    notwendigSelbst: 0,                   // … davon nur durch DEIN Häkchen notwendig
     barEin: 0,                            // bar bekommen — kam nie aufs Konto
     barNotwendig: 0, barNicht: 0,         // bar bezahlt — ging nie vom Konto ab
     barGespart: 0,                        // bar zurückgelegt
+    abgehoben: 0,                         // am Automaten geholt — vom Konto in die Tasche
+    geschaeftlich: 0, barGeschaeft: 0,    // Betriebsausgaben (nur selbstständig) … davon bar
+    offen: 0, offeneAnzahl: 0,            // geschriebene, noch nicht bezahlte Rechnungen
+    steuerBezahlt: 0,                     // ans Finanzamt gezahlt (nur selbstständig)
     faelligJetzt: [],                     // große Brocken DIESEN Monat
     faelligBald: [],                      // … und in den nächsten zwei
     ausnahmen: [],                        // alle Ausnahmen einzeln (für die Rangliste)
@@ -1461,7 +1563,7 @@ function rechne(monat) {
     pausiertSumme: 0,                     // … und was dadurch bei dir bleibt
   };
 
-  KATEGORIEN.forEach(kat => {
+  aktiveKategorien().forEach(kat => {
     (monat[kat.key] || []).forEach(posten => {
       const betrag = Number(posten.amount) || 0;
 
@@ -1482,6 +1584,13 @@ function rechne(monat) {
         return;
       }
 
+      // Noch offen? Dann ist das Geld noch nicht da und zählt nirgends mit.
+      if (kat.typ === "positiv" && posten.offen && istSelbststaendig()) {
+        z.offen += betrag;
+        z.offeneAnzahl += 1;
+        return;
+      }
+
       if (kat.typ === "positiv") {
         // In die Prozente geht ALLES ein, was du zur Verfügung hast — Bürgergeld
         // und Flohmarkt-Geld zählen genauso wie Gehalt. In den Stundenlohn geht
@@ -1496,6 +1605,26 @@ function rechne(monat) {
       /* Gespartes ist eine Summe. Hier fiel es einmal je nach Häkchen in
          einen von zwei Töpfen — die gibt es nicht mehr, und damit auch die
          Frage nicht, welcher davon gemeint war. */
+      // Abgehoben ist eine Umbuchung: kein Prozent, nur Konto und Tasche.
+      if (kat.typ === "abhebung") {
+        z.abgehoben += betrag;
+        return;
+      }
+
+      // Geschäftliches Geld ist kein privates: keine Ausnahme, nicht notwendig.
+      // Es mindert den Gewinn, siehe die Steuer-Rechnung nach dieser Schleife.
+      if (kat.typ === "geschaeft") {
+        z.geschaeftlich += betrag;
+        if (posten.bar) z.barGeschaeft += betrag;
+        return;
+      }
+
+      // Steuer bezahlt: geht vom Konto und aus dem Topf, ist aber keine Ausgabe.
+      if (kat.typ === "steuer") {
+        z.steuerBezahlt += betrag;
+        return;
+      }
+
       if (kat.typ === "sparen") {
         z.gespart += betrag;
         if (posten.bar) z.barGespart += betrag;
@@ -1543,7 +1672,6 @@ function rechne(monat) {
           kategorie: kat.titel,
           selbstMarkiert: durchHaken,
         });
-        if (durchHaken) z.notwendigSelbst += umlage;
       }
 
       // Für die Rangliste: jede einzelne Ausnahme merken.
@@ -1587,6 +1715,57 @@ function rechne(monat) {
     });
   });
 
+  /* --- Selbstständig: was davon dem Finanzamt gehört ---
+
+     Bis hier ist `gehalt` alles, was reinkam. Bei Angestellten ist das schon
+     ihr Geld, die Steuer ging vorher ab. Bei Selbstständigen steckt darin
+     noch die Steuer, und die Rechnung dafür kommt erst Monate später.
+
+     Geschäftseinnahmen sind die Einnahmen mit „dafür gearbeitet?". Kindergeld,
+     Geschenke oder Unterhalt bleiben, wie sie sind.
+
+       Umsatzsteuer   steckt im Rechnungsbetrag (bei 19 %: 19/119 davon). Die
+                      Umsatzsteuer in den geschäftlichen Ausgaben (Vorsteuer)
+                      geht davon ab. Kleinunternehmerinnen haben beides nicht.
+       Gewinn         Einnahmen ohne Umsatzsteuer, minus Ausgaben ohne Vorsteuer
+       Rücklage       der eingestellte Anteil vom Gewinn, für die Einkommensteuer
+
+     Was danach übrig ist, ist „dein Geld", und daran messen sich alle
+     Prozente. `einnahmen` behält die volle Summe — die Kontostand-Kette
+     braucht sie, denn aufs Konto kam ja alles. */
+  z.einnahmen = z.gehalt;
+  z.ust = 0; z.vorsteuer = 0; z.ustZahllast = 0;
+  z.gewinn = 0; z.estRuecklage = 0; z.finanzamt = 0;
+  if (istSelbststaendig()) {
+    const e = STATE.einstellungen;
+    const anteilUst = e.kleinunternehmerin ? 0 : e.ustSatz / (100 + e.ustSatz);
+    z.ust          = z.arbeitsEinkommen * anteilUst;
+    z.vorsteuer    = z.geschaeftlich * anteilUst;
+    // Mehr Vorsteuer als Umsatzsteuer gibt eine Erstattung. Die zählt die App
+    // nicht vorab als Geld, sie kommt erst, wenn sie wirklich da ist.
+    z.ustZahllast  = Math.max(0, z.ust - z.vorsteuer);
+    z.gewinn       = (z.arbeitsEinkommen - z.ust) - (z.geschaeftlich - z.vorsteuer);
+    z.estRuecklage = Math.max(0, z.gewinn) * (e.steuerProzent / 100);
+    z.finanzamt    = runde(z.ustZahllast + z.estRuecklage);
+    z.gehalt       = z.einnahmen - z.geschaeftlich - z.finanzamt;
+    // Der Stundenlohn rechnet mit dem, was dir von deiner Arbeit bleibt.
+    z.arbeitsEinkommen = Math.max(0, z.gewinn - z.estRuecklage);
+  }
+
+  /* Selbstständige Einnahmen schwanken. Ein schwacher Monat sähe sonst aus
+     wie ein Absturz, ein starker wie Luxus. Deshalb messen sich die Prozente
+     am Schnitt der letzten (bis zu) drei abgeschlossenen Monate.
+
+     Der laufende Monat zählt nicht mit: Am Monatsanfang steht dort erst ein
+     Bruchteil, und der Schnitt würde mit jeder neuen Rechnung springen.
+     Ohne abgeschlossenen Monat gibt es keinen Schnitt, dann gilt dieser.
+
+     `dieserMonat` ist die Zahl, die ins Archiv geht — der Schnitt darf nie
+     selbst wieder in einen Schnitt einfließen. */
+  z.dieserMonat = z.gehalt;
+  z.schnitt = istSelbststaendig() ? schnittVor(monat.id) : null;
+  if (z.schnitt !== null) z.gehalt = z.schnitt;
+
   z.ausgegebenUmlage = z.notwendigUmlage + z.nichtUmlage;
   z.ausgegebenReal   = z.notwendigReal + z.nichtReal;
   z.uebrig           = z.gehalt - z.ausgegebenUmlage - z.gespart;
@@ -1602,19 +1781,21 @@ function rechne(monat) {
      Deshalb bekommt jede Zeile der Kette ihren Konto-Anteil: alles, minus
      dem, was bar lief.
 
-     Gemeint ist ausdrücklich Geld, das NIE aufs Konto kam — Trinkgeld,
-     Geschenke, bar bezahlte Nebenjobs. Was am Automaten geholt wird, ist
-     längst abgebucht und gehört hier nicht her. */
-  z.barAus           = z.barNotwendig + z.barNicht;
-  z.kontoEin         = z.gehalt - z.barEin;
+     „bar bekommen" ist Geld, das NIE aufs Konto kam — Trinkgeld, Geschenke,
+     bar bezahlte Nebenjobs. Was du am Automaten holst, steht in der eigenen
+     Kategorie „Bargeld abgehoben": Es geht vom Konto ab und landet in der
+     Tasche, und was du davon bar bezahlst, zieht die Tasche wieder ab. */
+  z.barAus           = z.barNotwendig + z.barNicht + z.barGeschaeft;
+  z.kontoEin         = z.einnahmen - z.barEin;
+  z.kontoGeschaeft   = z.geschaeftlich - z.barGeschaeft;
   z.kontoNotwendig   = z.notwendigReal - z.barNotwendig;
   z.kontoNicht       = z.nichtReal - z.barNicht;
   z.kontoSparen      = z.gespart - z.barGespart;
-  // Was am Monatsende in der Tasche liegt. Negativ heißt: mehr bar bezahlt
-  // als bar bekommen — dann steckt Automatengeld darin, und das Häkchen
-  // gehört an der Stelle wieder raus.
-  z.bargeld          = runde(z.barEin - z.barAus - z.barGespart);
-  z.hatBargeld       = (z.barEin + z.barAus + z.barGespart) > 0;
+  // Was am Monatsende in der Tasche liegt: bar bekommen und abgehoben, minus
+  // bar bezahlt und bar zurückgelegt. Negativ heißt: Es fehlt noch eine
+  // Abhebung in der Liste.
+  z.bargeld          = runde(z.barEin + z.abgehoben - z.barAus - z.barGespart);
+  z.hatBargeld       = (z.barEin + z.abgehoben + z.barAus + z.barGespart) > 0;
 
   /* Der Kontostand zu Beginn dieses Monats.
 
@@ -1648,7 +1829,8 @@ function rechne(monat) {
 
      Gerundet, weil diese Zahl beim Monatsabschluss zum neuen Startguthaben
      wird und sonst Nachkommastellen ansammelt. */
-  z.kontostand       = runde(z.startBalance + z.kontoEin - z.kontoNotwendig - z.kontoNicht - z.kontoSparen);
+  z.kontostand       = runde(z.startBalance + z.kontoEin - z.kontoNotwendig - z.kontoNicht - z.kontoSparen
+                             - z.abgehoben - z.kontoGeschaeft - z.steuerBezahlt);
   z.imMinus          = z.kontostand < 0;
 
   // Prozente vom Gehalt — auf Basis der Umlage.
@@ -1656,6 +1838,11 @@ function rechne(monat) {
   z.quoteNotwendig = anteil(z.notwendigUmlage);
   z.quoteNicht     = anteil(z.nichtUmlage);   // <- das ist der Konsumopfer-Wert
   z.quoteSpar      = anteil(z.gespart);
+  /* Alles, was diesen Monat wirklich rausgeht — notwendig und Ausnahmen
+     zusammen, mit der echten Abbuchung statt der Umlage. Die Jahres-
+     versicherung zählt also in dem Monat voll, in dem sie abgeht. Das ist
+     die Zahl, die man am Konto spürt. */
+  z.quoteAusgegeben = anteil(z.ausgegebenReal);
 
   /* Die 50%-Grenze in Euro — die Zahl, die der Balken „Notwendig" nur als
      Strich zeigt. Ein Prozentsatz sagt dir nicht, worum es geht; 390 € im
@@ -1703,7 +1890,47 @@ function rechne(monat) {
      Summen oben — die Ausnahmen für die Umleitung). */
   z.sparen = ersparnis(z);
 
+  /* Der Topf fürs Finanzamt und was dir danach bleibt.
+
+     `kontostand` bleibt die echte Zahl auf dem Konto — sie wird beim
+     Monatsabschluss zum Startwert des nächsten Monats. Was davon dem
+     Finanzamt gehört, liegt zwar dort, ist aber nicht deins. `bleibtDir`
+     zieht es ab. Ein Topf unter null heißt: Du hast mehr bezahlt, als du
+     zurückgelegt hattest — das ist schon vom Konto runter, da gibt es
+     nichts mehr abzuziehen. */
+  z.finanzamtTopf = istSelbststaendig() ? finanzamtTopf(z) : 0;
+  z.bleibtDir     = runde(z.kontostand - Math.max(0, z.finanzamtTopf));
+  // Die Zahl, die oben in der Leiste steht.
+  z.stand         = istSelbststaendig() ? z.bleibtDir : z.kontostand;
+  z.standImMinus  = z.stand < 0;
+
   return z;
+}
+
+/* Der Schnitt von „deinem Geld" über die bis zu drei letzten abgeschlossenen
+   Monate vor `monatId`, die selbstständig gerechnet wurden. Monate aus der
+   Zeit als Angestellte zählen nicht: Dort stand das Brutto ohne Steuer-
+   Rücklage, und der Schnitt läge zu hoch. null = noch kein solcher Monat. */
+function schnittVor(monatId) {
+  const monate = STATE.archive
+    .filter(e => String(e.id) < String(monatId) && e.summary && e.summary.modus === "selbststaendig")
+    .sort((a, b) => String(b.id).localeCompare(String(a.id)))
+    .slice(0, 3);
+  if (monate.length === 0) return null;
+  return runde(monate.reduce((s, e) => s + (Number(e.summary.gehalt) || 0), 0) / monate.length);
+}
+
+/* Was im Topf fürs Finanzamt liegt: alles zurückgelegte, minus alles
+   bezahlte — über alle abgeschlossenen Monate plus den laufenden.
+   Der laufende zählt nur, wenn er nicht gerade selbst als Archiv-Monat
+   in Bearbeitung ist (siehe laufenderZaehltExtra). */
+function finanzamtTopf(z) {
+  const alt = STATE.archive.reduce((summe, eintrag) => {
+    const s = eintrag.summary || {};
+    return summe + (Number(s.finanzamt) || 0) - (Number(s.steuerBezahlt) || 0);
+  }, 0);
+  const jetzt = laufenderZaehltExtra() ? z.finanzamt - z.steuerBezahlt : 0;
+  return runde(alt + jetzt);
 }
 
 /* Posten mit derselben Bezeichnung zu einem Eintrag verschmelzen.
@@ -1733,6 +1960,35 @@ function verdiktFuer(quoteNicht) {
   return VERDIKTE.find(v => quoteNicht <= v.grenze) || VERDIKTE[VERDIKTE.length - 1];
 }
 
+/* Das Urteil im Banner: die Ausnahmen-Stufe, aber nur, solange die
+   Gesamtrechnung aufgeht.
+
+   Wenige Ausnahmen sind nur dann ein Grund zum Loben, wenn auch insgesamt
+   genug übrig bleibt. Wer kaum Ausnahmen hat, aber durch Essen und hohe
+   Fixkosten fast alles ausgibt, bekam hier trotzdem die „Steuererklärung".
+
+   Zwei Grenzen, beide aus der 50/30/20-Regel:
+     über 100 %  mehr raus als rein — die letzte Stufe, egal wie die
+                 Ausnahmen stehen
+     über 80 %   weniger als die 20 % fürs Sparen übrig — die Lob-Stufen
+                 fallen weg, es bleibt der Satz von der Kippe */
+/* Woran die Prozente gemessen werden, in Worten. Bei Selbstständigen ist das
+   nicht alles, was reinkam, sondern was nach Steuer und Geschäftskosten
+   bleibt — „dein Geld", wie es auch in der Notwendig-Karte heißt. */
+function basisWort() {
+  return istSelbststaendig() ? "deines Geldes" : "deiner Einnahmen";
+}
+
+function urteilFuer(z) {
+  const v = verdiktFuer(z.quoteNicht);
+  if (z.quoteAusgegeben > 100) return VERDIKTE[VERDIKTE.length - 1];
+  if (z.quoteAusgegeben > 100 - REGEL.sparen && v.stufe < 2) {
+    const kippe = VERDIKTE.find(x => x.stufe === 2);
+    return { ...kippe, sprueche: [kippe.sprueche[kippe.sprueche.length - 1]] };
+  }
+  return v;
+}
+
 /* Die Munition, aus der ein Spruch schöpfen darf.
 
    Das ist der ganze Trick der App: Der Roast benutzt nicht irgendeine
@@ -1745,6 +2001,7 @@ function verdiktFuer(quoteNicht) {
      top       teuerster Ausnahme-Posten { label, betrag, anzahl }
      fix       größte notwendige Ausgabe { label, betrag } — meist die Miete
      summe     alle Ausnahmen zusammen
+     ausgegeben alles, was diesen Monat rausging (notwendig + Ausnahmen)
      jahr      dieselbe Summe aufs Jahr hochgerechnet
      anzahl    Stückzahl aller Ausnahmen (dreimal Sushi = drei)
      prozent   die Quote
@@ -1765,6 +2022,7 @@ function spruchDaten(z) {
     prozent: Math.round(z.quoteNicht),
     gehalt:  z.gehalt,
     summe:   z.nichtUmlage,
+    ausgegeben: z.ausgegebenReal,
     jahr:    z.nichtUmlage * 12,
     gespart: z.gespart,
     puffer:  z.sparen.bisher,
@@ -1839,6 +2097,20 @@ function laufenderZaehltExtra() {
 
 /* Was in einem Monat zurückgelegt wurde. Eine Summe — hier gab es einmal
    zwei, je nach Häkchen am Posten. */
+/* Wie sich das Ersparte auf Rücklage, Investment und Sparziel verteilt —
+   über alle abgeschlossenen Monate plus den laufenden (wenn er nicht gerade
+   selbst als Archiv-Monat offen liegt). Was schon vor der App zurückgelegt
+   war, hat keine Art und steht auf der Karte als eigene Zeile. */
+function sparNachArt() {
+  const teile = { ruecklage: 0, investment: 0, sparziel: 0 };
+  const zaehle = (monat) => ((monat && monat.sparen) || []).forEach(p => {
+    teile[sparArt(p.art)] += Number(p.amount) || 0;
+  });
+  STATE.archive.forEach(e => zaehle(e.snapshot));
+  if (laufenderZaehltExtra()) zaehle(STATE.currentMonth);
+  return teile;
+}
+
 function gespartIn(monat) {
   return summe((monat && monat.sparen) || []);
 }
@@ -2129,6 +2401,10 @@ let affirmationenOffen = false;
    bei jedem getippten Buchstaben zu, denn jede Änderung zeichnet die Karte neu. */
 let sparVerwaltenOffen = false;
 
+/* Und für die Notwendig-Karte. Sie startet zugeklappt und bleibt so, wie du
+   sie zuletzt hinterlassen hast, bis die Seite neu lädt. */
+let notwendigOffen = false;
+
 /* Welcher Archiv-Monat zeigt gerade seine beiden Knöpfe (PDF, bearbeiten)?
 
    Dieselbe Überlegung wie bei den Posten: Zwei Knöpfe an jedem Monat wären
@@ -2152,7 +2428,10 @@ let offenerPosten = null;
    hundertmal neu gezeichnet wird.
 
    Metapher: ein Abreißkalender. Ein Blatt pro Tag, und wer zweimal hinschaut,
-   sieht zweimal dasselbe Blatt. */
+   sieht zweimal dasselbe Blatt.
+
+   Der Tag bestimmt nur, wo es losgeht. Danach blättert die App alle
+   20 Sekunden von selbst weiter, siehe naechsteAffirmation(). */
 function tagesNummer() {
   const jetzt = new Date();
   // Auf Mitternacht setzen, damit die Uhrzeit das Ergebnis nicht verschiebt.
@@ -2185,7 +2464,8 @@ function render() {
      durchgereicht: Drei Karten brauchen ihn, und drei eigene Rechnungen wären
      drei Gelegenheiten, dass sie auseinanderlaufen.
      `zy` ist null, solange kein Zyklus gestartet wurde. */
-  const zy = gehaltszyklus();
+  // Selbstständige haben keinen festen Zahltag: Sie rechnen im Kalendermonat.
+  const zy = istSelbststaendig() ? null : gehaltszyklus();
   renderBearbeitung();
   renderStand(z, zy);
   renderKopf(z);
@@ -2265,7 +2545,10 @@ const MARKE_SVG = `
 function renderStand(z, zy) {
   const chips = [];
   if (!z.keinGehalt) {
-    chips.push(`<span class="stand-chip ${z.regelErreicht ? "" : "chip-warn"}">${Math.round(z.quoteNicht)} % Ausnahmen</span>`);
+    // Wie viel von den Einnahmen schon rausging. Warnfarbe ab der Grenze,
+    // ab der keine 20 % fürs Sparen mehr übrig sind.
+    const eng = z.quoteAusgegeben > 100 - REGEL.sparen;
+    chips.push(`<span class="stand-chip ${eng ? "chip-warn" : ""}">${Math.round(z.quoteAusgegeben)} % ausgegeben</span>`);
   }
   if (zy) {
     chips.push(`<span class="stand-chip">Tag ${zy.tag}/${zy.laenge}</span>`);
@@ -2275,10 +2558,10 @@ function renderStand(z, zy) {
   const label = zy ? "bleibt bis zum nächsten Gehalt" : "bleibt am Monatsende";
 
   document.getElementById("stand").innerHTML = `
-    <div class="stand-leiste ${z.imMinus ? "im-minus" : ""}">
+    <div class="stand-leiste ${z.standImMinus ? "im-minus" : ""}">
       <div class="stand-geld">
         <span class="stand-label">${label}</span>
-        <span class="stand-zahl">${euro(z.kontostand)}</span>
+        <span class="stand-zahl">${euro(z.stand)}</span>
       </div>
       <div class="stand-chips">${chips.join("")}</div>
     </div>
@@ -2297,7 +2580,7 @@ function renderKopf(z) {
         <p class="spruch">Trag erst dein Gehalt ein. Vorher rede ich nicht über deine Ausnahmen.</p>
       </div>`;
   } else {
-    const v = verdiktFuer(z.quoteNicht);
+    const v = urteilFuer(z);
     /* Die Zeile unter dem Spruch: das eigentliche „oh shit".
        Wer arbeitet, bekommt Arbeitsstunden. Wer nicht arbeitet, bekommt den
        Vergleich mit der eigenen größten Rechnung — sonst stünde hier bei jeder
@@ -2319,7 +2602,7 @@ function renderKopf(z) {
     let zeit = "";
     if (std) {
       if (!spruch.includes(std)) {
-        zeit = `<p class="verdikt-zeit">Dafür hast du <strong>${std}</strong> gearbeitet.${tage ? ` Das sind ${tage}.` : ""}</p>`;
+        zeit = `<p class="verdikt-zeit">Für deine Ausnahmen hast du <strong>${std}</strong> gearbeitet.${tage ? ` Das sind ${tage}.` : ""}</p>`;
       }
     } else if (imVerhaeltnis && !spruch.includes(imVerhaeltnis)) {
       zeit = `<p class="verdikt-zeit">Das sind <strong>${imVerhaeltnis}</strong>.</p>`;
@@ -2334,9 +2617,13 @@ function renderKopf(z) {
 
        Der Kontostand braucht das Banner auch nicht: Er steht ohnehin in der
        Leiste ganz oben und ist beim Scrollen immer da. Einmal sichtbar reicht. */
+    /* Die große Zahl ist alles, was diesen Monat rausging. Die Ausnahmen
+       stehen klein darunter: Sie sind ein Teil davon, nicht das Ganze. */
     banner = `
       <div class="verdikt v${v.stufe}">
-        <p class="prozent">${Math.round(z.quoteNicht)}%<small> deines Gehalts für Ausnahmen</small></p>
+        <p class="prozent">${euro(z.ausgegebenReal)}<small> ausgegeben</small></p>
+        <p class="verdikt-anteil"><span>${Math.round(z.quoteAusgegeben)} % ${basisWort()}</span> · <span>${Math.round(z.quoteNicht)} % für Ausnahmen</span></p>
+        ${z.schnitt !== null ? `<p class="verdikt-anteil"><span>Diesen Monat ${euro(z.dieserMonat)}</span> · <span>Schnitt ${euro(z.schnitt)}</span></p>` : ""}
         <p class="spruch">${spruch}</p>
         ${zeit}
       </div>`;
@@ -2397,6 +2684,12 @@ function zyklusKnopf(text) {
 
 function renderZyklus(z, zy) {
   const ziel = document.getElementById("zyklus");
+
+  // Selbstständig: kein „Gehalt ist da", gerechnet wird im Kalendermonat.
+  if (istSelbststaendig()) {
+    ziel.innerHTML = "";
+    return;
+  }
 
   // Noch nie gedrückt: eine Einladung statt geratener Zahlen.
   if (!zy) {
@@ -2488,7 +2781,7 @@ function renderZyklus(z, zy) {
 /* --- 11c. Alle Eingabe-Kategorien --- */
 function renderKategorien(z) {
   document.getElementById("kategorien").innerHTML =
-    KATEGORIEN.map(kat => kategorieHtml(kat, z)).join("");
+    aktiveKategorien().map(kat => kategorieHtml(kat, z)).join("");
 }
 
 // HTML für eine einzelne Kategorie-Karte bauen.
@@ -2524,6 +2817,7 @@ function kategorieHtml(kat, z) {
       ${schalter.text}
     </label>`);
   });
+  if (kat.auswahl === "art") extras.push(sparArtAuswahl("ruecklage", "data-add-art"));
   if (kat.wiederkehrend) {
     // Der Rhythmus wird EINMAL beim Eintragen gewählt und danach nicht mehr
     // angezeigt — sonst stünde in jeder Zeile „monatlich". Ändert sich etwas,
@@ -2543,7 +2837,8 @@ function kategorieHtml(kat, z) {
      automatisch in den nächsten Monat weiter." Dreimal derselbe Satz
      untereinander liest niemand, und beim ersten Monatswechsel sieht man
      es ohnehin. */
-  const hinweis = kat.hinweis ? `<p class="kat-hinweis">${kat.hinweis}</p>` : "";
+  const hinweisText = (istSelbststaendig() && kat.hinweisSelbststaendig) || kat.hinweis;
+  const hinweis = hinweisText ? `<p class="kat-hinweis">${hinweisText}</p>` : "";
 
   // Nur bei den Einnahmen: das Feld für die Wochenstunden, aus dem sich
   // der Stundenlohn und damit die ganze Lebenszeit-Rechnung ergibt.
@@ -2569,6 +2864,7 @@ function kategorieHtml(kat, z) {
       </summary>
 
       <div class="karte-inhalt">
+        ${kat.zeitfeld ? modusHtml() : ""}
         ${hinweis}
 
         <div class="posten-liste">${zeilen}</div>
@@ -2584,6 +2880,42 @@ function kategorieHtml(kat, z) {
         ${zeitfeld}
       </div>
     </details>
+  `;
+}
+
+/* Der Schalter „angestellt | selbstständig" und, im Modus selbstständig,
+   die drei Einstellungen für die Steuer.
+
+   Er sitzt in der Einnahmen-Karte, weil er genau dort etwas ändert: wie viel
+   von dem, was reinkommt, wirklich dir gehört. */
+function modusHtml() {
+  const e = STATE.einstellungen;
+  const knopf = (wert, text) =>
+    `<button type="button" class="modus-knopf ${e.modus === wert ? "aktiv" : ""}" data-modus="${wert}">${text}</button>`;
+
+  const steuer = istSelbststaendig() ? `
+    <div class="modus-steuer">
+      <label class="mini-label">Steuer-Rücklage
+        <input id="steuer-prozent" class="mini-zahl" type="text" inputmode="decimal"
+               value="${alsFeldwert(e.steuerProzent)}" /> %
+      </label>
+      <label class="mini-label">
+        <input id="kleinunternehmerin" type="checkbox" ${e.kleinunternehmerin ? "checked" : ""} />
+        Kleinunternehmerin?
+      </label>
+      ${e.kleinunternehmerin ? "" : `
+      <label class="mini-label">Umsatzsteuer
+        <select id="ust-satz" class="mini-auswahl">
+          <option value="19" ${e.ustSatz === 19 ? "selected" : ""}>19 %</option>
+          <option value="7" ${e.ustSatz === 7 ? "selected" : ""}>7 %</option>
+        </select>
+      </label>`}
+      <p class="feld-hinweis breit">Einnahmen mit „dafür gearbeitet?“ zählen als Geschäftseinnahmen.</p>
+    </div>` : "";
+
+  return `
+    <div class="modus-schalter">${knopf("angestellt", "angestellt")}${knopf("selbststaendig", "selbstständig")}</div>
+    ${steuer}
   `;
 }
 
@@ -2681,6 +3013,10 @@ function postenHtml(kat, p, z) {
       ${schalter.text}
     </label>`);
   });
+
+  if (kat.auswahl === "art") {
+    bedienung.push(sparArtAuswahl(p.art, `data-field="art" data-cat="${kat.key}" data-id="${p.id}"`));
+  }
 
   let intervall = 1;
   if (kat.wiederkehrend) {
@@ -2893,7 +3229,9 @@ function startBlockHtml(z) {
 
   return `
     <div class="konto-block">
-      <div class="beschriftung">Was lag VOR deinem Gehalt auf dem Konto?</div>
+      <div class="beschriftung">${istSelbststaendig()
+        ? "Was lag AM 1. auf dem Konto?"
+        : "Was lag VOR deinem Gehalt auf dem Konto?"}</div>
       <input id="start-guthaben" type="text" inputmode="decimal"
              value="${wert}" placeholder="z.B. 1200" />
       ${hinweis ? `<div class="feld-hinweis">${hinweis}</div>` : ""}
@@ -2922,16 +3260,33 @@ function renderKonto(z, zy) {
   /* Der Bargeld-Block: dieselben drei Spalten wie oben, damit man ihn ohne
      Umgewöhnung liest. Er erscheint nur, wenn es Bargeld gibt.
 
-     Ein negatives Ergebnis ist kein Rechenfehler, sondern ein Hinweis: Dann
-     ist Geld vom Automaten als bar markiert, und das ist längst abgebucht. */
+     Ein negatives Ergebnis heißt: Es wurde mehr bar bezahlt, als in die
+     Tasche kam. Meistens fehlt dann eine Abhebung in der Liste. */
   const bargeldSatz = z.bargeld < 0
-    ? "Mehr bar ausgegeben als bar bekommen — dann steckt da Geld vom Automaten drin. Das ist längst vom Konto runter, nimm das Häkchen dort wieder raus."
+    ? "Mehr bar bezahlt, als in der Tasche war. Trag ein, was du am Automaten geholt hast, unter „10 · Bargeld abgehoben“."
     : "Läuft an deinem Konto vorbei und zählt in den Prozenten oben trotzdem voll mit. Was übrig bleibt, wandert nicht von allein in den nächsten Monat.";
+
+  /* Selbstständig: der Topf fürs Finanzamt. Dieselbe Form wie der
+     Bargeld-Block — eine eigene kleine Kasse unter der Rechnung. */
+  const selbst = istSelbststaendig();
+  const finanzamtBlock = selbst ? `
+      <div class="konto-rechnung bargeld-block finanzamt-block">
+        <div class="bargeld-titel">Fürs Finanzamt zurückgelegt 🧾</div>
+        ${z.ustZahllast > 0 ? zeile("+", "Umsatzsteuer diesen Monat", z.ustZahllast) : ""}
+        ${zeile("+", "Rücklage diesen Monat", z.estRuecklage)}
+        ${z.steuerBezahlt > 0 ? zeile("−", "Steuer bezahlt", z.steuerBezahlt) : ""}
+        <div class="konto-zeile ergebnis">
+          <span class="konto-zeichen">=</span>
+          <span class="konto-text">Im Topf insgesamt</span>
+          <span class="konto-betrag">${euro(z.finanzamtTopf)}</span>
+        </div>
+      </div>` : "";
 
   const bargeldBlock = z.hatBargeld ? `
       <div class="konto-rechnung bargeld-block">
         <div class="bargeld-titel">Bargeld 👛</div>
-        ${zeile("+", "bar bekommen", z.barEin, "positiv")}
+        ${z.barEin > 0 || z.abgehoben === 0 ? zeile("+", "bar bekommen", z.barEin, "positiv") : ""}
+        ${z.abgehoben > 0 ? zeile("+", "vom Konto abgehoben", z.abgehoben, "positiv") : ""}
         ${zeile("−", "bar bezahlt", z.barAus)}
         ${z.barGespart > 0 ? zeile("−", "bar zurückgelegt", z.barGespart) : ""}
         <div class="konto-zeile ergebnis ${z.bargeld < 0 ? "negativ" : ""}">
@@ -2948,18 +3303,32 @@ function renderKonto(z, zy) {
       ${startBlockHtml(z)}
 
       <div class="konto-rechnung">
-        ${zeile("", z.startFehlt ? "Vor dem Gehalt (fehlt noch)" : "Vor dem Gehalt", z.startBalance)}
+        ${zeile("", (selbst ? "Am 1." : "Vor dem Gehalt") + (z.startFehlt ? " (fehlt noch)" : ""), z.startBalance)}
         ${zeile("+", "Einnahmen" + aufsKonto, z.kontoEin, "positiv")}
         ${zeile("−", "Notwendige Ausgaben" + vomKonto, z.kontoNotwendig)}
         ${zeile("−", "Ausnahmen" + vomKonto, z.kontoNicht, "nicht")}
         ${zeile("−", "Gespart" + vomKonto, z.kontoSparen)}
+        ${z.abgehoben > 0 ? zeile("−", "Bargeld abgehoben", z.abgehoben) : ""}
+        ${selbst ? zeile("−", "Geschäftlich" + vomKonto, z.kontoGeschaeft) : ""}
+        ${selbst && z.steuerBezahlt > 0 ? zeile("−", "Steuer bezahlt", z.steuerBezahlt) : ""}
         <div class="konto-zeile ergebnis ${z.imMinus ? "negativ" : ""}">
           <span class="konto-zeichen">=</span>
-          <span class="konto-text">${endeLabel}</span>
+          <span class="konto-text">${selbst ? "Auf dem Konto" : endeLabel}</span>
           <span class="konto-betrag">${euro(z.kontostand)}</span>
         </div>
+        ${selbst ? `
+        ${zeile("−", "gehört dem Finanzamt", Math.max(0, z.finanzamtTopf))}
+        <div class="konto-zeile ergebnis ${z.standImMinus ? "negativ" : ""}">
+          <span class="konto-zeichen">=</span>
+          <span class="konto-text">${endeLabel}</span>
+          <span class="konto-betrag">${euro(z.bleibtDir)}</span>
+        </div>` : ""}
       </div>
 
+      ${selbst && z.offen > 0 ? `
+      <p class="konto-offen">Noch offen: <strong>${euro(z.offen)}</strong>
+        aus ${z.offeneAnzahl === 1 ? "1 Rechnung" : `${z.offeneAnzahl} Rechnungen`}. Zählt erst, wenn das Geld da ist.</p>` : ""}
+      ${finanzamtBlock}
       ${bargeldBlock}
 
       <p class="konto-fussnote"><strong>Vorschau</strong> aufs Monatsende: Hier ist schon abgezogen,
@@ -3168,21 +3537,25 @@ function renderNotwendig(z) {
     `;
   }).join("");
 
-  const summe = `
-    <div class="notwendig-summe">
-      zusammen ${euro(z.notwendigUmlage)}${
-        z.keinGehalt ? "" : ` · ${Math.round(z.quoteNotwendig)}% deines Geldes`}
-    </div>`;
+  /* Die Karte ist zugeklappt, bis du sie öffnest. Im Kopf steht schon die
+     eine Zahl, um die es geht: alles Notwendige zusammen und sein Anteil.
+     Die einzelnen Posten liegen darunter, für den Moment, in dem man
+     wissen will, woraus die Zahl besteht. */
+  const kopfAnteil = z.keinGehalt ? "" : ` · ${Math.round(z.quoteNotwendig)} %`;
 
   ziel.innerHTML = `
-    <h2 class="nr-titel">Was du als notwendig führst</h2>
-    <div class="karte notwendig-karte">
-      <p class="kat-hinweis">Notwendig heißt: geht weg, egal wie der Monat läuft. Hier steht alles, was diese Schublade gerade enthält.</p>
-      ${zeilen}
-      ${summe}
-      ${grenzeHtml(z)}
-      ${haekchenHtml(z)}
-    </div>
+    <details class="karte kat-karte notwendig-karte" ${notwendigOffen ? "open" : ""}>
+      <summary class="karte-kopf">
+        <span class="karte-pfeil" aria-hidden="true">▸</span>
+        <h2 class="karte-titel">Notwendig</h2>
+        <span class="karte-summe notwendig-kopf-summe">${euro(z.notwendigUmlage)}${kopfAnteil}</span>
+      </summary>
+      <div class="karte-inhalt">
+        <p class="kat-hinweis">Notwendig heißt: geht weg, egal wie der Monat läuft. Hier steht alles, was diese Schublade gerade enthält.</p>
+        ${zeilen}
+        ${grenzeHtml(z)}
+      </div>
+    </details>
   `;
 }
 
@@ -3203,15 +3576,10 @@ function grenzeHtml(z) {
 
   const punkte = Math.round(z.quoteNotwendig - REGEL.notwendig);
 
-  // Unter der Grenze: die Luft, die bleibt, und ein Bild dafür. Sonst nichts.
-  if (z.ueberNotwendig <= 0) {
-    return `
-      <div class="notwendig-fazit gut">
-        <div class="fazit-titel">Unter der Grenze</div>
-        <div class="fazit-zahl">${euro(z.notwendigGrenze - z.notwendigUmlage)} Luft im Monat</div>
-        <p>Genau die federt eine kaputte Waschmaschine ab.</p>
-      </div>`;
-  }
+  /* Unter der Grenze steht hier nichts. Hier stand einmal ein Block „Unter
+     der Grenze, X € Luft im Monat" — eine Antwort auf eine Frage, die an
+     dieser Stelle niemand stellt. Gemeldet wird nur, wenn es eng wird. */
+  if (z.ueberNotwendig <= 0) return "";
 
   /* Hier stand ein zweiter Satz: „und dein Notgroschen-Ziel läge X niedriger".
      Den Notgroschen rechnet die App nicht mehr aus, also gibt es auch kein
@@ -3221,34 +3589,6 @@ function grenzeHtml(z) {
       <div class="fazit-titel">${punkte} ${punkte === 1 ? "Punkt" : "Punkte"} über der Grenze</div>
       <div class="fazit-zahl">${euro(z.ueberNotwendig)} im Monat<small>${euro(z.ueberNotwendig * 12)} im Jahr</small></div>
       <p>Bei 50% wäre das Geld frei.</p>
-    </div>
-  `;
-}
-
-/* Der Häkchen-Block: was passiert, wenn du eins zurücknimmst.
-
-   Die ehrliche Pointe steht am Ende — am Geld ändert ein Häkchen nichts. Es
-   verschiebt den Betrag nur von einer Spalte in die andere. Die App darf hier
-   keine Verbesserung suggerieren, die keine ist: Ohne den letzten Satz läse
-   sich „Notwendig fiele auf 58%" wie ein Gewinn. */
-function haekchenHtml(z) {
-  const angehakt = z.notwendige.filter(n => n.selbstMarkiert);
-  if (angehakt.length === 0 || z.keinGehalt) return "";
-
-  // Was wäre, wenn alle Häkchen fielen? Die Posten wandern in die Ausnahmen.
-  const ohneNotwendig = ((z.notwendigUmlage - z.notwendigSelbst) / z.gehalt) * 100;
-  const mitAusnahmen  = ((z.nichtUmlage + z.notwendigSelbst) / z.gehalt) * 100;
-
-  const wieViele = angehakt.length === 1
-    ? "Einen Eintrag"
-    : `${angehakt.length} Einträge`;
-
-  return `
-    <div class="notwendig-haken">
-      <div class="fazit-titel">${wieViele} hast du selbst angehakt</div>
-      <div class="fazit-zahl">${euro(z.notwendigSelbst)} im Monat</div>
-      <p>Ohne die Häkchen: Notwendig ${Math.round(ohneNotwendig)}%,
-        Ausnahmen ${Math.round(mitAusnahmen)}%. Am Geld ändert das nichts.</p>
     </div>
   `;
 }
@@ -3310,7 +3650,11 @@ function markeHtml(m, sp) {
     satz = `Es fehlen ${euro(m.fehlt)} — so wie bisher bist du im ${monatLesbar(m.ankunft)} da.`;
   }
 
-  /* Der Wunschtermin, falls einer gesetzt ist. Er steht als eigener Satz
+  /* Der Wunschtermin steht direkt an der Marke und lässt sich dort ändern.
+     Er lag einmal in „Ziele und Erspartes von früher" — zugeklappt, und damit
+     so gut versteckt, dass man ihn nicht wiederfand.
+
+     Ist einer gesetzt, steht darüber ein eigener Satz,
      darunter, weil er etwas anderes misst als die Ankunft: nicht „wann komme
      ich an", sondern „reicht das, was ich tue, für meinen eigenen Termin". */
   let terminSatz = "";
@@ -3337,6 +3681,7 @@ function markeHtml(m, sp) {
       </div>
       <p class="spar-marke-satz">${Math.round(m.quote)}% · ${satz}</p>
       ${terminSatz}
+      ${m.id ? `<label class="mini-label spar-marke-terminwahl">bis ${terminAuswahl(m.id, m.termin || "")}</label>` : ""}
     </div>`;
 }
 
@@ -3356,9 +3701,6 @@ function sparVerwaltungHtml(sp) {
              value="${alsFeldwert(zi.betrag)}" />
       <button type="button" class="del" data-ziel-weg="${escapeAttr(zi.id)}"
               title="Ziel löschen">✕</button>
-      <label class="mini-label ziel-termin">bis
-        ${terminAuswahl(zi.id, zi.termin || "")}
-      </label>
     </div>`).join("");
 
   return `
@@ -3372,6 +3714,20 @@ function sparVerwaltungHtml(sp) {
       </label>
       <p class="feld-hinweis breit">Was auf dem Tagesgeldkonto oder unterm Kopfkissen liegt.</p>
     </details>`;
+}
+
+/* Die Aufteilung unter der großen Summe: eine Zeile pro Art, nur für Arten,
+   in denen etwas liegt. */
+function sparArtenHtml(sp) {
+  const teile = sparNachArt();
+  const zeilen = SPAR_ARTEN
+    .filter(a => teile[a.wert] > 0)
+    .map(a => ({ text: a.text, betrag: teile[a.wert] }));
+  if (sp.start > 0) zeilen.push({ text: "von früher", betrag: sp.start });
+  if (zeilen.length === 0) return "";
+  return `<div class="spar-arten">${zeilen.map(t => `
+    <div class="spar-art"><span>${t.text}</span><strong>${euro(t.betrag)}</strong></div>`).join("")}
+  </div>`;
 }
 
 function renderSparen(z) {
@@ -3405,6 +3761,7 @@ function renderSparen(z) {
       <div class="spar-summe">${euro(sp.bisher)}</div>
       <div class="spar-unter">liegt zusammen auf der hohen Kante${
         sp.rate > 0 ? ` · ${euro(sp.rate)} im Monat` : ""}</div>
+      ${sparArtenHtml(sp)}
 
       <div class="spar-marken">${markenBlock}</div>
       ${umleitung}
@@ -3549,7 +3906,6 @@ function renderAffirmation() {
   const kopf = `
     <p class="affirmation-satz">${escapeAttr(a.text)}</p>
     <div class="affirmation-fuss">
-      <button id="btn-affirmation-weiter" class="affirmation-weiter">nächster Satz ↻</button>
       <span class="affirmation-zaehler">${a.nummer} von ${a.gesamt}</span>
     </div>`;
 
@@ -3828,6 +4184,8 @@ document.addEventListener("change", (e) => {
     if (field === "gearbeitet") posten.gearbeitet = e.target.checked;
     if (field === "fuersZiel")  posten.fuersZiel  = e.target.checked;
     if (field === "bar")        posten.bar        = e.target.checked;
+    if (field === "offen")      posten.offen      = e.target.checked;
+    if (field === "art")        posten.art        = sparArt(e.target.value);
 
     speichern();
     render();
@@ -3840,6 +4198,27 @@ document.addEventListener("change", (e) => {
      betragAusText(): Es gibt für leere Eingaben null zurück. */
   if (e.target.id === "start-guthaben") {
     STATE.currentMonth.startBalance = betragAusText(e.target.value);
+    speichern();
+    render();
+    return;
+  }
+
+  // Selbstständig: die drei Steuer-Einstellungen.
+  if (e.target.id === "steuer-prozent") {
+    const wert = betragAusText(e.target.value);
+    STATE.einstellungen.steuerProzent = Math.min(100, Math.max(0, wert === null ? 30 : wert));
+    speichern();
+    render();
+    return;
+  }
+  if (e.target.id === "kleinunternehmerin") {
+    STATE.einstellungen.kleinunternehmerin = e.target.checked;
+    speichern();
+    render();
+    return;
+  }
+  if (e.target.id === "ust-satz") {
+    STATE.einstellungen.ustSatz = Number(e.target.value) === 7 ? 7 : 19;
     speichern();
     render();
     return;
@@ -3901,6 +4280,11 @@ document.addEventListener("toggle", (e) => {
     return;
   }
 
+  if (e.target.classList && e.target.classList.contains("notwendig-karte")) {
+    notwendigOffen = e.target.open;
+    return;
+  }
+
   const karte = e.target.closest && e.target.closest("[data-kat]");
   if (!karte) return;
 
@@ -3929,6 +4313,15 @@ document.addEventListener("toggle", (e) => {
 
 // Klicks: Löschen, Pause, Hilfe-Knopf, Willkommens-Fenster schließen
 document.addEventListener("click", (e) => {
+  // Angestellt oder selbstständig.
+  const modusKnopf = e.target.closest("[data-modus]");
+  if (modusKnopf) {
+    STATE.einstellungen.modus = modusKnopf.dataset.modus === "selbststaendig" ? "selbststaendig" : "angestellt";
+    speichern();
+    render();
+    return;
+  }
+
   /* Welcher Posten zeigt seine Bedienelemente? Der, den man gerade angetippt
      hat — und nur der. Umgeschaltet wird direkt im DOM statt über render():
      Neuzeichnen würde den Cursor aus dem angetippten Eingabefeld werfen.
@@ -3959,6 +4352,10 @@ document.addEventListener("click", (e) => {
      klappte den Bereich unter dem Finger wieder zu. */
   const sparKopf = e.target.closest(".spar-verwalten > summary");
   if (sparKopf) sparVerwaltenOffen = !sparKopf.parentElement.open;
+
+  // Dasselbe für die Notwendig-Karte.
+  const notwendigKopf = e.target.closest(".notwendig-karte > summary");
+  if (notwendigKopf) notwendigOffen = !notwendigKopf.parentElement.open;
 
   const box = e.target.closest("[data-posten]");
   const neuOffen = box ? box.dataset.posten : null;
@@ -4111,13 +4508,6 @@ document.addEventListener("click", (e) => {
     return;
   }
 
-  // Einen Satz weiterblättern. Nur eine Anzeige-Sache, deshalb nichts speichern.
-  if (e.target.closest("#btn-affirmation-weiter")) {
-    affirmationOffset++;
-    renderAffirmation();
-    return;
-  }
-
   // Einen deiner eigenen Sätze löschen. Die 111 aus dem Programm stehen fest.
   const weg = e.target.closest("[data-affirmation-weg]");
   if (weg) {
@@ -4220,6 +4610,10 @@ document.addEventListener("submit", (e) => {
     const feld = form.querySelector(`[data-add-schalter="${schalter.feld}"]`);
     posten[schalter.feld] = feld ? feld.checked : false;
   });
+  if (kat.auswahl === "art") {
+    const aFeld = form.querySelector("[data-add-art]");
+    posten.art = sparArt(aFeld && aFeld.value);
+  }
   if (kat.wiederkehrend) {
     const rFeld = form.querySelector("[data-add-rhythmus]");
     posten.rhythmus = (rFeld && INTERVALL[rFeld.value]) ? rFeld.value : "monatlich";
@@ -4257,7 +4651,10 @@ document.addEventListener("submit", (e) => {
    vergisst — und das fiele erst Monate später auf. */
 function summaryAus(z, zu) {
   return {
-    gehalt: z.gehalt,
+    // Das Geld DIESES Monats, nie der Schnitt — sonst flösse der Schnitt
+    // beim nächsten Monat in sich selbst zurück.
+    gehalt: z.dieserMonat,
+    modus: STATE.einstellungen.modus,
     notwendig: z.notwendigUmlage,
     nicht: z.nichtUmlage,
     gespart: z.gespart,
@@ -4272,6 +4669,10 @@ function summaryAus(z, zu) {
        durchrechnen. */
     zuflussSumme: zu.summe,
     zuflussAnzahl: zu.anzahl,
+    // Selbstständig: was diesen Monat in den Topf fürs Finanzamt ging und
+    // was daraus bezahlt wurde. Bei Angestellten beides 0.
+    finanzamt: z.finanzamt,
+    steuerBezahlt: z.steuerBezahlt,
   };
 }
 
@@ -4428,16 +4829,19 @@ function renderBericht(z, monat) {
     `<tr><th>${was}</th><td class="${klasse || ""}">${euro(betrag)}</td></tr>`;
 
   // Nur zeigen, wenn ein Teil des Geldes wirklich erarbeitet wurde.
-  const erarbeitet = (z.arbeitsEinkommen > 0 && z.arbeitsEinkommen < z.gehalt)
+  const erarbeitet = (!istSelbststaendig() && z.arbeitsEinkommen > 0 && z.arbeitsEinkommen < z.gehalt)
     ? zeile("davon erarbeitet", z.arbeitsEinkommen)
     : "";
 
   // Das Urteil oben. Ohne Einnahmen gibt es keins.
-  const v = z.keinGehalt ? null : verdiktFuer(z.quoteNicht);
+  /* Dasselbe Urteil wie im Banner der App: Lob nur, wenn die Gesamtrechnung
+     aufgeht. Und dieselbe große Zahl — alles, was rausging —, damit der
+     Spruch zu dem passt, was darüber steht. */
+  const v = z.keinGehalt ? null : urteilFuer(z);
   const verdikt = v
     ? `<div class="bericht-verdikt v${v.stufe}">
-         <div class="bericht-prozent">${Math.round(z.quoteNicht)}%</div>
-         <div class="bericht-prozent-unter">deines Geldes für Ausnahmen</div>
+         <div class="bericht-prozent">${euro(z.ausgegebenReal)}</div>
+         <div class="bericht-prozent-unter">ausgegeben · ${Math.round(z.quoteAusgegeben)} % ${basisWort()} · ${Math.round(z.quoteNicht)} % für Ausnahmen</div>
          <p class="bericht-spruch">${spruchFuer(v, monat.id, spruchDaten(z))}</p>
        </div>`
     : `<div class="bericht-verdikt v-neutral">
@@ -4549,7 +4953,9 @@ function renderBericht(z, monat) {
 
     <h2 class="bericht-titel">Die Zahlen</h2>
     <table class="bericht-tabelle gross">
-      ${zeile("Einnahmen gesamt", z.gehalt)}
+      ${zeile("Einnahmen gesamt", z.einnahmen)}
+      ${istSelbststaendig() ? zeile("Geschäftlich", z.geschaeftlich) : ""}
+      ${istSelbststaendig() ? zeile("Fürs Finanzamt zurückgelegt", z.finanzamt) : ""}
       ${erarbeitet}
       ${zeile("Notwendige Ausgaben", z.notwendigUmlage)}
       ${zeile("Ausnahmen", z.nichtUmlage, "wert-nicht")}
@@ -4639,3 +5045,25 @@ startwerteFestschreiben();
 // denn dort werden die Startwerte der alten Kette überhaupt erst gesetzt.
 gehaltsHaekchenAufloesen();
 render();
+
+/* Die Affirmation blättert von selbst weiter. Ausgetauscht werden nur Satz
+   und Zähler, die Seite wird dafür NICHT neu gezeichnet — ein render() würde
+   dir sonst alle 20 Sekunden den Cursor aus dem Feld werfen, in dem du
+   gerade tippst. Der Satz blendet kurz aus und mit dem neuen wieder ein. */
+const AFFIRMATION_TAKT_MS = 20000;
+const AFFIRMATION_BLENDE_MS = 400;   // muss zur transition in styles.css passen
+
+function naechsteAffirmation() {
+  affirmationOffset++;
+  const satz = document.querySelector(".affirmation-satz");
+  const zaehler = document.querySelector(".affirmation-zaehler");
+  if (!satz) return;
+  satz.classList.add("ausgeblendet");
+  setTimeout(() => {
+    const a = aktuelleAffirmation();
+    satz.textContent = a.text;
+    if (zaehler) zaehler.textContent = `${a.nummer} von ${a.gesamt}`;
+    satz.classList.remove("ausgeblendet");
+  }, AFFIRMATION_BLENDE_MS);
+}
+setInterval(naechsteAffirmation, AFFIRMATION_TAKT_MS);

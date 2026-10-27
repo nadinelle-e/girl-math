@@ -27,9 +27,16 @@ Beim ersten Besuch erklärt dir ein kurzes Fenster den Ablauf. Später kommst du
    Netflix = nein.
 4. **Versicherungen** — genauso mit „notwendig?"-Schalter, damit du siehst,
    was davon wirklich sein muss.
-5. **Einkauf** in Lebensmittel (notwendig) und Ausnahmen (Sushi, Snacks).
+5. **Einkauf** in Alltag (notwendig: Lebensmittel, Putzmittel, Drogerie) und
+   Ausnahmen (Sushi, Snacks). Ein gemischter Einkauf wird auf beide aufgeteilt.
 6. **Große Ausnahmen** (Klamotten & alles nicht Lebensnotwendige).
-7. **Sparen** (was du zur Seite legst).
+7. **Einmalig** — wichtig, aber nur einmal (Domain, Mitgliedschaft für einen
+   Monat). Mit Häkchen „notwendig?" zählt es als notwendig, ohne als Ausnahme.
+8. **Sparen** (was du zur Seite legst), jeweils als **Rücklage**, **Investment**
+   oder **Sparziel**. Die Spar-Karte zeigt die Summe und darunter die Aufteilung.
+   **Bargeld abgehoben** — was du am Automaten holst. Das Geld wandert vom Konto
+   in die Tasche und zählt in keinem Prozent. Gezählt wird erst, was du damit
+   bar bezahlst (Häkchen „bar bezahlt?" am Posten).
 8. **Kontostand zu Beginn des Monats** eintragen: was auf dem Konto lag, bevor
    Gehalt und Ausgaben dieses Monats kamen. Alles Weitere rechnet die App und
    zeigt die Rechnung Zeile für Zeile.
@@ -46,7 +53,7 @@ Ganz oben klebt eine schmale Leiste, die beim Scrollen **immer sichtbar** bleibt
 Darin stehen beide Zahlen, die zusammen erst ein Bild ergeben:
 
 - **Der Kontostand** sagt, **ob** überhaupt noch Geld da ist.
-- **Die Prozente** sagen, **wofür** es weggeht.
+- **Die Prozente** sagen, wie viel deiner Einnahmen **schon rausging**.
 
 Keine der beiden ersetzt die andere, und genau daran ist die App vorher
 gescheitert: Man konnte tadellos unter 30 % Ausnahmen liegen und trotzdem im
@@ -54,9 +61,15 @@ Minus stehen — Miete, Versicherungen und Rücklagen räumen ein Konto leer, oh
 dass eine einzige Ausnahme dabei ist. Oben stand dann ein grünes „Spar-Königin",
 und vom Minus erfuhr man erst nach dreimal Scrollen.
 
-Jetzt wird die Leiste rot, sobald der Kontostand unter null geht. Mehr passiert
-nicht, und das ist Absicht: Das Banner darunter urteilt weiter **nur** über die
-Ausnahmen und bleibt schlicht.
+Jetzt wird die Leiste rot, sobald der Kontostand unter null geht. Der Chip
+daneben zeigt, wie viel Prozent deiner Einnahmen ausgegeben sind, und warnt ab
+80 % — dann bleiben keine 20 % fürs Sparen.
+
+Das Banner darunter zeigt als große Zahl **alles, was diesen Monat rausging**,
+notwendig und Ausnahmen zusammen. Die Ausnahmen-Prozente stehen klein darunter.
+Gelobt wird nur, wenn die Gesamtrechnung aufgeht: Über 80 % Ausgaben gibt es
+kein Lob, über 100 % kommt die letzte Stufe, egal wie wenig Ausnahmen dabei
+waren. Der Monatsbericht im Archiv urteilt genauso.
 
 Eine Zeit lang stand der Kontostand zusätzlich im Banner, mit rotem Rahmen und
 eigenem Kasten. Das war zu viel auf einmal — vier Blöcke übereinander, und man
@@ -72,6 +85,34 @@ Wichtig dabei: Diese Zahl ist eine **Vorschau aufs Ende des Zeitraums**. Alles,
 was diesen Monat noch abgebucht wird, ist darin schon abgezogen. Deine
 Banking-App zeigt heute deshalb etwas anderes — das ist kein Fehler, sondern ein
 anderer Zeitpunkt.
+
+## Angestellt oder selbstständig
+
+Oben in der Karte **Einnahmen** sitzt ein Schalter: **angestellt | selbstständig**.
+Angestellt ist voreingestellt und rechnet wie immer. Selbstständig schaltet frei:
+
+- **Steuer-Rücklage** (voreingestellt 30 % vom Gewinn, änderbar) und, wer keine
+  Kleinunternehmerin ist, die **Umsatzsteuer** (19 % oder 7 %). Als
+  Geschäftseinnahmen zählen die Einnahmen mit „dafür gearbeitet?"; Kindergeld
+  oder Geschenke bleiben unversteuert.
+- **11 · Geschäftlich 💼** für Betriebsausgaben. Sie mindern den Gewinn und die
+  Umsatzsteuer (Vorsteuer) und zählen weder als Ausnahme noch als notwendig.
+- **12 · Steuer bezahlt 🧾** für Vorauszahlungen und Nachzahlungen. Geht vom Konto
+  und aus dem Topf ab, zählt aber nicht als Ausgabe.
+- Die Kontostand-Karte zeigt, was **auf dem Konto** liegt, zieht ab, was **dem
+  Finanzamt gehört**, und zeigt, was **dir bleibt**. Darunter der Topf **„Fürs
+  Finanzamt zurückgelegt"** über alle Monate. Die Leiste oben zeigt, was dir bleibt.
+- **„noch offen?"** an jeder Einnahme: Eine geschriebene, noch nicht bezahlte
+  Rechnung zählt nirgends mit, steht als „Noch offen" in der Kontostand-Karte
+  und wandert beim Monatsabschluss mit.
+- Die Prozente messen sich an **deinem Geld** (Einnahmen minus Geschäftliches
+  und Finanzamt), und zwar am **Schnitt der letzten drei abgeschlossenen
+  Monate**. Das Banner nennt beides: diesen Monat und den Schnitt.
+- Gerechnet wird im **Kalendermonat**, die Karte „Gehalt ist da" entfällt.
+- Bei den Versicherungen steht der Hinweis auf Krankenkasse und Altersvorsorge.
+
+Zurück auf „angestellt" gestellt, bleiben alle Einträge gespeichert und zählen
+nur so lange nicht mit.
 
 ## Dein Gehaltszyklus
 
@@ -160,7 +201,8 @@ Hast du schon etwas zurückgelegt, trag es einmal unter **„Schon vorhanden"** 
 Alles, was du danach in der App unter „Sparen" einträgst, kommt automatisch obendrauf.
 
 **Sparziel.** Eine Sache, auf die du zusparst: eine Reise, ein Führerschein, ein
-Umzug. Du trägst ein, was sie kostet, und optional bis wann. Daraus rechnet die
+Umzug. Du trägst ein, was sie kostet, und optional bis wann. Den Termin änderst
+du direkt am Ziel in der Spar-Karte, über die Auswahl **„bis"**. Daraus rechnet die
 App zwei Daten aus, und der Abstand zwischen ihnen ist der eigentliche Punkt:
 
 - **Wann du ankommst**, wenn du weitermachst wie bisher.
@@ -225,9 +267,8 @@ wenn es wirklich auf dein Konto gekommen ist. Hier unten ist es kein Geld, sonde
 ein Moment.
 
 **Affirmationen.** Ganz unten steht ein Satz, der nichts von dir will: keine
-Prozente, kein Vergleich, kein Urteil. Er wechselt einmal am Tag von allein, und
-über **nächster Satz ↻** blätterst du weiter, wenn du mehr willst. Am nächsten Tag
-steht wieder der Satz des Tages da.
+Prozente, kein Vergleich, kein Urteil. Er wechselt **alle 20 Sekunden von
+selbst**, mit einem weichen Überblenden. Wo er beginnt, hängt am Tag.
 
 111 Wohlstands-Affirmationen liegen von Anfang an drin, und sie mischen zwei
 Tonlagen. Die eine besitzt: „Ich bin reich", „Mein Konto ist immer gedeckt". Die

@@ -255,6 +255,20 @@ body.modal-offen { overflow: hidden; }
   letter-spacing: -1px;
 }
 .verdikt .prozent small { font-size: 17px; font-weight: 700; opacity: 0.92; letter-spacing: 0; }
+/* Die Zeile unter der großen Zahl: Anteil an den Einnahmen und der Teil
+   davon, der auf Ausnahmen fiel. */
+.verdikt-anteil {
+  font-size: 14px;
+  font-weight: 700;
+  opacity: 0.92;
+  margin: 6px 0 0;
+}
+/* Jede Hälfte bleibt am Stück. Bricht die Zeile, dann am Punkt dazwischen. */
+.verdikt-anteil span { white-space: nowrap; }
+
+/* Im Kopf der Notwendig-Karte gibt es keine Anzahl, die die Summe nach
+   rechts schiebt. Das übernimmt sie selbst. */
+.notwendig-kopf-summe { margin-left: auto; white-space: nowrap; }
 .verdikt .spruch {
   font-size: 17px;
   font-weight: 700;
@@ -1412,19 +1426,9 @@ body.bearbeitung-offen .archiv-weg { display: none; }
   color: var(--braun-weich);
 }
 
-.notwendig-summe {
-  text-align: right;
-  font-weight: 900;
-  font-size: 15px;
-  margin-top: 10px;
-  padding-top: 9px;
-  border-top: 1px solid var(--linie);
-}
-
-/* Die Blöcke unter der Summe. Drei Zustände, drei Farben — man soll schon
-   an der Kante sehen, ob es hier eng wird oder nicht. */
-.notwendig-fazit,
-.notwendig-haken {
+/* Der Block unter den Posten. Er erscheint nur, wenn es eng wird (rot) oder
+   noch keine Einnahmen drinstehen (ruhig). */
+.notwendig-fazit {
   margin-top: 14px;
   padding: 12px 14px;
   border-radius: var(--radius-klein);
@@ -1432,15 +1436,11 @@ body.bearbeitung-offen .archiv-weg { display: none; }
   font-size: 13px;
   line-height: 1.55;
 }
-.notwendig-fazit p,
-.notwendig-haken p { margin: 8px 0 0; }
-.notwendig-fazit p:first-of-type,
-.notwendig-haken p:first-of-type { margin-top: 6px; }
+.notwendig-fazit p { margin: 8px 0 0; }
+.notwendig-fazit p:first-of-type { margin-top: 6px; }
 
 .notwendig-fazit.warnung { border-left: 4px solid var(--rot); }
-.notwendig-fazit.gut     { border-left: 4px solid var(--gruen); }
 .notwendig-fazit.ruhig   { color: var(--braun-weich); }
-.notwendig-haken         { border-left: 4px solid var(--pink); }
 
 .fazit-titel {
   font-weight: 900;
@@ -1467,10 +1467,7 @@ body.bearbeitung-offen .archiv-weg { display: none; }
   margin-top: 1px;
 }
 .notwendig-fazit.warnung .fazit-zahl { color: var(--rot); }
-.notwendig-fazit.gut .fazit-zahl     { color: var(--gruen); }
-.notwendig-haken .fazit-zahl         { color: var(--pink); }
 .notwendig-fazit.warnung .fazit-titel { color: var(--rot); }
-.notwendig-haken .fazit-titel         { color: var(--pink); }
 
 /* ============================================================
    Gespart — eine Summe, und die Marken, an denen sie sich misst.
@@ -2084,7 +2081,11 @@ body.bearbeitung-offen .archiv-weg { display: none; }
   padding: 30px 22px 20px;
 }
 
+/* Beim automatischen Weiterblättern blendet der Satz kurz aus und wieder
+   ein (0,4 s, siehe AFFIRMATION_BLENDE_MS in app.js). */
+.affirmation-satz.ausgeblendet { opacity: 0; }
 .affirmation-satz {
+  transition: opacity 0.4s ease;
   font-family: Georgia, "Iowan Old Style", "Times New Roman", serif;
   font-size: 22px;
   font-style: italic;
@@ -2095,7 +2096,7 @@ body.bearbeitung-offen .archiv-weg { display: none; }
   text-wrap: balance;       /* verteilt die Wörter gleichmäßig auf die Zeilen */
 }
 
-/* Die Zeile unter dem Satz: weiterblättern links, Zähler rechts. */
+/* Die Zeile unter dem Satz: der Zähler. */
 .affirmation-fuss {
   display: flex;
   align-items: center;
@@ -2103,24 +2104,6 @@ body.bearbeitung-offen .archiv-weg { display: none; }
   gap: 14px;
   margin-top: 18px;
   flex-wrap: wrap;
-}
-
-/* Der Blätter-Knopf ist absichtlich leiser als die übrigen Knöpfe —
-   er soll da sein, aber nicht vom Satz ablenken. */
-.affirmation-weiter {
-  border: 1px solid var(--linie);
-  background: var(--karte);
-  color: var(--braun-weich);
-  font-family: inherit;
-  font-size: 13px;
-  font-weight: 700;
-  padding: 7px 14px;
-  border-radius: 999px;
-  cursor: pointer;
-}
-.affirmation-weiter:hover {
-  border-color: var(--pink);
-  color: var(--pink);
 }
 
 .affirmation-zaehler {
@@ -2208,3 +2191,72 @@ body.bearbeitung-offen .archiv-weg { display: none; }
   .stand-zahl { font-size: 19px; }
   .stand-chip { font-size: 11px; padding: 2px 8px; }
 }
+
+/* ============================================================
+   Angestellt | selbstständig — der Schalter in der Einnahmen-Karte
+
+   Zwei Knöpfe nebeneinander, der gewählte ist gefüllt. Darunter, nur im
+   Modus selbstständig, die Steuer-Einstellungen in derselben kleinen
+   Form wie das Wochenstunden-Feld.
+   ============================================================ */
+.modus-schalter {
+  display: inline-flex;
+  border: 1px solid var(--linie);
+  border-radius: 999px;
+  padding: 3px;
+  margin: 4px 0 10px;
+  background: var(--feld);
+}
+.modus-knopf {
+  border: none;
+  background: transparent;
+  border-radius: 999px;
+  padding: 6px 14px;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--braun-weich);
+  cursor: pointer;
+}
+.modus-knopf.aktiv {
+  background: var(--pink);
+  color: #fff;
+}
+.modus-steuer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+  margin-bottom: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px dashed var(--linie);
+}
+
+/* Selbstständig: geschriebene Rechnungen, deren Geld noch nicht da ist. */
+.konto-offen {
+  margin: 12px 0 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--braun-weich);
+}
+.konto-offen strong { color: var(--braun); }
+
+/* Gespart: die Aufteilung unter der großen Summe — Rücklage, Investment,
+   Sparziel, von früher. Leise, damit die Summe darüber die Zahl bleibt. */
+.spar-arten {
+  margin: 10px 0 4px;
+  padding: 8px 12px;
+  background: var(--creme);
+  border-radius: var(--radius-klein);
+}
+.spar-art {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  padding: 3px 0;
+  color: var(--braun-weich);
+}
+.spar-art strong { color: var(--braun); }
+
+/* Der Wunschtermin direkt an der Marke. */
+.spar-marke-terminwahl { margin-top: 6px; }
